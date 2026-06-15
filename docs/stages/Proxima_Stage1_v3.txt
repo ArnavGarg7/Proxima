@@ -1,0 +1,984 @@
+╔══════════════════════════════════════════════════════════════════════╗
+║         PROXIMA v4.1 — ANTIGRAVITY BUILD PROMPT                     ║
+║                  STAGE 1: FOUNDATION                                ║
+║  Scaffold · RS256 Auth · 22 Tables · ModelRegistry · CI/CD · Tests  ║
+║  Source of truth: Proxima_v4_PRD_v2.md                              ║
+║  Engineered by Arnav Garg                                           ║
+╚══════════════════════════════════════════════════════════════════════╝
+
+STAGE 1 GOAL
+════════════
+Build the complete, correctly structured foundation that all subsequent
+stages extend. Every architectural decision here is final — later stages
+cannot retroactively fix structural mistakes.
+
+By end of Stage 1:
+  ✓ Full project scaffold with correct file structure
+  ✓ Google OAuth 2.0 with PKCE + state + refresh rotation + revocation
+  ✓ RS256 JWT (4096-bit RSA, asymmetric — NOT HS256)
+  ✓ PostgreSQL: all 22 tables created with embedding versioning fields
+  ✓ pgvector extension + IVFFlat indexes
+  ✓ ModelRegistry abstraction (NO hardcoded model strings anywhere)
+  ✓ Celery app skeleton (4 queues defined)
+  ✓ All 10 routes (8 stubs, landing + workspace real)
+  ✓ Navbar with auth state
+  ✓ Landing page (static — Three.js added Stage 4)
+  ✓ Workspace: upload + textarea + streaming via ModelRegistry
+  ✓ /api/health working
+  ✓ Admin role guard middleware
+  ✓ CI/CD: GitHub Actions (lint + test + build)
+  ✓ Testing infrastructure: pytest + vitest + playwright installed + skeleton tests
+
+DO NOT build: animations, domain detection, confidence scoring, RAG,
+real Celery tasks, admin UI, knowledge base. Foundation only.
+
+═══════════════════════════════════════════════════════════════════════
+TECH STACK (exact versions)
+═══════════════════════════════════════════════════════════════════════
+
+FRONTEND:
+  react@18, react-dom@18, typescript, vite@5
+  tailwindcss@3, @tailwindcss/forms
+  zustand@4, react-router-dom@6
+  @tanstack/react-query@5, axios
+  framer-motion@11
+  # Testing
+  vitest@1, @vitest/coverage-v8
+  @testing-library/react, @testing-library/user-event
+  @playwright/test@1.44
+
+BACKEND:
+  fastapi==0.111.0
+  uvicorn[standard]==0.30.0
+  sqlalchemy[asyncio]==2.0.30
+  asyncpg==0.29.0
+  alembic==1.13.1
+  aioredis==2.0.1
+  python-jose[cryptography]==3.3.0
+  cryptography==42.0.8
+  authlib==1.3.0
+  httpx==0.27.0
+  google-generativeai==0.7.2
+  openai==1.30.0            ← for ModelRegistry multi-provider support
+  anthropic==0.28.0         ← for ModelRegistry multi-provider support
+  python-dotenv==1.0.1
+  python-multipart==0.0.9
+  structlog==24.2.0
+  slowapi==0.1.9
+  pydantic==2.7.1
+  pydantic-settings==2.3.1
+  celery[redis]==5.4.0
+  pgvector==0.3.2
+  numpy==1.26.4
+  scipy==1.13.1
+  PyMuPDF==1.24.5
+  pytesseract==0.3.10
+  python-docx==1.1.2
+  weasyprint==62.1
+  bleach==6.1.0
+  boto3==1.34.131
+  sentry-sdk[fastapi]==2.6.0
+  apscheduler==3.10.4
+  # Testing
+  pytest==8.2.2
+  pytest-asyncio==0.23.7
+  pytest-cov==5.0.0
+  httpx==0.27.0             ← also used for test client
+
+═══════════════════════════════════════════════════════════════════════
+COMPLETE FILE STRUCTURE
+═══════════════════════════════════════════════════════════════════════
+
+proxima/
+├── .github/
+│   └── workflows/
+│       └── ci.yml                  ← CI/CD pipeline
+├── frontend/
+│   ├── index.html
+│   ├── vite.config.ts
+│   ├── tailwind.config.ts
+│   ├── tsconfig.json
+│   ├── package.json
+│   ├── playwright.config.ts
+│   └── src/
+│       ├── main.tsx
+│       ├── App.tsx
+│       ├── store/
+│       │   ├── useAuthStore.ts
+│       │   └── useWorkspaceStore.ts
+│       ├── pages/
+│       │   ├── Landing.tsx
+│       │   ├── Workspace.tsx
+│       │   ├── Analyze.tsx          ← stub
+│       │   ├── Clinical.tsx         ← stub
+│       │   ├── Code.tsx             ← stub
+│       │   ├── Compare.tsx          ← stub
+│       │   ├── Templates.tsx        ← stub
+│       │   ├── Audit.tsx            ← stub
+│       │   ├── Radar.tsx            ← stub
+│       │   └── Dashboard.tsx        ← stub
+│       ├── components/
+│       │   ├── Navbar.tsx
+│       │   ├── ProtectedRoute.tsx
+│       │   ├── AuthCallback.tsx
+│       │   └── StubPage.tsx
+│       ├── hooks/
+│       │   └── useAuth.ts
+│       ├── lib/
+│       │   ├── axios.ts
+│       │   └── queryClient.ts
+│       ├── styles/
+│       │   └── globals.css
+│       └── __tests__/
+│           ├── auth.test.tsx           ← skeleton
+│           └── ConfidenceHeatmap.test.tsx ← skeleton
+│   └── e2e/
+│       ├── auth.spec.ts               ← skeleton
+│       └── workspace.spec.ts          ← skeleton
+└── backend/
+    ├── proxima/
+    │   ├── __init__.py
+    │   ├── main.py
+    │   ├── config.py
+    │   ├── database.py
+    │   ├── models/
+    │   │   ├── __init__.py
+    │   │   ├── user.py
+    │   │   ├── document.py
+    │   │   ├── session.py
+    │   │   ├── ai_request.py
+    │   │   ├── template.py
+    │   │   ├── export.py
+    │   │   ├── audit.py
+    │   │   ├── comparison.py
+    │   │   ├── contract.py
+    │   │   ├── clinical.py
+    │   │   ├── knowledge.py
+    │   │   ├── prompt_registry.py
+    │   │   ├── routing.py
+    │   │   ├── background_job.py
+    │   │   └── admin.py
+    │   ├── schemas/
+    │   │   ├── __init__.py
+    │   │   ├── auth.py
+    │   │   ├── user.py
+    │   │   ├── document.py
+    │   │   └── intelligence.py
+    │   ├── routers/
+    │   │   ├── __init__.py
+    │   │   ├── auth_router.py
+    │   │   ├── users_router.py
+    │   │   ├── documents_router.py
+    │   │   ├── intelligence_router.py
+    │   │   ├── tools_router.py
+    │   │   ├── templates_router.py
+    │   │   ├── exports_router.py
+    │   │   ├── sessions_router.py
+    │   │   ├── jobs_router.py
+    │   │   └── admin_router.py
+    │   ├── services/
+    │   │   ├── __init__.py
+    │   │   ├── model_registry.py       ← NEW: ModelRegistry abstraction
+    │   │   ├── auth_service.py
+    │   │   ├── gemini_service.py       ← delegates to ModelRegistry
+    │   │   └── document_service.py
+    │   ├── middleware/
+    │   │   ├── __init__.py
+    │   │   ├── auth_middleware.py
+    │   │   └── admin_middleware.py
+    │   ├── celery_app.py
+    │   └── tasks/
+    │       ├── __init__.py
+    │       ├── exports.py
+    │       ├── ai.py
+    │       ├── embeddings.py
+    │       └── maintenance.py
+    ├── alembic/
+    │   ├── alembic.ini
+    │   ├── env.py
+    │   └── versions/
+    │       └── 001_initial_schema.py
+    ├── tests/
+    │   ├── conftest.py
+    │   ├── unit/
+    │   │   ├── test_domain_detector.py    ← skeleton
+    │   │   └── test_confidence_scorer.py  ← skeleton
+    │   ├── integration/
+    │   │   ├── test_auth_flow.py          ← skeleton
+    │   │   └── test_intelligence_endpoints.py ← skeleton
+    │   └── fixtures/
+    │       ├── sample_legal_doc.txt
+    │       ├── sample_medical_doc.txt
+    │       └── sample_code_doc.py
+    ├── scripts/
+    │   └── generate_keys.py
+    └── requirements.txt
+
+═══════════════════════════════════════════════════════════════════════
+ENVIRONMENT VARIABLES
+═══════════════════════════════════════════════════════════════════════
+
+backend/.env:
+  DATABASE_URL=postgresql+asyncpg://postgres:password@localhost:5432/proxima
+  REDIS_URL=redis://localhost:6379
+  GEMINI_API_KEY=your_gemini_key
+  GOOGLE_CLIENT_ID=your_google_client_id
+  GOOGLE_CLIENT_SECRET=your_google_client_secret
+  GOOGLE_REDIRECT_URI=http://localhost:8000/api/auth/callback
+  JWT_PRIVATE_KEY="-----BEGIN RSA PRIVATE KEY-----\n...\n-----END RSA PRIVATE KEY-----"
+  JWT_PUBLIC_KEY="-----BEGIN PUBLIC KEY-----\n...\n-----END PUBLIC KEY-----"
+  JWT_ALGORITHM=RS256
+  ACCESS_TOKEN_EXPIRE_MINUTES=15
+  REFRESH_TOKEN_EXPIRE_DAYS=7
+  AWS_ACCESS_KEY_ID=your_aws_key
+  AWS_SECRET_ACCESS_KEY=your_aws_secret
+  AWS_BUCKET_NAME=proxima-uploads
+  AWS_REGION=us-east-1
+  SENTRY_DSN=your_sentry_dsn
+  ENVIRONMENT=development
+  FRONTEND_URL=http://localhost:5173
+  MONTHLY_AI_BUDGET_USD=50.00
+  COST_ALERT_THRESHOLD=0.80
+  RESPONSE_CACHE_TTL=900
+  EMBEDDING_CACHE_TTL=86400
+  ENABLE_RESPONSE_CACHE=true
+  CELERY_BROKER_URL=redis://localhost:6379/1
+  CELERY_RESULT_BACKEND=redis://localhost:6379/2
+  FLOWER_PASSWORD=your_flower_password
+  OPENAI_API_KEY=optional_for_phase2
+  ANTHROPIC_API_KEY=optional_for_phase2
+
+frontend/.env:
+  VITE_API_URL=http://localhost:8000
+  VITE_POSTHOG_KEY=your_posthog_key
+
+═══════════════════════════════════════════════════════════════════════
+TAILWIND CONFIG — EXACT DESIGN TOKENS
+═══════════════════════════════════════════════════════════════════════
+
+module.exports = {
+  darkMode: 'class',
+  content: ['./src/**/*.{ts,tsx}'],
+  theme: {
+    extend: {
+      colors: {
+        void: '#0A0A0A', surface: '#111111', elevated: '#1A1A1A',
+        border: { DEFAULT: '#2A2A2A', strong: '#3A3A3A' },
+        text: { primary: '#F0EFE9', secondary: '#888880', muted: '#555550' },
+        gold: { primary: '#C9A84C', bright: '#E5C76B', dim: '#8A6F32' },
+        light: { bg: '#FAFAF8', surface: '#FFFFFF', border: '#E8E8E4', text: '#0A0A0A' },
+        domain: { code: '#4ADE80', medical: '#60A5FA', legal: '#C9A84C' },
+        // CANONICAL confidence colors — PRD §6 — do not copy locally
+        conf: {
+          high:     '#22c55e',   // 80-100
+          amber:    '#f59e0b',   // 65-79
+          low:      '#f97316',   // 50-64
+          critical: '#ef4444',   // 0-49
+        }
+      },
+      fontFamily: {
+        display: ['Playfair Display', 'Georgia', 'serif'],
+        sans:    ['Inter', 'system-ui', 'sans-serif'],
+        mono:    ['JetBrains Mono', 'Fira Code', 'monospace'],
+      },
+      borderRadius: { DEFAULT: '6px', sm: '4px', md: '8px', lg: '12px', xl: '16px' },
+    }
+  }
+}
+
+═══════════════════════════════════════════════════════════════════════
+GLOBALS.CSS
+═══════════════════════════════════════════════════════════════════════
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html { background: #0A0A0A; color: #F0EFE9; }
+  * { box-sizing: border-box; }
+  ::-webkit-scrollbar { width: 6px; height: 6px; }
+  ::-webkit-scrollbar-track { background: #111111; }
+  ::-webkit-scrollbar-thumb { background: #3A3A3A; border-radius: 3px; }
+  ::-webkit-scrollbar-thumb:hover { background: #C9A84C; }
+  ::selection { background: rgba(201,168,76,0.25); color: #F0EFE9; }
+}
+
+@layer components {
+  .btn-primary   { @apply bg-gold-primary text-void font-medium text-sm px-5 py-2.5 rounded hover:bg-gold-bright hover:-translate-y-px active:translate-y-0 transition-all duration-150 cursor-pointer select-none; }
+  .btn-secondary { @apply bg-transparent text-text-primary border border-border-strong text-sm px-5 py-2.5 rounded hover:bg-elevated transition-all duration-150 cursor-pointer select-none; }
+  .btn-ghost     { @apply bg-transparent text-text-secondary text-sm px-4 py-2 rounded hover:text-text-primary hover:bg-white/5 transition-all duration-150 cursor-pointer select-none; }
+  .btn-danger    { @apply bg-red-900/20 text-red-300 border border-red-800 text-sm px-5 py-2.5 rounded hover:bg-red-900/40 transition-all duration-150; }
+  .input-base    { @apply bg-surface border border-border rounded px-3.5 py-2.5 text-sm text-text-primary placeholder:text-text-muted w-full focus:outline-none focus:border-gold-primary focus:ring-2 focus:ring-gold-primary/15 transition-colors duration-150; }
+  .card          { @apply bg-surface border border-border rounded-lg p-6 hover:border-border-strong hover:bg-elevated transition-all duration-150; }
+  .metric-card   { @apply bg-surface border border-border rounded-lg p-6 border-t-2 border-t-gold-primary; }
+  .panel-header  { @apply text-text-muted text-xs font-medium uppercase tracking-widest px-5 py-3 border-b border-border; }
+}
+
+/* Confidence heatmap — PRD §6 canonical thresholds */
+.conf-high     { background: rgba(34,197,94,0.08); }
+.conf-amber    { background: rgba(245,158,11,0.10); text-decoration: underline; text-decoration-color: #f59e0b; text-decoration-style: dashed; }
+.conf-low      { background: rgba(249,115,22,0.12); }
+.conf-critical { background: rgba(239,68,68,0.15); animation: confPulse 2.5s ease-in-out infinite; }
+
+@keyframes confPulse {
+  0%,100% { box-shadow: 0 0 0 0px rgba(239,68,68,0); }
+  50%      { box-shadow: 0 0 0 2px rgba(239,68,68,0.4); }
+}
+
+═══════════════════════════════════════════════════════════════════════
+BACKEND — services/model_registry.py  ← CRITICAL NEW SERVICE
+═══════════════════════════════════════════════════════════════════════
+
+"""
+ModelRegistry: the single source of truth for all AI model configuration.
+NO other file in the codebase may reference model strings directly.
+All AI calls go through this service.
+"""
+
+from proxima.models.routing import RegisteredModel, ModelRoutingRule
+from proxima.database import get_db
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select
+import structlog
+
+logger = structlog.get_logger()
+
+class ModelRegistry:
+
+    async def get_default_generation(self, db: AsyncSession) -> RegisteredModel:
+        """Returns the active default generation model."""
+        stmt = select(RegisteredModel).where(
+            RegisteredModel.model_type == 'generation',
+            RegisteredModel.is_default_generation == True,
+            RegisteredModel.is_active == True,
+        )
+        result = await db.execute(stmt)
+        model = result.scalar_one_or_none()
+        if not model:
+            raise RuntimeError("No active default generation model found in registry.")
+        return model
+
+    async def get_default_embedding(self, db: AsyncSession) -> RegisteredModel:
+        """Returns the active default embedding model."""
+        stmt = select(RegisteredModel).where(
+            RegisteredModel.model_type == 'embedding',
+            RegisteredModel.is_default_embedding == True,
+            RegisteredModel.is_active == True,
+        )
+        result = await db.execute(stmt)
+        model = result.scalar_one_or_none()
+        if not model:
+            raise RuntimeError("No active default embedding model found in registry.")
+        return model
+
+    async def get_for_task(self, task_class: str, domain: str | None,
+                            db: AsyncSession) -> RegisteredModel:
+        """Returns the best registered model for a given task + domain."""
+        # Try specific domain match first
+        if domain:
+            stmt = select(ModelRoutingRule).join(
+                RegisteredModel, ModelRoutingRule.model_id == RegisteredModel.model_id
+            ).where(
+                ModelRoutingRule.task_class == task_class,
+                ModelRoutingRule.domain == domain,
+                ModelRoutingRule.is_active == True,
+                RegisteredModel.is_active == True,
+            ).order_by(ModelRoutingRule.priority)
+            result = await db.execute(stmt)
+            rule = result.scalar_one_or_none()
+            if rule:
+                return await db.get(RegisteredModel, rule.model_id)
+
+        # Fall back to task-level (domain=NULL) rule
+        stmt = select(ModelRoutingRule).where(
+            ModelRoutingRule.task_class == task_class,
+            ModelRoutingRule.domain == None,
+            ModelRoutingRule.is_active == True,
+        ).order_by(ModelRoutingRule.priority)
+        result = await db.execute(stmt)
+        rule = result.scalar_one_or_none()
+        if rule:
+            return await db.get(RegisteredModel, rule.model_id)
+
+        # Ultimate fallback: default generation model
+        return await self.get_default_generation(db)
+
+    async def build_generation_client(self, model: RegisteredModel):
+        """
+        Returns a provider-appropriate generation client.
+        Application code uses this client — never imports provider SDKs directly.
+        """
+        if model.provider == 'google':
+            import google.generativeai as genai
+            from proxima.config import settings
+            genai.configure(api_key=settings.gemini_api_key)
+            return genai.GenerativeModel(model.model_id)
+
+        elif model.provider == 'openai':
+            from openai import AsyncOpenAI
+            from proxima.config import settings
+            return AsyncOpenAI(api_key=settings.openai_api_key)
+
+        elif model.provider == 'anthropic':
+            import anthropic
+            from proxima.config import settings
+            return anthropic.AsyncAnthropic(api_key=settings.anthropic_api_key)
+
+        raise ValueError(f"Unknown provider: {model.provider}")
+
+    async def build_embedding_client(self, model: RegisteredModel):
+        """Returns a provider-appropriate embedding client."""
+        if model.provider == 'google':
+            import google.generativeai as genai
+            from proxima.config import settings
+            genai.configure(api_key=settings.gemini_api_key)
+            return genai  # embed_content called directly on module
+        raise ValueError(f"Unknown embedding provider: {model.provider}")
+
+    async def stream_completion(
+        self, model: RegisteredModel, system_prompt: str,
+        user_message: str, temperature: float, max_tokens: int
+    ):
+        """
+        Unified streaming interface across all providers.
+        Yields (token_text: str) for each token.
+        """
+        client = await self.build_generation_client(model)
+
+        if model.provider == 'google':
+            response = await client.generate_content_async(
+                user_message,
+                stream=True,
+                generation_config={
+                    'temperature': temperature,
+                    'max_output_tokens': max_tokens,
+                },
+                system_instruction=system_prompt,
+            )
+            async for chunk in response:
+                if chunk.text:
+                    yield chunk.text
+
+        elif model.provider == 'openai':
+            stream = await client.chat.completions.create(
+                model=model.model_id,
+                messages=[
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user",   "content": user_message},
+                ],
+                temperature=temperature,
+                max_tokens=max_tokens,
+                stream=True,
+            )
+            async for chunk in stream:
+                delta = chunk.choices[0].delta.content
+                if delta:
+                    yield delta
+
+        elif model.provider == 'anthropic':
+            async with client.messages.stream(
+                model=model.model_id,
+                system=system_prompt,
+                messages=[{"role": "user", "content": user_message}],
+                temperature=temperature,
+                max_tokens=max_tokens,
+            ) as stream:
+                async for text in stream.text_stream:
+                    yield text
+
+model_registry = ModelRegistry()  # singleton
+
+═══════════════════════════════════════════════════════════════════════
+BACKEND — config.py
+═══════════════════════════════════════════════════════════════════════
+
+from pydantic_settings import BaseSettings
+
+class Settings(BaseSettings):
+    database_url: str
+    redis_url: str = "redis://localhost:6379"
+    gemini_api_key: str
+    google_client_id: str
+    google_client_secret: str
+    google_redirect_uri: str
+    jwt_private_key: str
+    jwt_public_key: str
+    jwt_algorithm: str = "RS256"
+    access_token_expire_minutes: int = 15
+    refresh_token_expire_days: int = 7
+    aws_access_key_id: str = ""
+    aws_secret_access_key: str = ""
+    aws_bucket_name: str = "proxima-uploads"
+    aws_region: str = "us-east-1"
+    sentry_dsn: str = ""
+    environment: str = "development"
+    frontend_url: str = "http://localhost:5173"
+    monthly_ai_budget_usd: float = 50.00
+    cost_alert_threshold: float = 0.80
+    response_cache_ttl: int = 900
+    embedding_cache_ttl: int = 86400
+    enable_response_cache: bool = True
+    celery_broker_url: str = "redis://localhost:6379/1"
+    celery_result_backend: str = "redis://localhost:6379/2"
+    flower_password: str = "admin"
+    openai_api_key: str = ""
+    anthropic_api_key: str = ""
+
+    @property
+    def storage_configured(self) -> bool:
+        return bool(self.aws_access_key_id and self.aws_secret_access_key)
+
+    @property
+    def is_production(self) -> bool:
+        return self.environment == "production"
+
+    class Config:
+        env_file = ".env"
+        extra = "ignore"
+
+settings = Settings()
+
+═══════════════════════════════════════════════════════════════════════
+BACKEND — ALL 22 MODELS (key schema additions vs previous version)
+═══════════════════════════════════════════════════════════════════════
+
+Build all 22 models as described in Stage 1 v2, with these ADDITIONS:
+
+── models/routing.py — updated RegisteredModel ──────────────────────
+
+class RegisteredModel(Base):
+    __tablename__ = "registered_models"
+    model_id:              Mapped[str]   = mapped_column(String(100), primary_key=True)
+    provider:              Mapped[str]   = mapped_column(String(50), nullable=False)
+    model_type:            Mapped[str]   = mapped_column(String(50), nullable=False)  # generation|embedding
+    context_window:        Mapped[int | None]   = mapped_column(Integer)
+    embedding_dimensions:  Mapped[int | None]   = mapped_column(Integer)       # NULL for generation
+    embedding_version:     Mapped[str | None]   = mapped_column(String(50))    # NULL for generation
+    cost_per_1m_input:     Mapped[float] = mapped_column(Float, nullable=False)
+    cost_per_1m_output:    Mapped[float] = mapped_column(Float, nullable=False, default=0.0)
+    supports_streaming:    Mapped[bool]  = mapped_column(Boolean, default=True)
+    is_active:             Mapped[bool]  = mapped_column(Boolean, default=True)
+    is_default_generation: Mapped[bool]  = mapped_column(Boolean, default=False)
+    is_default_embedding:  Mapped[bool]  = mapped_column(Boolean, default=False)
+    created_at:            Mapped[datetime] = mapped_column(TIMESTAMPTZ, server_default=func.now())
+
+── models/document.py — DocumentChunk with embedding versioning ────
+
+class DocumentChunk(Base):
+    __tablename__ = "document_chunks"
+    id:                  Mapped[UUID]        = mapped_column(UUID(as_uuid=True), primary_key=True, server_default=text("gen_random_uuid()"))
+    document_id:         Mapped[UUID]        = mapped_column(UUID(as_uuid=True), ForeignKey("documents.id", ondelete="CASCADE"), nullable=False)
+    chunk_index:         Mapped[int]         = mapped_column(Integer, nullable=False)
+    content:             Mapped[str]         = mapped_column(Text, nullable=False)
+    token_count:         Mapped[int | None]  = mapped_column(Integer)
+    chunk_type:          Mapped[str | None]  = mapped_column(String(50))
+    domain_hint:         Mapped[str | None]  = mapped_column(String(50))
+    embedding:           Mapped[list | None] = mapped_column(Vector(768))
+    # Embedding versioning fields (PRD §8)
+    embedding_model:      Mapped[str | None]  = mapped_column(String(100))
+    embedding_version:    Mapped[str | None]  = mapped_column(String(50))
+    embedding_dimensions: Mapped[int | None]  = mapped_column(Integer)
+    embedded_at:          Mapped[datetime | None] = mapped_column(TIMESTAMPTZ)
+    metadata:            Mapped[dict | None]  = mapped_column(JSONB)
+    created_at:          Mapped[datetime]     = mapped_column(TIMESTAMPTZ, server_default=func.now())
+    __table_args__ = (Index("idx_chunks_document_id", "document_id"),)
+
+── models/knowledge.py — DomainKnowledgeChunk with embedding versioning
+
+class DomainKnowledgeChunk(Base):
+    __tablename__ = "domain_knowledge_chunks"
+    id:                   Mapped[UUID]        = mapped_column(UUID(as_uuid=True), primary_key=True, server_default=text("gen_random_uuid()"))
+    kb_name:              Mapped[str]         = mapped_column(String(50), nullable=False)   # legal|medical|engineering
+    title:                Mapped[str | None]  = mapped_column(String(500))
+    content:              Mapped[str]         = mapped_column(Text, nullable=False)
+    source:               Mapped[str | None]  = mapped_column(String(500))
+    chunk_index:          Mapped[int]         = mapped_column(Integer, nullable=False)
+    token_count:          Mapped[int | None]  = mapped_column(Integer)
+    embedding:            Mapped[list | None] = mapped_column(Vector(768))
+    # Embedding versioning fields (PRD §8)
+    embedding_model:      Mapped[str | None]  = mapped_column(String(100))
+    embedding_version:    Mapped[str | None]  = mapped_column(String(50))
+    embedding_dimensions: Mapped[int | None]  = mapped_column(Integer)
+    embedded_at:          Mapped[datetime | None] = mapped_column(TIMESTAMPTZ)
+    metadata:             Mapped[dict | None]  = mapped_column(JSONB)
+    created_at:           Mapped[datetime]     = mapped_column(TIMESTAMPTZ, server_default=func.now())
+    __table_args__ = (Index("idx_domain_kb_kb_name", "kb_name"),)
+
+All other 20 models: same as Stage 1 v2. No changes.
+
+═══════════════════════════════════════════════════════════════════════
+ALEMBIC — 001_initial_schema.py (key additions)
+═══════════════════════════════════════════════════════════════════════
+
+Additions vs Stage 1 v2:
+
+1. Add embedding versioning columns to document_chunks and domain_knowledge_chunks:
+   embedding_model VARCHAR(100), embedding_version VARCHAR(50),
+   embedding_dimensions INTEGER, embedded_at TIMESTAMPTZ
+
+2. Seed registered_models with model_type + is_default flags:
+   op.execute("""
+     INSERT INTO registered_models (
+       model_id, provider, model_type, context_window,
+       embedding_dimensions, embedding_version,
+       cost_per_1m_input, cost_per_1m_output,
+       supports_streaming, is_active,
+       is_default_generation, is_default_embedding
+     ) VALUES
+       ('gemini-2.0-flash',    'google', 'generation', 1048576, NULL, NULL, 0.075, 0.30,  true, true,  true,  false),
+       ('gemini-1.5-flash-8b', 'google', 'generation', 1048576, NULL, NULL, 0.0375,0.15,  true, true,  false, false),
+       ('text-embedding-004',  'google', 'embedding',  NULL,    768,  '1.0', 0.000, 0.000, false,true, false, true),
+       ('gpt-4o',             'openai', 'generation', 128000,  NULL, NULL, 5.000, 15.00, true, false, false, false),
+       ('claude-3-5-sonnet',  'anthropic','generation',200000, NULL, NULL, 3.000, 15.00, true, false, false, false);
+   """)
+
+3. Everything else same as Stage 1 v2.
+
+═══════════════════════════════════════════════════════════════════════
+BACKEND — auth_router.py — COMPLETE OAuth with PKCE
+═══════════════════════════════════════════════════════════════════════
+
+GET /api/auth/google
+  1. Generate PKCE:
+     code_verifier = secrets.token_urlsafe(64)  # 64-char random
+     code_challenge = base64url(sha256(code_verifier.encode()))
+     # Store: await redis.setex(f"pkce:{state}", 600, code_verifier)
+  2. Generate state: state = secrets.token_urlsafe(32)
+     await redis.setex(f"oauth_state:{state}", 600, "valid")
+  3. Build Google OAuth URL:
+     params = {
+       "client_id":             settings.google_client_id,
+       "redirect_uri":          settings.google_redirect_uri,
+       "response_type":         "code",
+       "scope":                 "openid email profile",
+       "state":                 state,
+       "code_challenge":        code_challenge,
+       "code_challenge_method": "S256",
+       "access_type":           "offline",
+     }
+  4. Return RedirectResponse to Google OAuth URL
+
+GET /api/auth/callback?code=...&state=...
+  1. Validate state: check Redis key "oauth_state:{state}" exists, then delete
+  2. Retrieve code_verifier from Redis: "pkce:{state}"
+  3. Exchange code for tokens (include code_verifier in token request):
+     POST https://oauth2.googleapis.com/token with code_verifier
+  4. Fetch Google user info
+  5. Upsert user in DB (set role='user' on create)
+  6. Issue RS256 JWT tokens:
+     access_token  = create_access_token(user_id, email, plan, role)
+     refresh_token = create_refresh_token(user_id)
+  7. Store refresh token in Redis:
+     await redis.setex(f"refresh:{user_id}", 7*24*3600, refresh_token_hash)
+  8. Set cookies:
+     access_token:  HttpOnly, Secure (prod), SameSite=Lax, Max-Age=900
+     refresh_token: HttpOnly, Secure, SameSite=Lax, Max-Age=604800
+  9. Return RedirectResponse to FRONTEND_URL/dashboard
+
+POST /api/auth/refresh
+  1. Read refresh_token cookie
+  2. Verify JWT signature
+  3. Validate against Redis: f"refresh:{user_id}" — reject if not found
+  4. DELETE old refresh token from Redis (rotation)
+  5. Issue new access_token AND new refresh_token
+  6. Store new refresh_token hash in Redis
+  7. Set both new cookies
+  8. Return { ok: true }
+
+POST /api/auth/logout
+  1. Read access_token cookie, extract user_id
+  2. DELETE refresh token from Redis: f"refresh:{user_id}" (revocation)
+  3. Clear both cookies (set Max-Age=0)
+  4. Return { ok: true }
+
+═══════════════════════════════════════════════════════════════════════
+BACKEND — intelligence_router.py (Stage 1 — uses ModelRegistry)
+═══════════════════════════════════════════════════════════════════════
+
+POST /api/intelligence/complete
+  Requires auth. Rate limit 20/hour.
+  Body: { text, cursor_position, temperature=0.3, max_tokens=200 }
+
+  1. Token budget check: if user.tokens_used >= user.tokens_limit → 429
+  2. Resolve model via ModelRegistry:
+     model = await model_registry.get_for_task('streaming_completion', None, db)
+  3. Fetch system prompt from prompt_versions where prompt_key='system.base' and is_active=TRUE
+     If not found: fallback = "You are Proxima. Complete the text professionally."
+  4. Extract context: immediate_context = text[max(0, cursor_position-2000):cursor_position]
+  5. Stream via ModelRegistry:
+     async def generate():
+         full = ''
+         async for token in model_registry.stream_completion(
+             model, system_prompt, immediate_context, temperature, max_tokens
+         ):
+             full += token
+             yield f"data: {json.dumps({'token':token,'done':False})}\n\n"
+         yield f"data: {json.dumps({'token':'','done':True})}\n\n"
+         asyncio.create_task(log_and_update(full, model, user, db))
+     return StreamingResponse(generate(), media_type="text/event-stream")
+
+POST /api/intelligence/scan         → stub: returns { code:0.33, medical:0.33, legal:0.34 }
+POST /api/intelligence/confidence   → stub: returns { scores: [] }
+POST /api/intelligence/compare      → stub: returns { message: "Stage 2" }
+GET  /api/jobs/:id/status           → returns BackgroundJob from DB
+
+═══════════════════════════════════════════════════════════════════════
+FRONTEND — Key components (unchanged from Stage 1 v2 except auth)
+═══════════════════════════════════════════════════════════════════════
+
+No frontend changes vs Stage 1 v2 except:
+1. "Sign In" CTA → window.location.href = '/api/auth/google' (PKCE handled server-side)
+2. useAuthStore: check role field (user | admin | super_admin)
+3. AdminRoute component: redirects non-admin roles to /dashboard
+
+All other frontend code: same as Stage 1 v2.
+
+═══════════════════════════════════════════════════════════════════════
+TESTING INFRASTRUCTURE
+═══════════════════════════════════════════════════════════════════════
+
+─── backend/tests/conftest.py ───────────────────────────────────────
+
+import pytest, pytest_asyncio
+from httpx import AsyncClient, ASGITransport
+from proxima.main import app
+from proxima.database import AsyncSessionLocal, engine, Base
+
+@pytest.fixture(scope="session")
+def anyio_backend():
+    return "asyncio"
+
+@pytest_asyncio.fixture(scope="function")
+async def client():
+    """Test client with in-process ASGI transport."""
+    async with AsyncClient(
+        transport=ASGITransport(app=app),
+        base_url="http://test"
+    ) as c:
+        yield c
+
+@pytest_asyncio.fixture(scope="function")
+async def db():
+    async with AsyncSessionLocal() as session:
+        yield session
+
+─── backend/tests/unit/test_domain_detector.py (skeleton) ──────────
+
+import pytest
+# from proxima.services.domain_detector import domain_detector
+
+def test_legal_doc_detection():
+    """A legal document should score legal ≥ 0.50."""
+    text = "WHEREAS the parties agree to indemnify and hold harmless..."
+    # weights = domain_detector.detect(text)
+    # assert weights['legal'] >= 0.50
+    assert True  # replace with real assert in Stage 2
+
+def test_code_doc_detection():
+    """Python code should score code ≥ 0.50."""
+    text = "def calculate(x, y):\n    return x + y\nimport os"
+    assert True  # Stage 2
+
+def test_mixed_doc_detection():
+    """Mixed doc should have no single domain > 0.90."""
+    assert True  # Stage 2
+
+─── backend/tests/integration/test_auth_flow.py (skeleton) ─────────
+
+import pytest
+
+@pytest.mark.anyio
+async def test_health_endpoint(client):
+    response = await client.get("/api/health")
+    assert response.status_code == 200
+    data = response.json()
+    assert data["status"] == "ok"
+    assert data["engineer"] == "Arnav Garg"
+    assert data["version"] == "4.0"
+
+@pytest.mark.anyio
+async def test_protected_route_without_auth(client):
+    """Workspace returns 401 without auth cookie."""
+    response = await client.post("/api/intelligence/complete",
+        json={"text": "hello", "cursor_position": 5})
+    assert response.status_code == 401
+
+─── frontend/src/__tests__/auth.test.tsx (skeleton) ─────────────────
+
+import { render, screen } from '@testing-library/react';
+import { MemoryRouter } from 'react-router-dom';
+import { describe, it, expect, vi } from 'vitest';
+
+describe('ProtectedRoute', () => {
+  it('redirects unauthenticated users to /', () => {
+    // Full implementation in Stage 2
+    expect(true).toBe(true);
+  });
+});
+
+─── frontend/e2e/auth.spec.ts (skeleton) ────────────────────────────
+
+import { test, expect } from '@playwright/test';
+
+test('health endpoint returns ok', async ({ request }) => {
+  const response = await request.get('http://localhost:8000/api/health');
+  expect(response.status()).toBe(200);
+  const body = await response.json();
+  expect(body.status).toBe('ok');
+});
+
+test('landing page loads', async ({ page }) => {
+  await page.goto('http://localhost:5173');
+  await expect(page.locator('text=PROXIMA')).toBeVisible();
+});
+
+─── frontend/playwright.config.ts ───────────────────────────────────
+
+import { defineConfig } from '@playwright/test';
+export default defineConfig({
+  testDir: './e2e',
+  use: { baseURL: 'http://localhost:5173' },
+  webServer: [
+    { command: 'npm run dev', url: 'http://localhost:5173', reuseExistingServer: true },
+  ],
+});
+
+═══════════════════════════════════════════════════════════════════════
+CI/CD — .github/workflows/ci.yml
+═══════════════════════════════════════════════════════════════════════
+
+name: Proxima CI
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main]
+
+jobs:
+  backend-test:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_DB: proxima_test
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: password
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 5
+      redis:
+        image: redis:7-alpine
+        ports: ["6379:6379"]
+    env:
+      DATABASE_URL: postgresql+asyncpg://postgres:password@localhost:5432/proxima_test
+      REDIS_URL: redis://localhost:6379
+      GEMINI_API_KEY: test_key
+      GOOGLE_CLIENT_ID: test_client_id
+      GOOGLE_CLIENT_SECRET: test_secret
+      GOOGLE_REDIRECT_URI: http://localhost:8000/api/auth/callback
+      JWT_PRIVATE_KEY: ${{ secrets.JWT_PRIVATE_KEY_TEST }}
+      JWT_PUBLIC_KEY: ${{ secrets.JWT_PUBLIC_KEY_TEST }}
+      JWT_ALGORITHM: RS256
+      ACCESS_TOKEN_EXPIRE_MINUTES: "15"
+      REFRESH_TOKEN_EXPIRE_DAYS: "7"
+      ENVIRONMENT: test
+      FRONTEND_URL: http://localhost:5173
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: '3.11' }
+      - name: Install deps
+        run: cd backend && pip install -r requirements.txt
+      - name: Run migrations
+        run: cd backend && alembic upgrade head
+      - name: Lint
+        run: cd backend && python -m flake8 proxima/ --max-line-length=120 --ignore=E501,W503
+      - name: Run tests
+        run: cd backend && pytest tests/ --cov=proxima --cov-report=xml --cov-fail-under=60
+        # 60% in Stage 1 (skeleton tests) → 80% by Stage 3
+
+  frontend-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: '20' }
+      - name: Install deps
+        run: cd frontend && npm ci
+      - name: Type check
+        run: cd frontend && npx tsc --noEmit
+      - name: Lint
+        run: cd frontend && npx eslint src/ --ext .ts,.tsx
+      - name: Unit tests
+        run: cd frontend && npx vitest run --coverage
+
+  build:
+    runs-on: ubuntu-latest
+    needs: [backend-test, frontend-test]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: '20' }
+      - name: Build frontend
+        run: cd frontend && npm ci && npm run build
+      - name: Build backend Docker image
+        run: docker build -t proxima-backend ./backend
+
+═══════════════════════════════════════════════════════════════════════
+STARTUP COMMANDS
+═══════════════════════════════════════════════════════════════════════
+
+# 1. Generate RSA keys
+cd backend && python scripts/generate_keys.py
+# Copy output into backend/.env
+
+# 2. Backend
+pip install -r requirements.txt
+alembic upgrade head
+uvicorn proxima.main:app --reload --port 8000
+
+# 3. Frontend
+cd frontend && npm install
+npm run dev
+
+# 4. Tests
+cd backend && pytest tests/ -v
+cd frontend && npx vitest run
+
+═══════════════════════════════════════════════════════════════════════
+STAGE 1 COMPLETION CHECKLIST
+═══════════════════════════════════════════════════════════════════════
+
+✓ uvicorn and npm run dev start without errors
+✓ GET /api/health → { status:"ok", engineer:"Arnav Garg", version:"4.0" }
+✓ alembic upgrade head creates ALL 22 tables
+✓ document_chunks has: embedding_model, embedding_version, embedding_dimensions, embedded_at columns
+✓ domain_knowledge_chunks has same 4 embedding versioning columns
+✓ registered_models seeded (5 models) with model_type + is_default flags
+✓ model_routing_rules seeded (8 rules pointing to registry, not hardcoded)
+✓ model_registry.get_default_generation(db) returns gemini-2.0-flash model
+✓ NO file imports google.generativeai directly (only model_registry.py does)
+✓ POST /api/intelligence/complete uses model_registry.stream_completion() — NOT genai directly
+✓ Google OAuth redirects to Google with PKCE code_challenge in URL
+✓ After Google login: user created with role='user', RS256 JWT set in cookies
+✓ Refresh token stored in Redis under f"refresh:{user_id}"
+✓ POST /api/auth/refresh rotates refresh token (old deleted, new stored)
+✓ POST /api/auth/logout deletes Redis key (revocation)
+✓ Admin role guard: /admin/api/* returns 403 for role='user'
+✓ No self-escalation: admin cannot change own role
+✓ Confidence thresholds in tailwind.config use PRD §6 exact values
+✓ .github/workflows/ci.yml exists and passes on clean checkout
+✓ backend/tests/ skeleton exists (conftest.py + unit + integration)
+✓ frontend/src/__tests__/ skeleton exists
+✓ frontend/e2e/ skeleton exists
+✓ pytest runs (even if only skeleton tests pass)
+✓ vitest runs (even if only skeleton tests pass)
+✓ tsc --noEmit passes (no type errors)
+
+═══════════════════════════════════════════════════════════════════════

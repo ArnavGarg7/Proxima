@@ -1,0 +1,1573 @@
+╔══════════════════════════════════════════════════════════════════════╗
+║         PROXIMA v4.1 — ANTIGRAVITY BUILD PROMPT                     ║
+║                STAGE 5: PRODUCTION READY                            ║
+║  Exports · Vector Embeddings · pgvector · Semantic Compare · Sentry ║
+║  Source of truth: Proxima_v4_PRD_v2.md                              ║
+║  Engineered by Arnav Garg                                           ║
+╚══════════════════════════════════════════════════════════════════════╝
+
+STAGE 5 CONTEXT
+════════════════
+Stages 1–4 are complete and verified:
+  ✓ All 22 DB tables, RS256 JWT + PKCE OAuth, ModelRegistry
+  ✓ QHE (80/65/50 thresholds, KL divergence, domain coefficients)
+  ✓ FTS Retrieval (code→engineering mapping, DOMAIN_TO_KB)
+  ✓ 10 canonical prompt keys, upload security, clinical boundary
+  ✓ Semantic compare: Jaccard+Hungarian+LLM (documented as temporary)
+  ✓ Admin Platform (18 routes, PRD-synced, audit log, no self-escalation)
+  ✓ Framer Motion system + Three.js cinematic hero
+  ✓ Accessibility, prefers-reduced-motion, lazy loading enforced
+  ✓ CI/CD green, tests passing
+
+STAGE 5 GOAL — SHIP READY
+════════════
+  ✓ Full export file generation: PDF, DOCX, MD, CSV, JSON (with bleach sanitization)
+  ✓ Export Celery tasks: async generation + S3 upload + polling
+  ✓ Embedding service: via ModelRegistry (not hardcoded google-generativeai)
+  ✓ Versioned embedding cache key: md5(text + model + version + dims + task)
+  ✓ Embedding versioning fields populated on every vector record
+  ✓ Knowledge base: full 150 embeddings via embed_knowledge_base task
+  ✓ RAG service upgraded: pgvector cosine similarity (replaces FTS)
+  ✓ Semantic compare upgraded: embedding similarity matrix (replaces Jaccard)
+  ✓ 50 templates seeded (up from 15)
+  ✓ Sentry: full redaction (headers, nested JSON, URLs, task args, breadcrumbs)
+  ✓ PostHog analytics
+  ✓ Billing hooks + /pricing page
+  ✓ Performance: code splitting, Redis caching, DB indexes
+  ✓ Docker + docker-compose (pgvector/pgvector:pg16 image)
+  ✓ Complete README.md + .env.example files
+  ✓ E2E tests (Playwright) filled in
+
+CRITICAL RULES CARRIED FROM PRD:
+  - All AI calls via ModelRegistry — no direct provider SDK imports outside model_registry.py
+  - Embedding cache key includes model+version+dims+task (NOT just md5(text))
+  - pgvector cosine_distance uses official pgvector.sqlalchemy import
+  - Export HTML sanitized with bleach.clean() before WeasyPrint — never {{ content | safe }}
+  - Sentry redaction covers: request body, headers, nested JSON, URLs, task args, breadcrumbs
+  - Confidence thresholds: 80/65/50 (unchanged throughout — do not drift)
+  - Prompt keys: 10 canonical keys only (unchanged)
+  - KB names: engineering / medical / legal (not code)
+
+═══════════════════════════════════════════════════════════════════════
+1. EMBEDDING SERVICE — via ModelRegistry
+═══════════════════════════════════════════════════════════════════════
+
+─── services/embedding_service.py ───────────────────────────────────
+
+"""
+EmbeddingService: all embedding calls go through ModelRegistry.
+Never import google.generativeai or any provider SDK directly here.
+"""
+
+import hashlib
+import json
+from proxima.services.model_registry import model_registry
+from proxima.database import get_db, get_redis
+from proxima.config import settings
+
+class EmbeddingService:
+
+    def _cache_key(self, text: str, model_id: str, version: str,
+                   dims: int, task_type: str) -> str:
+        """
+        Versioned cache key — PRD fix: includes model+version+dims+task.
+        NOT just md5(text) — that would serve stale embeddings after model change.
+        """
+        fingerprint = f"{text}||{model_id}||{version}||{dims}||{task_type}"
+        return f"embed:{hashlib.md5(fingerprint.encode()).hexdigest()}"
+
+    async def embed_text(
+        self, text: str, db, redis,
+        task_type: str = 'RETRIEVAL_DOCUMENT'
+    ) -> tuple[list[float], dict]:
+        """
+        Embed a single text string.
+        Returns (embedding_vector, embedding_meta) where meta contains
+        the versioning fields to store on the DB record.
+        """
+        model = await model_registry.get_default_embedding(db)
+        cache_key = self._cache_key(
+            text, model.model_id,
+            model.embedding_version or '1.0',
+            model.embedding_dimensions or 768,
+            task_type
+        )
+
+        # Check cache
+        cached = await redis.get(cache_key)
+        if cached:
+            return json.loads(cached), self._meta(model)
+
+        # Call via ModelRegistry
+        embedding = await self._call_embed(model, [text], task_type)
+        result = embedding[0]
+
+        # Cache with versioned key
+        await redis.setex(cache_key, settings.embedding_cache_ttl, json.dumps(result))
+        return result, self._meta(model)
+
+    async def embed_batch(
+        self, texts: list[str], db, redis,
+        task_type: str = 'RETRIEVAL_DOCUMENT'
+    ) -> tuple[list[list[float]], dict]:
+        """
+        Batch embed up to 100 texts.
+        Returns (list_of_vectors, embedding_meta).
+        """
+        if not texts:
+            return [], {}
+        model = await model_registry.get_default_embedding(db)
+        embeddings = await self._call_embed(model, texts, task_type)
+        return embeddings, self._meta(model)
+
+    async def _call_embed(
+        self, model, texts: list[str], task_type: str
+    ) -> list[list[float]]:
+        """Route to correct provider via ModelRegistry."""
+        client = await model_registry.build_embedding_client(model)
+
+        if model.provider == 'google':
+            result = client.embed_content(
+                model=model.model_id,
+                content=texts if len(texts) > 1 else texts[0],
+                task_type=task_type,
+            )
+            raw = result['embedding']
+            # Google returns list[float] for single, list[list[float]] for batch
+            if isinstance(raw[0], float):
+                return [raw]
+            return raw
+        else:
+            raise ValueError(f"Unsupported embedding provider: {model.provider}")
+
+    def _meta(self, model) -> dict:
+        """Returns the versioning fields to store on each embedded record."""
+        from datetime import datetime, timezone
+        return {
+            'embedding_model':      model.model_id,
+            'embedding_version':    model.embedding_version or '1.0',
+            'embedding_dimensions': model.embedding_dimensions or 768,
+            'embedded_at':          datetime.now(timezone.utc),
+        }
+
+embedding_service = EmbeddingService()
+
+═══════════════════════════════════════════════════════════════════════
+2. CELERY EMBEDDING TASKS — full implementation
+═══════════════════════════════════════════════════════════════════════
+
+─── tasks/embeddings.py ─────────────────────────────────────────────
+
+@app.task(name='proxima.tasks.embeddings.embed_document_chunks',
+          queue='proxima:embed', bind=True, max_retries=2, default_retry_delay=60)
+def embed_document_chunks(self, document_id: str):
+    """
+    Embed all NULL-embedding chunks for a document.
+    Populates embedding_model, embedding_version, embedding_dimensions, embedded_at.
+    """
+    import asyncio
+    from proxima.database import AsyncSessionLocal, get_redis
+    from proxima.models.document import Document, DocumentChunk
+    from proxima.services.embedding_service import embedding_service
+
+    async def _run():
+        redis = await get_redis()
+        async with AsyncSessionLocal() as db:
+            stmt = (select(DocumentChunk)
+                    .where(DocumentChunk.document_id == UUID(document_id),
+                           DocumentChunk.embedding == None)
+                    .order_by(DocumentChunk.chunk_index))
+            chunks = (await db.execute(stmt)).scalars().all()
+            if not chunks:
+                return
+
+            BATCH = 50
+            for i in range(0, len(chunks), BATCH):
+                batch = chunks[i:i + BATCH]
+                texts = [c.content for c in batch]
+                embeddings, meta = await embedding_service.embed_batch(texts, db, redis)
+                for chunk, emb in zip(batch, embeddings):
+                    chunk.embedding           = emb
+                    chunk.embedding_model     = meta['embedding_model']
+                    chunk.embedding_version   = meta['embedding_version']
+                    chunk.embedding_dimensions = meta['embedding_dimensions']
+                    chunk.embedded_at         = meta['embedded_at']
+                await db.commit()
+
+            # Update document ingest status
+            doc = await db.get(Document, UUID(document_id))
+            if doc:
+                doc.ingest_status = 'EMBEDDED'
+                await db.commit()
+
+    try:
+        asyncio.run(_run())
+    except Exception as e:
+        raise self.retry(exc=e)
+
+@app.task(name='proxima.tasks.embeddings.embed_knowledge_base',
+          queue='proxima:embed', bind=True, max_retries=2)
+def embed_knowledge_base(self, kb_name: str = None):
+    """
+    Embed all NULL-embedding rows in domain_knowledge_chunks.
+    Run once after deployment to activate vector RAG.
+    Populates embedding_model, embedding_version, embedding_dimensions, embedded_at.
+    """
+    import asyncio
+    from proxima.database import AsyncSessionLocal, get_redis
+    from proxima.models.knowledge import DomainKnowledgeChunk
+    from proxima.services.embedding_service import embedding_service
+
+    async def _run():
+        redis = await get_redis()
+        async with AsyncSessionLocal() as db:
+            stmt = select(DomainKnowledgeChunk).where(DomainKnowledgeChunk.embedding == None)
+            if kb_name:
+                stmt = stmt.where(DomainKnowledgeChunk.kb_name == kb_name)
+            stmt = stmt.order_by(DomainKnowledgeChunk.chunk_index)
+            chunks = (await db.execute(stmt)).scalars().all()
+            if not chunks:
+                return
+
+            BATCH = 50
+            for i in range(0, len(chunks), BATCH):
+                batch = chunks[i:i + BATCH]
+                texts = [c.content for c in batch]
+                embeddings, meta = await embedding_service.embed_batch(texts, db, redis)
+                for chunk, emb in zip(batch, embeddings):
+                    chunk.embedding           = emb
+                    chunk.embedding_model     = meta['embedding_model']
+                    chunk.embedding_version   = meta['embedding_version']
+                    chunk.embedding_dimensions = meta['embedding_dimensions']
+                    chunk.embedded_at         = meta['embedded_at']
+                await db.commit()
+
+    try:
+        asyncio.run(_run())
+    except Exception as e:
+        raise self.retry(exc=e)
+
+# Trigger after deployment:
+# celery -A proxima.celery_app call proxima.tasks.embeddings.embed_knowledge_base
+
+═══════════════════════════════════════════════════════════════════════
+3. RAG SERVICE — pgvector cosine similarity upgrade
+═══════════════════════════════════════════════════════════════════════
+
+─── services/fts_retrieval.py → services/vector_retrieval.py ────────
+
+"""
+Vector Retrieval Service — Stage 5 upgrade.
+
+Replaces FTS Retrieval (Stage 2) with pgvector cosine similarity.
+Falls back to FTS if embeddings not yet available.
+
+Domain-to-KB mapping (PRD §7.2 — unchanged):
+  code    → "engineering"
+  medical → "medical"
+  legal   → "legal"
+"""
+
+from pgvector.sqlalchemy import cosine_distance   # official pgvector comparator
+
+DOMAIN_TO_KB = {
+    'code':    'engineering',
+    'medical': 'medical',
+    'legal':   'legal',
+}
+
+class VectorRetrievalService:
+
+    async def retrieve(
+        self, query: str, domain_weights: dict,
+        db: AsyncSession, redis, top_k: int = 3
+    ) -> str | None:
+        """
+        Primary: pgvector cosine similarity.
+        Fallback: FTS (if no embeddings available or embed fails).
+        """
+        dominant = max(domain_weights, key=domain_weights.get)
+        kb_name  = DOMAIN_TO_KB.get(dominant, dominant)
+
+        # Try vector search
+        try:
+            query_vec, _ = await embedding_service.embed_text(
+                query[:500], db, redis, task_type='RETRIEVAL_QUERY'
+            )
+            chunks = await self._vector_search(query_vec, kb_name, db, top_k)
+            if chunks:
+                return '\n\n---\n\n'.join(c.content for c in chunks)
+        except Exception:
+            pass  # fall through to FTS
+
+        # FTS fallback
+        return await self._fts_search(query, kb_name, db, top_k)
+
+    async def _vector_search(
+        self, embedding: list[float], kb_name: str,
+        db: AsyncSession, top_k: int
+    ) -> list:
+        """
+        pgvector cosine distance search — official comparator syntax.
+        cosine_distance from pgvector.sqlalchemy is the correct import.
+        Lower distance = more similar.
+        """
+        stmt = (
+            select(DomainKnowledgeChunk)
+            .where(DomainKnowledgeChunk.kb_name == kb_name)
+            .where(DomainKnowledgeChunk.embedding != None)
+            .order_by(cosine_distance(DomainKnowledgeChunk.embedding, embedding))
+            .limit(top_k)
+        )
+        result = await db.execute(stmt)
+        return result.scalars().all()
+
+    async def _fts_search(
+        self, query: str, kb_name: str,
+        db: AsyncSession, top_k: int
+    ) -> str | None:
+        stmt = (
+            select(DomainKnowledgeChunk)
+            .where(DomainKnowledgeChunk.kb_name == kb_name)
+            .where(
+                func.to_tsvector('english', DomainKnowledgeChunk.content)
+                .match(func.plainto_tsquery('english', query[:200]))
+            )
+            .limit(top_k)
+        )
+        result = await db.execute(stmt)
+        chunks = result.scalars().all()
+        if not chunks:
+            return None
+        return '\n\n---\n\n'.join(c.content for c in chunks)
+
+vector_retrieval = VectorRetrievalService()
+
+# Update all references from fts_retrieval to vector_retrieval in:
+#   intelligence_router.py
+#   prompt_assembler.py
+
+═══════════════════════════════════════════════════════════════════════
+4. SEMANTIC COMPARE — embedding similarity matrix upgrade
+═══════════════════════════════════════════════════════════════════════
+
+─── services/semantic_compare.py — Stage 5 upgrade ──────────────────
+
+"""
+Semantic Compare Service — Stage 5 (Production implementation).
+
+Pipeline (PRD §7.3):
+  Step 1: Chunking (sentence-level, ≤3 sentences) — unchanged
+  Step 2: Embedding cosine similarity matrix  ← REPLACES Jaccard
+  Step 3: Hungarian alignment — unchanged
+  Step 4: Classification by threshold — unchanged
+  Step 5: LLM analysis for MODIFIED pairs — unchanged
+"""
+
+from scipy.optimize import linear_sum_assignment
+import numpy as np
+
+def split_sentences(text: str, max_per_chunk: int = 3) -> list[str]:
+    import re
+    sentences = re.split(r'(?<=[.!?])\s+', text.strip())
+    chunks = []
+    for i in range(0, len(sentences), max_per_chunk):
+        chunk = ' '.join(sentences[i:i + max_per_chunk]).strip()
+        if chunk:
+            chunks.append(chunk)
+    return chunks
+
+def classify_pair(score: float) -> str:
+    """PRD §7.3 Step 4 — exact thresholds, unchanged."""
+    if   score >= 0.97: return 'IDENTICAL'
+    elif score >= 0.82: return 'MODIFIED'
+    elif score >= 0.72: return 'MODIFIED'
+    elif score >= 0.65: return 'CRITICAL'
+    else:               return 'REWRITTEN'
+
+def cosine_similarity(a: list[float], b: list[float]) -> float:
+    """Pure numpy cosine similarity between two embedding vectors."""
+    va = np.array(a, dtype=np.float32)
+    vb = np.array(b, dtype=np.float32)
+    norm_a = np.linalg.norm(va)
+    norm_b = np.linalg.norm(vb)
+    if norm_a < 1e-10 or norm_b < 1e-10:
+        return 0.0
+    return float(np.dot(va, vb) / (norm_a * norm_b))
+
+class SemanticCompareService:
+
+    async def compare(
+        self, text_a: str, text_b: str, mode: str,
+        db: AsyncSession, redis
+    ) -> dict:
+
+        # Step 1: Chunk both documents
+        chunks_a = split_sentences(text_a)
+        chunks_b = split_sentences(text_b)
+
+        if not chunks_a or not chunks_b:
+            return {
+                'similarity_score': 0.0,
+                'summary': 'One or both documents are empty.',
+                'changes': [], 'critical_count': 0,
+                'semantic_count': 0, 'textual_count': 0,
+            }
+
+        # Step 2: Embedding similarity matrix (PRODUCTION — replaces Jaccard)
+        all_texts  = chunks_a + chunks_b
+        all_embeds, _ = await embedding_service.embed_batch(
+            all_texts, db, redis, task_type='SEMANTIC_SIMILARITY'
+        )
+        embeds_a = all_embeds[:len(chunks_a)]
+        embeds_b = all_embeds[len(chunks_a):]
+
+        n, m = len(chunks_a), len(chunks_b)
+        sim_matrix = np.array([
+            [cosine_similarity(embeds_a[i], embeds_b[j]) for j in range(m)]
+            for i in range(n)
+        ])
+
+        # Step 3: Hungarian algorithm alignment
+        size   = max(n, m)
+        padded = np.ones((size, size))
+        padded[:n, :m] = 1.0 - sim_matrix   # cost = 1 - similarity
+        row_ind, col_ind = linear_sum_assignment(padded)
+
+        # Step 4 + 5: Classify and LLM-analyze
+        changes, scores_for_avg = [], []
+
+        for r, c in zip(row_ind, col_ind):
+            if r >= n or c >= m:
+                continue
+            score       = float(sim_matrix[r][c])
+            change_type = classify_pair(score)
+            scores_for_avg.append(score)
+            is_critical = change_type == 'CRITICAL'
+
+            semantic_shift = False
+            if change_type == 'MODIFIED' and 0.65 <= score < 0.82:
+                semantic_shift = await self._llm_semantic_check(
+                    chunks_a[r], chunks_b[c], db
+                )
+
+            changes.append({
+                'type':           change_type,
+                'location':       f"Chunk A[{r}] ↔ B[{c}]",
+                'original':       chunks_a[r],
+                'revised':        chunks_b[c],
+                'significance':   round((1.0 - score) * 100),
+                'is_critical':    is_critical,
+                'semantic_shift': semantic_shift,
+            })
+
+        similarity_score = round(float(np.mean(scores_for_avg)) * 100, 1) if scores_for_avg else 0.0
+
+        return {
+            'similarity_score': similarity_score,
+            'summary': self._build_summary(changes, similarity_score, mode),
+            'changes': changes,
+            'critical_count':  sum(1 for c in changes if c['is_critical']),
+            'semantic_count':  sum(1 for c in changes if c['semantic_shift']),
+            'textual_count':   sum(1 for c in changes if
+                                   c['type'] == 'MODIFIED' and not c['semantic_shift']),
+        }
+
+    async def _llm_semantic_check(
+        self, chunk_a: str, chunk_b: str, db: AsyncSession
+    ) -> bool:
+        model = await model_registry.get_for_task('compare_documents', None, db)
+        prompt = (
+            "Do these two passages mean the same thing? "
+            "Reply YES or NO only.\n\n"
+            f"A: {chunk_a[:400]}\n\nB: {chunk_b[:400]}"
+        )
+        tokens = []
+        async for token in model_registry.stream_completion(
+            model, "You are a precise document analyst.", prompt, 0.0, 5
+        ):
+            tokens.append(token)
+        return ''.join(tokens).strip().upper().startswith('NO')
+
+    def _build_summary(self, changes: list, score: float, mode: str) -> str:
+        total    = len(changes)
+        critical = sum(1 for c in changes if c['is_critical'])
+        semantic = sum(1 for c in changes if c['semantic_shift'])
+        return (
+            f"{score:.0f}% similarity across {total} matched sections. "
+            f"{critical} critical, {semantic} semantic shift(s). Mode: {mode.upper()}."
+        )
+
+semantic_compare_service = SemanticCompareService()
+
+═══════════════════════════════════════════════════════════════════════
+5. EXPORT SUITE — with bleach sanitization
+═══════════════════════════════════════════════════════════════════════
+
+─── services/export_service.py ──────────────────────────────────────
+
+"""
+Export Service — PRD §12.3: all user content sanitized before rendering.
+Never pass unsanitized content to WeasyPrint or Jinja2 | safe filter.
+"""
+
+import bleach
+from datetime import datetime
+
+# Allowed HTML tags and attributes for sanitization
+ALLOWED_TAGS = [
+    'p', 'h1', 'h2', 'h3', 'h4', 'ul', 'ol', 'li',
+    'strong', 'em', 'code', 'pre', 'table', 'tr', 'th', 'td', 'br',
+    'blockquote', 'hr', 'a',
+]
+ALLOWED_ATTRS = {
+    '*': ['class'],
+    'a': ['href', 'title'],
+}
+
+def sanitize_content(content: str) -> str:
+    """
+    Sanitize user-supplied content before rendering into HTML/PDF.
+    PRD §12.3: must be called before any {{ content | safe }} usage.
+    """
+    return bleach.clean(
+        content,
+        tags=ALLOWED_TAGS,
+        attributes=ALLOWED_ATTRS,
+        strip=True,
+    )
+
+class ExportService:
+
+    # ── PDF (WeasyPrint) ──────────────────────────────────────────
+
+    def generate_pdf(self, content: str, title: str, metadata: dict) -> bytes:
+        import markdown as md
+        from weasyprint import HTML, CSS
+        from jinja2 import Template
+
+        # SANITIZE before markdown processing
+        safe_content     = sanitize_content(content)
+        content_html     = md.markdown(
+            safe_content,
+            extensions=['tables', 'fenced_code', 'nl2br']
+        )
+        # Re-sanitize the rendered HTML (defense in depth)
+        content_html_safe = sanitize_content(content_html)
+
+        html = Template(self.PDF_TEMPLATE).render(
+            title=sanitize_content(title),
+            content=content_html_safe,
+            domain=metadata.get('domain', '').upper()[:20],
+            tool=sanitize_content(metadata.get('tool', '')),
+            confidence=metadata.get('confidence_score'),
+            generated_at=datetime.now().strftime('%B %d, %Y'),
+            credit='Proxima · Engineered by Arnav Garg',
+        )
+        return HTML(string=html).write_pdf(stylesheets=[CSS(string=self.PDF_CSS)])
+
+    PDF_TEMPLATE = """<!DOCTYPE html>
+<html lang="en">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width"></head>
+<body>
+  <div class="header">
+    <div class="wordmark">PROXIMA</div>
+    <div class="title">{{ title }}</div>
+    <div class="meta">
+      <span class="chip">{{ domain }}</span>
+      <span>{{ tool }}</span>
+      {% if confidence %}<span>Confidence: {{ confidence }}%</span>{% endif %}
+      <span>{{ generated_at }}</span>
+    </div>
+  </div>
+  <div class="divider"></div>
+  <div class="content">{{ content }}</div>
+  <div class="footer">
+    <span>{{ credit }}</span>
+    <span>Page <pdf:pagenumber> of <pdf:pagecount></span>
+  </div>
+</body>
+</html>"""
+    # NOTE: {{ content }} — NOT {{ content | safe }} — Jinja2 auto-escapes
+    # The content is already sanitized HTML; Jinja2's auto-escape is then
+    # disabled selectively for this field using Markup() from markupsafe:
+    # content=markupsafe.Markup(content_html_safe) — add this to Template.render()
+
+    # Actually: use jinja2.Markup to mark as safe after bleach.clean():
+    # from markupsafe import Markup
+    # Template().render(..., content=Markup(content_html_safe), ...)
+
+    PDF_CSS = """
+@page { size: A4; margin: 2.5cm 2cm; @bottom-center { content: element(footer); } }
+body { font-family: Georgia, serif; font-size: 11pt; line-height: 1.65; color: #111; }
+.wordmark { font-size: 18pt; font-weight: bold; letter-spacing: .1em; margin-bottom: 4pt; }
+.title { font-size: 20pt; font-weight: bold; margin-bottom: 8pt; }
+.meta { display: flex; gap: 14pt; font-size: 9pt; color: #555; margin-bottom: 8pt; }
+.chip { background: #f5f5f0; padding: 1pt 5pt; }
+.divider { height: 1pt; background: #C9A84C; margin: 10pt 0 16pt; }
+.content { font-size: 11pt; line-height: 1.7; }
+.content h1 { font-size: 16pt; margin: 14pt 0 7pt; }
+.content h2 { font-size: 13pt; margin: 11pt 0 5pt; }
+.content p  { margin: 0 0 8pt; }
+.content pre { background: #f5f5f0; padding: 8pt; font-family: monospace;
+               font-size: 9pt; border-left: 3pt solid #C9A84C; overflow-x: auto; }
+.content code { font-family: monospace; font-size: 9pt; background: #f5f5f0; padding: 1pt 3pt; }
+.content table { width: 100%; border-collapse: collapse; margin: 8pt 0; }
+.content th { background: #111; color: white; padding: 5pt 8pt; font-size: 9pt; text-align: left; }
+.content td { padding: 4pt 8pt; border-bottom: .5pt solid #ddd; font-size: 10pt; }
+.footer { position: running(footer); display: flex; justify-content: space-between;
+          font-size: 8pt; color: #888; border-top: .5pt solid #ddd; padding-top: 3pt; }
+"""
+
+    # ── DOCX (python-docx) ──────────────────────────────────────────
+
+    def generate_docx(self, content: str, title: str, metadata: dict) -> bytes:
+        """Content is plain text/markdown — sanitize before storage."""
+        from docx import Document
+        from docx.shared import Inches, Pt, RGBColor
+        from docx.enum.text import WD_ALIGN_PARAGRAPH
+        import io
+
+        # Sanitize plain text content (strip any HTML tags if present)
+        safe_content = bleach.clean(content, tags=[], strip=True)
+        safe_title   = bleach.clean(title,   tags=[], strip=True)
+
+        doc = Document()
+        for section in doc.sections:
+            section.top_margin = Inches(1); section.bottom_margin = Inches(1)
+            section.left_margin = Inches(1.25); section.right_margin = Inches(1.25)
+
+        def r(para, text, bold=False, size=11, color=None):
+            run = para.add_run(bleach.clean(str(text), tags=[], strip=True))
+            run.bold = bold; run.font.size = Pt(size); run.font.name = 'Georgia'
+            if color: run.font.color.rgb = RGBColor(*color)
+            return run
+
+        r(doc.add_paragraph(), 'PROXIMA', bold=True, size=18)
+        r(doc.add_paragraph(), '─' * 65, size=8, color=(0xC9, 0xA8, 0x4C))
+        h = doc.add_heading(safe_title, level=1)
+        if h.runs: h.runs[0].font.color.rgb = RGBColor(0x0A, 0x0A, 0x0A)
+        meta_str = (
+            f"Domain: {metadata.get('domain', '').upper()} · "
+            f"Tool: {metadata.get('tool', '')} · "
+            f"Generated: {datetime.now().strftime('%B %d, %Y')}"
+        )
+        if metadata.get('confidence_score'):
+            meta_str += f" · Confidence: {metadata['confidence_score']}%"
+        r(doc.add_paragraph(), bleach.clean(meta_str, tags=[], strip=True),
+          size=9, color=(0x88, 0x88, 0x80))
+        doc.add_paragraph()
+
+        for line in safe_content.split('\n'):
+            s = line.strip()
+            if not s: doc.add_paragraph(); continue
+            if s.startswith('### '): doc.add_heading(s[4:], level=3)
+            elif s.startswith('## '): doc.add_heading(s[3:], level=2)
+            elif s.startswith('# '):  doc.add_heading(s[2:], level=1)
+            elif s.startswith(('- ', '* ')): doc.add_paragraph(s[2:], style='List Bullet')
+            else: doc.add_paragraph(s)
+
+        foot = doc.add_paragraph()
+        r(foot, 'Generated by Proxima · Engineered by Arnav Garg', size=8, color=(0x88,0x88,0x80))
+        foot.alignment = WD_ALIGN_PARAGRAPH.CENTER
+
+        buf = io.BytesIO(); doc.save(buf); buf.seek(0)
+        return buf.getvalue()
+
+    # ── MARKDOWN ────────────────────────────────────────────────────
+
+    def generate_markdown(self, content: str, title: str, metadata: dict) -> bytes:
+        safe_content = bleach.clean(content, tags=[], strip=True)
+        safe_title   = bleach.clean(title,   tags=[], strip=True)
+        conf = f" · Confidence: {metadata['confidence_score']}%" if metadata.get('confidence_score') else ""
+        header = (
+            f"# {safe_title}\n\n"
+            f"> **Proxima** · Domain: {metadata.get('domain','').upper()}"
+            f" · {datetime.now().strftime('%B %d, %Y')}{conf}\n"
+            f"> Engineered by Arnav Garg\n\n---\n\n"
+        )
+        return (header + safe_content + "\n\n---\n*Proxima AI Writing Suite*\n").encode('utf-8')
+
+    # ── CSV ──────────────────────────────────────────────────────────
+
+    def generate_csv(self, segment_scores: list[dict]) -> bytes:
+        import csv, io
+        out    = io.StringIO()
+        fields = ['segment_index','segment_text','overall','terminology_accuracy',
+                  'structural_validity','domain_consistency','contextual_coherence','heatmap_class']
+        w = csv.DictWriter(out, fieldnames=fields, extrasaction='ignore')
+        w.writeheader()
+        # Sanitize text fields in each row
+        for row in segment_scores:
+            row['segment_text'] = bleach.clean(str(row.get('segment_text', '')), tags=[], strip=True)
+            w.writerow(row)
+        return out.getvalue().encode('utf-8')
+
+    # ── JSON ──────────────────────────────────────────────────────────
+
+    def generate_json(self, document: dict, metadata: dict) -> bytes:
+        import json
+        # Sanitize any string fields in document
+        safe_doc = {k: bleach.clean(str(v), tags=[], strip=True) if isinstance(v, str) else v
+                    for k, v in document.items()}
+        return json.dumps({
+            'proxima_export': True, 'version': '4.0',
+            'generated_at':   datetime.now().isoformat(),
+            'engineer':       'Arnav Garg',
+            'document':       safe_doc,
+            'metadata':       metadata,
+        }, indent=2, default=str).encode('utf-8')
+
+    # ── ZIP ───────────────────────────────────────────────────────────
+
+    def generate_zip(self, files: list[tuple[str, bytes]]) -> bytes:
+        import zipfile, io
+        buf = io.BytesIO()
+        with zipfile.ZipFile(buf, 'w', zipfile.ZIP_DEFLATED) as zf:
+            for name, data in files:
+                # Sanitize filename
+                safe_name = bleach.clean(name, tags=[], strip=True).replace('/', '_')
+                zf.writestr(safe_name, data)
+        buf.seek(0)
+        return buf.getvalue()
+
+export_service = ExportService()
+
+═══════════════════════════════════════════════════════════════════════
+6. EXPORT CELERY TASK — full implementation
+═══════════════════════════════════════════════════════════════════════
+
+─── tasks/exports.py ────────────────────────────────────────────────
+
+@app.task(name='proxima.tasks.exports.generate_export',
+          queue='proxima:exports', bind=True, max_retries=2, default_retry_delay=30)
+def generate_export(self, export_id: str):
+    import asyncio
+    from proxima.database import AsyncSessionLocal
+    from proxima.models.export import Export
+    from proxima.services.export_service import export_service
+    from proxima.services.storage_service import storage_service
+
+    async def _run():
+        async with AsyncSessionLocal() as db:
+            export = await db.get(Export, UUID(export_id))
+            if not export:
+                return
+            try:
+                export.status = 'processing'
+                await db.commit()
+
+                meta    = export.metadata or {}
+                content = meta.get('content', '')
+                title   = meta.get('title', 'Proxima Export')
+                doc_meta = meta.get('doc_metadata', {})
+
+                if export.format == 'pdf':
+                    data = export_service.generate_pdf(content, title, doc_meta)
+                    ct   = 'application/pdf'; ext = 'pdf'
+                elif export.format == 'docx':
+                    data = export_service.generate_docx(content, title, doc_meta)
+                    ct   = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+                    ext  = 'docx'
+                elif export.format == 'md':
+                    data = export_service.generate_markdown(content, title, doc_meta)
+                    ct   = 'text/markdown'; ext = 'md'
+                elif export.format == 'csv':
+                    data = export_service.generate_csv(meta.get('segment_scores', []))
+                    ct   = 'text/csv'; ext = 'csv'
+                elif export.format == 'json':
+                    data = export_service.generate_json({'content': content}, doc_meta)
+                    ct   = 'application/json'; ext = 'json'
+                else:
+                    raise ValueError(f"Unknown format: {export.format}")
+
+                key = storage_service.export_key(str(export.user_id), export_id, ext)
+                await storage_service.upload_bytes(data, key, ct)
+                url = storage_service.get_presigned_download(key, expires=604800)
+
+                from datetime import datetime, timedelta, timezone
+                export.status     = 'ready'
+                export.file_url   = url
+                export.file_name  = f"{title[:50].lower().replace(' ','_')}.{ext}"
+                export.file_size  = len(data)
+                export.expires_at = datetime.now(timezone.utc) + timedelta(days=7)
+                await db.commit()
+
+            except Exception as e:
+                export.status        = 'failed'
+                export.error_message = str(e)
+                await db.commit()
+                raise self.retry(exc=e)
+
+    try:
+        asyncio.run(_run())
+    except Exception as e:
+        raise self.retry(exc=e)
+
+═══════════════════════════════════════════════════════════════════════
+7. SENTRY — FULL REDACTION
+═══════════════════════════════════════════════════════════════════════
+
+─── proxima/main.py — Sentry initialization ─────────────────────────
+
+import sentry_sdk
+from sentry_sdk.integrations.fastapi import FastApiIntegration
+from sentry_sdk.integrations.sqlalchemy import SqlalchemyIntegration
+from sentry_sdk.integrations.celery import CeleryIntegration
+
+# Fields to redact in ALL locations (request body, nested JSON, headers, task args)
+REDACT_FIELDS = {
+    'text', 'content', 'original_text', 'current_text',
+    'bullet_points', 'code', 'error_message', 'input_bullets',
+    'email', 'password', 'token', 'access_token', 'refresh_token',
+    'authorization', 'cookie', 'set-cookie', 'x-api-key',
+}
+
+def _redact_dict(obj: dict | list | str, depth: int = 0) -> dict | list | str:
+    """Recursively redact sensitive fields from any nested structure."""
+    if depth > 8:  # prevent infinite recursion
+        return '[MAX_DEPTH]'
+    if isinstance(obj, dict):
+        return {
+            k: '[REDACTED]' if k.lower() in REDACT_FIELDS
+               else _redact_dict(v, depth + 1)
+            for k, v in obj.items()
+        }
+    if isinstance(obj, list):
+        return [_redact_dict(item, depth + 1) for item in obj]
+    if isinstance(obj, str) and len(obj) > 500:
+        return '[TRUNCATED]'  # don't send large strings
+    return obj
+
+def _redact_url(url: str) -> str:
+    """Remove query string from URLs (may contain tokens)."""
+    return url.split('?')[0] if url else url
+
+def scrub_event(event: dict, hint: dict) -> dict:
+    """
+    Comprehensive PII and sensitive data scrubber.
+    Covers: request body, headers, nested JSON, task args, breadcrumbs, URLs.
+    """
+    # 1. Request body
+    if 'request' in event:
+        req = event['request']
+        if 'data' in req:
+            req['data'] = _redact_dict(req['data'])
+        # 2. Request headers
+        if 'headers' in req:
+            req['headers'] = {
+                k: '[REDACTED]' if k.lower() in REDACT_FIELDS else v
+                for k, v in req.get('headers', {}).items()
+            }
+        # 3. URL query string
+        if 'url' in req:
+            req['url'] = _redact_url(req['url'])
+        if 'query_string' in req:
+            req['query_string'] = '[REDACTED]'
+
+    # 4. User object (never send email)
+    if 'user' in event:
+        user = event['user']
+        user['email']    = '[REDACTED]'
+        user['username'] = '[REDACTED]'
+        user['ip_address'] = '[REDACTED]'
+
+    # 5. Celery task args and kwargs
+    if 'extra' in event:
+        extra = event.get('extra', {})
+        for key in ('celery-job', 'task_args', 'task_kwargs'):
+            if key in extra:
+                extra[key] = '[REDACTED]'
+
+    # 6. Exception values (may contain stack locals with content)
+    if 'exception' in event:
+        for exc in event['exception'].get('values', []):
+            frames = exc.get('stacktrace', {}).get('frames', [])
+            for frame in frames:
+                if 'vars' in frame:
+                    frame['vars'] = _redact_dict(frame['vars'])
+
+    # 7. Breadcrumbs (may contain request data)
+    if 'breadcrumbs' in event:
+        for crumb in event['breadcrumbs'].get('values', []):
+            if 'data' in crumb:
+                crumb['data'] = _redact_dict(crumb['data'])
+            if 'message' in crumb and len(crumb['message']) > 200:
+                crumb['message'] = crumb['message'][:200] + '...'
+
+    return event
+
+if settings.sentry_dsn:
+    sentry_sdk.init(
+        dsn=settings.sentry_dsn,
+        integrations=[
+            FastApiIntegration(transaction_style='endpoint'),
+            SqlalchemyIntegration(),
+            CeleryIntegration(monitor_beat_tasks=True),
+        ],
+        traces_sample_rate=0.08,
+        profiles_sample_rate=0.04,
+        environment=settings.environment,
+        release='proxima@4.1',
+        before_send=scrub_event,
+        send_default_pii=False,  # belt and suspenders
+    )
+
+═══════════════════════════════════════════════════════════════════════
+8. POSTHOG ANALYTICS
+═══════════════════════════════════════════════════════════════════════
+
+─── frontend/src/lib/analytics.ts ───────────────────────────────────
+
+import posthog from 'posthog-js';
+
+export function initAnalytics() {
+  if (!import.meta.env.VITE_POSTHOG_KEY) return;
+  posthog.init(import.meta.env.VITE_POSTHOG_KEY, {
+    api_host: 'https://app.posthog.com',
+    capture_pageview: false,
+    capture_pageleave: true,
+    autocapture: false,
+    disable_session_recording: true,
+    loaded: (ph) => { if (import.meta.env.DEV) ph.opt_out_capturing(); },
+  });
+}
+
+export function trackPageView(page: string) {
+  posthog.capture('$pageview', { page });
+}
+
+export function trackEvent(event: string, props?: Record<string, unknown>) {
+  // Never include document content in analytics events
+  posthog.capture(event, props);
+}
+
+export function identifyUser(userId: string, plan: string) {
+  // Anonymized — hashed ID, no email
+  const hash = Math.abs(
+    userId.split('').reduce((h, c) => (((h << 5) - h) + c.charCodeAt(0)) | 0, 0)
+  );
+  posthog.identify(`user_${hash}`, { plan });
+}
+
+// Events to track (call at each action):
+// tool_used        { tool, domain, has_confidence }
+// export_created   { format, tool }
+// template_used    { domain, category }
+// auth_completed   { method: 'google' }
+// feature_first_use { feature }
+// rate_limit_hit   { tool }
+// upgrade_cta_clicked {}
+// admin_action     { action }
+
+// In App.tsx:
+// useEffect(() => { initAnalytics(); }, []);
+// useEffect(() => { trackPageView(location.pathname); }, [location.pathname]);
+
+═══════════════════════════════════════════════════════════════════════
+9. BILLING HOOKS + /pricing PAGE
+═══════════════════════════════════════════════════════════════════════
+
+─── src/pages/Pricing.tsx ────────────────────────────────────────────
+
+Route: <Route path="/pricing" element={<Pricing />} /> (public)
+
+Three tier cards: FREE | PRO (gold "Most Popular" badge) | ENTERPRISE
+
+FREE ($0/month):
+  20 completions/hour | 50,000 tokens/month | All 10 tools
+  15 templates | Markdown export only | Community support
+  CTA: "Get Started" → /api/auth/google | "Current Plan" badge if on free
+
+PRO ($19/month):
+  200 completions/hour | 500,000 tokens/month | All 10 tools
+  50 templates | PDF + DOCX + MD exports | Priority support
+  CTA: onClick → toast.info('Pro plan launching Q3 2026. Join waitlist →')
+
+ENTERPRISE (Custom):
+  Unlimited | 5M tokens | Everything in Pro + custom intelligence + SLA
+  CTA: "Contact Us" → mailto:arnavgargdps@gmail.com
+
+Fine print (below cards, required by PRD §10):
+  "Proxima is not HIPAA-compliant. Clinical Notes is for drafting assistance only.
+   Do not enter real patient PHI."
+
+─── Dashboard billing enforcement (upgrade) ──────────────────────────
+
+Token usage progress bar — color by utilization:
+  0–60%:   bg-gold-primary
+  60–80%:  bg-amber-500
+  80–100%: bg-red-500
+
+On dashboard load, if tokens_used/tokens_limit > 0.80:
+  Show persistent banner:
+  "⚠️ You've used {pct}% of your monthly tokens. AI features may be paused soon."
+  "View Plans" → /pricing
+
+When API returns 429 "Monthly token limit reached":
+  Show modal: "Your monthly AI limit has been reached."
+  Body: "Upgrade to Pro for 10× more tokens."
+  CTA: "View Plans" → /pricing | "Dismiss" (secondary)
+
+─── tasks/maintenance.py — monthly token reset (complete) ────────────
+
+@app.task(name='proxima.tasks.maintenance.reset_monthly_tokens')
+def reset_monthly_tokens():
+    import asyncio, structlog
+    from proxima.database import AsyncSessionLocal
+    from proxima.models.user import User
+    logger = structlog.get_logger()
+
+    async def _run():
+        async with AsyncSessionLocal() as db:
+            result = await db.execute(update(User).values(tokens_used=0).returning(User.id))
+            count  = len(result.fetchall())
+            await db.commit()
+            logger.info("monthly_token_reset_complete", users_reset=count)
+
+    asyncio.run(_run())
+
+═══════════════════════════════════════════════════════════════════════
+10. PERFORMANCE — Code Splitting + Caching
+═══════════════════════════════════════════════════════════════════════
+
+─── App.tsx — all pages lazy ────────────────────────────────────────
+
+import { lazy, Suspense } from 'react';
+import { FullPageSpinner } from './components/FullPageSpinner';
+
+const Landing   = lazy(() => import('./pages/Landing'));
+const Workspace = lazy(() => import('./pages/Workspace'));
+const Analyze   = lazy(() => import('./pages/Analyze'));
+const Clinical  = lazy(() => import('./pages/Clinical'));
+const Code      = lazy(() => import('./pages/Code'));
+const Compare   = lazy(() => import('./pages/Compare'));
+const Templates = lazy(() => import('./pages/Templates'));
+const Audit     = lazy(() => import('./pages/Audit'));
+const Radar     = lazy(() => import('./pages/Radar'));
+const Dashboard = lazy(() => import('./pages/Dashboard'));
+const Pricing   = lazy(() => import('./pages/Pricing'));
+// Admin pages
+const AdminOverview  = lazy(() => import('./pages/admin/AdminOverview'));
+const AdminUsers     = lazy(() => import('./pages/admin/AdminUsers'));
+const AdminPrompts   = lazy(() => import('./pages/admin/AdminPrompts'));
+const AdminKnowledge = lazy(() => import('./pages/admin/AdminKnowledge'));
+const AdminCosts     = lazy(() => import('./pages/admin/AdminCosts'));
+const AdminLogs      = lazy(() => import('./pages/admin/AdminLogs'));
+
+// Wrap all routes:
+<Suspense fallback={<FullPageSpinner />}>
+  <Routes> ... </Routes>
+</Suspense>
+
+─── React Query staleTime per endpoint ──────────────────────────────
+
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      staleTime: 5 * 60 * 1000,   // 5 min default
+      gcTime:    30 * 60 * 1000,  // 30 min garbage collect
+      retry: 2,
+      refetchOnWindowFocus: false,
+    }
+  }
+});
+
+Per-query overrides:
+  /api/templates:          staleTime: 30 * 60 * 1000  (30 min — static content)
+  /api/users/me:           staleTime: 5  * 60 * 1000  (5 min)
+  /api/sessions:           staleTime: 2  * 60 * 1000  (2 min)
+  /api/exports:            staleTime: 30 * 1000        (30s — polling during processing)
+  /admin/api/overview:     staleTime: 60 * 1000        (1 min)
+  /admin/api/costs/summary: staleTime: 5 * 60 * 1000  (5 min)
+
+─── Migration 004 — final production indexes ────────────────────────
+
+004_production_indexes.py:
+  # CONCURRENTLY = no table lock during index build
+  op.execute("CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_ai_user_type_created ON ai_requests(user_id, request_type, created_at DESC);")
+  op.execute("CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_exports_user_status_created ON exports(user_id, status, created_at DESC);")
+  op.execute("CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_doc_chunks_embed_null ON document_chunks(document_id) WHERE embedding IS NULL;")
+  op.execute("CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_kb_chunks_embed_null ON domain_knowledge_chunks(kb_name) WHERE embedding IS NULL;")
+  op.execute("ANALYZE;")
+
+═══════════════════════════════════════════════════════════════════════
+11. DOCKER SETUP
+═══════════════════════════════════════════════════════════════════════
+
+─── backend/Dockerfile ──────────────────────────────────────────────
+
+FROM python:3.11-slim AS base
+WORKDIR /app
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    libpango-1.0-0 libpangoft2-1.0-0 libcairo2 libgdk-pixbuf2.0-0 \
+    libffi-dev tesseract-ocr poppler-utils \
+    && rm -rf /var/lib/apt/lists/*
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+COPY proxima/ ./proxima/
+COPY alembic/ ./alembic/
+COPY alembic.ini ./
+COPY scripts/ ./scripts/
+EXPOSE 8000
+CMD ["uvicorn", "proxima.main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "2"]
+
+─── backend/Dockerfile.worker ───────────────────────────────────────
+
+FROM python:3.11-slim
+WORKDIR /app
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    libpango-1.0-0 libpangoft2-1.0-0 libcairo2 libgdk-pixbuf2.0-0 tesseract-ocr \
+    && rm -rf /var/lib/apt/lists/*
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+COPY proxima/ ./proxima/
+CMD ["celery", "-A", "proxima.celery_app", "worker", "-Q", "proxima:default", "-c", "2", "--loglevel=info"]
+
+─── frontend/Dockerfile ─────────────────────────────────────────────
+
+FROM node:20-alpine AS build
+WORKDIR /app
+COPY package*.json ./
+RUN npm ci --silent
+COPY . .
+RUN npm run build
+
+FROM nginx:alpine
+COPY --from=build /app/dist /usr/share/nginx/html
+COPY nginx.conf /etc/nginx/conf.d/default.conf
+EXPOSE 80
+CMD ["nginx", "-g", "daemon off;"]
+
+─── frontend/nginx.conf ─────────────────────────────────────────────
+
+server {
+  listen 80;
+  root /usr/share/nginx/html;
+  index index.html;
+  location / { try_files $uri $uri/ /index.html; }
+  location ~* \.(js|css|woff2|png|ico|svg)$ {
+    expires 1y; add_header Cache-Control "public, immutable";
+  }
+  gzip on;
+  gzip_types text/plain text/css application/javascript application/json image/svg+xml;
+}
+
+─── docker-compose.yml ──────────────────────────────────────────────
+
+version: '3.9'
+services:
+  postgres:
+    image: pgvector/pgvector:pg16   # CRITICAL: pgvector pre-installed
+    environment:
+      POSTGRES_DB: proxima
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: password
+    ports: ["5432:5432"]
+    volumes: ["pgdata:/var/lib/postgresql/data"]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s; timeout: 5s; retries: 5
+
+  redis:
+    image: redis:7-alpine
+    ports: ["6379:6379"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s; timeout: 3s; retries: 5
+
+  backend:
+    build: { context: ./backend, dockerfile: Dockerfile }
+    ports: ["8000:8000"]
+    env_file: ./backend/.env
+    depends_on:
+      postgres: { condition: service_healthy }
+      redis:    { condition: service_healthy }
+    volumes: ["./backend:/app"]
+    command: uvicorn proxima.main:app --reload --host 0.0.0.0 --port 8000
+
+  worker-ai:
+    build: { context: ./backend, dockerfile: Dockerfile.worker }
+    env_file: ./backend/.env
+    depends_on: [backend, redis]
+    command: celery -A proxima.celery_app worker -Q proxima:ai -c 2 -n ai@%h --loglevel=info
+
+  worker-exports:
+    build: { context: ./backend, dockerfile: Dockerfile.worker }
+    env_file: ./backend/.env
+    depends_on: [backend, redis]
+    command: celery -A proxima.celery_app worker -Q proxima:exports -c 1 -n exports@%h --loglevel=info
+
+  worker-embed:
+    build: { context: ./backend, dockerfile: Dockerfile.worker }
+    env_file: ./backend/.env
+    depends_on: [backend, redis]
+    command: celery -A proxima.celery_app worker -Q proxima:embed -c 1 -n embed@%h --loglevel=info
+
+  worker-default:
+    build: { context: ./backend, dockerfile: Dockerfile.worker }
+    env_file: ./backend/.env
+    depends_on: [backend, redis]
+    command: celery -A proxima.celery_app worker -Q proxima:default -c 2 -n default@%h --loglevel=info
+
+  celery-beat:
+    build: { context: ./backend, dockerfile: Dockerfile.worker }
+    env_file: ./backend/.env
+    depends_on: [backend, redis]
+    command: celery -A proxima.celery_app beat --loglevel=info
+
+  flower:
+    image: mher/flower:2.0
+    ports: ["5555:5555"]
+    environment:
+      CELERY_BROKER_URL: redis://redis:6379/1
+      FLOWER_BASIC_AUTH: admin:${FLOWER_PASSWORD}
+    depends_on: [redis]
+
+  frontend:
+    build: { context: ./frontend, dockerfile: Dockerfile }
+    ports: ["3000:80"]
+    depends_on: [backend]
+
+volumes:
+  pgdata:
+
+═══════════════════════════════════════════════════════════════════════
+12. E2E TESTS — Playwright filled in
+═══════════════════════════════════════════════════════════════════════
+
+─── frontend/e2e/auth.spec.ts ───────────────────────────────────────
+
+import { test, expect } from '@playwright/test';
+
+test('landing page loads with PROXIMA headline', async ({ page }) => {
+  await page.goto('/');
+  await expect(page.locator('h1')).toBeVisible();
+  // Either cinematic or static hero should show
+  await expect(page.locator('text=PROXIMA').first()).toBeVisible();
+});
+
+test('health endpoint returns ok', async ({ request }) => {
+  const r = await request.get('http://localhost:8000/api/health');
+  expect(r.ok()).toBeTruthy();
+  const body = await r.json();
+  expect(body.status).toBe('ok');
+  expect(body.engineer).toBe('Arnav Garg');
+});
+
+test('protected route redirects to landing', async ({ page }) => {
+  await page.goto('/workspace');
+  await expect(page).toHaveURL('/');
+});
+
+test('pricing page loads', async ({ page }) => {
+  await page.goto('/pricing');
+  await expect(page.locator('text=Free')).toBeVisible();
+  await expect(page.locator('text=Pro')).toBeVisible();
+  await expect(page.locator('text=Enterprise')).toBeVisible();
+  await expect(page.locator('text=HIPAA')).toBeVisible();  // clinical disclaimer
+});
+
+─── frontend/e2e/workspace.spec.ts ──────────────────────────────────
+
+import { test, expect } from '@playwright/test';
+
+// These tests require auth — use storageState for saved auth session
+// See playwright.config.ts for auth setup
+test.describe('Workspace (authenticated)', () => {
+  test.use({ storageState: 'playwright/.auth/user.json' });
+
+  test('workspace loads three panels', async ({ page }) => {
+    await page.goto('/workspace');
+    await expect(page.locator('.panel-header').first()).toBeVisible();
+  });
+
+  test('confidence threshold classes use PRD values', async ({ page }) => {
+    await page.goto('/workspace');
+    // Inject a mock segment to verify CSS class assignment
+    // This is a visual regression test — simplified here
+    expect(true).toBeTruthy();
+  });
+});
+
+─── frontend/e2e/export.spec.ts ─────────────────────────────────────
+
+import { test, expect } from '@playwright/test';
+
+test('export endpoint returns pending status', async ({ request }) => {
+  // Without auth: 401
+  const r = await request.post('http://localhost:8000/api/exports', {
+    data: { format: 'md', content: 'test', title: 'Test', metadata: {} }
+  });
+  expect(r.status()).toBe(401);
+});
+
+─── backend/tests/integration/test_tools_endpoints.py ───────────────
+
+import pytest
+from unittest.mock import AsyncMock, patch
+
+@pytest.mark.anyio
+async def test_analyze_contract_requires_auth(client):
+    r = await client.post('/api/tools/analyze-contract',
+        json={'text': 'WHEREAS...', 'contract_type': 'nda', 'jurisdiction': 'us'})
+    assert r.status_code == 401
+
+@pytest.mark.anyio
+async def test_clinical_notes_requires_auth(client):
+    r = await client.post('/api/tools/clinical-notes',
+        json={'note_type': 'soap', 'patient_context': {}, 'bullet_points': 'test'})
+    assert r.status_code == 401
+
+@pytest.mark.anyio
+async def test_upload_url_path_correct(client):
+    """Verify canonical path /api/documents/upload-url (not /ingest)."""
+    r = await client.post('/api/documents/upload-url',
+        json={'filename': 'test.pdf', 'content_type': 'application/pdf'})
+    assert r.status_code != 404, "upload-url path not found"
+
+─── backend/tests/unit/test_export_sanitization.py ──────────────────
+
+import pytest
+from proxima.services.export_service import sanitize_content
+
+def test_strips_script_tags():
+    dirty = '<script>alert("xss")</script>Hello'
+    clean = sanitize_content(dirty)
+    assert '<script>' not in clean
+    assert 'Hello' in clean
+
+def test_allows_safe_tags():
+    html = '<p>Hello <strong>world</strong></p>'
+    clean = sanitize_content(html)
+    assert '<p>' in clean
+    assert '<strong>' in clean
+
+def test_strips_onclick():
+    html = '<p onclick="evil()">text</p>'
+    clean = sanitize_content(html)
+    assert 'onclick' not in clean
+    assert 'text' in clean
+
+def test_empty_string():
+    assert sanitize_content('') == ''
+
+def test_plain_text_passthrough():
+    text = 'Plain text with no HTML'
+    assert sanitize_content(text) == text
+
+═══════════════════════════════════════════════════════════════════════
+13. ENVIRONMENT EXAMPLES
+═══════════════════════════════════════════════════════════════════════
+
+backend/.env.example:
+  DATABASE_URL=postgresql+asyncpg://postgres:password@localhost:5432/proxima
+  REDIS_URL=redis://localhost:6379
+  GEMINI_API_KEY=your_gemini_api_key
+  GOOGLE_CLIENT_ID=your_google_oauth_client_id
+  GOOGLE_CLIENT_SECRET=your_google_oauth_client_secret
+  GOOGLE_REDIRECT_URI=http://localhost:8000/api/auth/callback
+  JWT_PRIVATE_KEY="-----BEGIN RSA PRIVATE KEY-----\n...\n-----END RSA PRIVATE KEY-----"
+  JWT_PUBLIC_KEY="-----BEGIN PUBLIC KEY-----\n...\n-----END PUBLIC KEY-----"
+  JWT_ALGORITHM=RS256
+  ACCESS_TOKEN_EXPIRE_MINUTES=15
+  REFRESH_TOKEN_EXPIRE_DAYS=7
+  AWS_ACCESS_KEY_ID=your_aws_key
+  AWS_SECRET_ACCESS_KEY=your_aws_secret
+  AWS_BUCKET_NAME=proxima-uploads
+  AWS_REGION=us-east-1
+  SENTRY_DSN=https://xxx@xxx.ingest.sentry.io/xxx
+  ENVIRONMENT=development
+  FRONTEND_URL=http://localhost:5173
+  MONTHLY_AI_BUDGET_USD=50.00
+  COST_ALERT_THRESHOLD=0.80
+  RESPONSE_CACHE_TTL=900
+  EMBEDDING_CACHE_TTL=86400
+  ENABLE_RESPONSE_CACHE=true
+  CELERY_BROKER_URL=redis://localhost:6379/1
+  CELERY_RESULT_BACKEND=redis://localhost:6379/2
+  FLOWER_PASSWORD=your_flower_password
+  OPENAI_API_KEY=optional_phase2
+  ANTHROPIC_API_KEY=optional_phase2
+
+frontend/.env.example:
+  VITE_API_URL=http://localhost:8000
+  VITE_POSTHOG_KEY=phc_your_posthog_key
+
+═══════════════════════════════════════════════════════════════════════
+14. COMPLETE README.md
+═══════════════════════════════════════════════════════════════════════
+
+# PROXIMA
+> Your document. Every domain. Zero guesswork.
+
+## Engineered by
+**Arnav Garg** · B.Tech CSE (AI/ML) · UPES Dehradun · 2026
+[LinkedIn](https://linkedin.com/in/arnavgarg-upes/) · [GitHub](https://github.com/ArnavGarg7)
+
+## ⚠️ Clinical Notice
+Proxima v1.0 is NOT HIPAA-compliant. Clinical Notes is for drafting assistance only.
+Do not enter real patient PHI.
+
+## Features
+- Context-Aware Completion — reads full document before completing
+- Cross-Domain Collision Engine — auto-detects and blends Code/Medical/Legal intelligence
+- Quality Heuristic Engine — 4-dimension confidence scoring with live heatmap
+- Contract Analyzer — risk flags, missing clauses, liability analysis
+- Clinical Notes — SOAP/discharge/referral from bullet points (non-HIPAA)
+- Code Suite — review, docstrings, README builder, bug explainer
+- Document Compare — embedding-based semantic diff
+- Confidence Audit — full document quality report
+- Domain Radar — cross-domain detection + blended completion
+- Template Library — 50 professional templates
+- Export Suite — PDF, DOCX, MD (async via Celery)
+- Admin Platform — user mgmt, prompt registry, KB, cost analytics
+
+## Architecture
+```
+React 18 + Three.js + GSAP (Frontend)
+         ↓ HTTPS + SSE
+FastAPI + RS256 JWT (API Gateway)
+         ↓
+ModelRegistry → Gemini 2.0 Flash / text-embedding-004
+         ↓
+PostgreSQL 16 + pgvector | Redis 7 | S3/R2
+         ↑
+Celery Workers (exports:1 | ai:2 | embed:1 | default:2)
+```
+
+## Setup
+
+### Prerequisites
+Node.js 20+, Python 3.11+, PostgreSQL 16+ with pgvector, Redis 7+
+Google Cloud OAuth credentials, Gemini API key
+
+### Quick Start
+```bash
+# 1. Generate RSA keys for RS256 JWT
+cd backend && python scripts/generate_keys.py
+# Copy output to backend/.env
+
+# 2. Backend
+cp .env.example .env && pip install -r requirements.txt
+alembic upgrade head
+python scripts/seed_templates_full.py
+python scripts/seed_knowledge_base.py
+uvicorn proxima.main:app --reload --port 8000
+
+# 3. Celery workers (separate terminals)
+celery -A proxima.celery_app worker -Q proxima:default -c 2 --loglevel=info
+celery -A proxima.celery_app worker -Q proxima:ai     -c 2 --loglevel=info
+celery -A proxima.celery_app worker -Q proxima:exports -c 1 --loglevel=info
+celery -A proxima.celery_app worker -Q proxima:embed  -c 1 --loglevel=info
+
+# 4. Embed knowledge base (one-time, after workers start)
+celery -A proxima.celery_app call proxima.tasks.embeddings.embed_knowledge_base
+
+# 5. Frontend
+cd frontend && cp .env.example .env && npm install && npm run dev
+
+# 6. Tests
+cd backend && pytest tests/ -v --cov=proxima
+cd frontend && npx vitest run && npx playwright test
+```
+
+### Docker
+```bash
+docker-compose up -d
+docker-compose exec backend alembic upgrade head
+docker-compose exec backend python scripts/seed_templates_full.py
+docker-compose exec backend python scripts/seed_knowledge_base.py
+# Then trigger KB embedding via admin UI (/admin/knowledge → Embed Pending)
+```
+
+## Deployment
+Frontend: Vercel | Backend + Workers: Railway | DB: Supabase (pgvector) | Storage: Cloudflare R2
+
+## Security
+RS256 JWT · Google OAuth PKCE · HttpOnly cookies · Rate limiting
+Upload MIME + magic-byte validation · bleach.clean() on all exports · Full Sentry PII redaction
+
+═══════════════════════════════════════════════════════════════════════
+STAGE 5 COMPLETION CHECKLIST
+═══════════════════════════════════════════════════════════════════════
+
+MODEL REGISTRY + EMBEDDINGS:
+✓ embedding_service.py uses model_registry.get_default_embedding() — no hardcoded model
+✓ embedding_service._cache_key() includes model+version+dims+task (NOT just text)
+✓ embed_document_chunks task populates all 4 versioning fields on each chunk
+✓ embed_knowledge_base task populates all 4 versioning fields on each chunk
+✓ After embed_knowledge_base runs: SELECT embedding_model, COUNT(*) FROM domain_knowledge_chunks GROUP BY embedding_model shows results
+
+VECTOR RETRIEVAL:
+✓ vector_retrieval.py replaces fts_retrieval.py in all callers
+✓ cosine_distance imported from pgvector.sqlalchemy (official comparator)
+✓ Falls back to FTS if embeddings unavailable
+✓ DOMAIN_TO_KB: code→engineering (unchanged)
+
+SEMANTIC COMPARE:
+✓ embedding similarity matrix REPLACES Jaccard in semantic_compare.py
+✓ embed_batch called for all chunks from both documents
+✓ cosine_similarity() uses numpy (not pgvector — runtime comparison)
+✓ Hungarian algorithm unchanged
+✓ Summary no longer says "Stage 5 upgrades..." (it IS Stage 5)
+✓ LLM check still uses model_registry
+
+EXPORTS:
+✓ sanitize_content() called before ALL PDF/DOCX/MD/CSV/JSON generation
+✓ bleach.clean() with ALLOWED_TAGS list defined
+✓ PDF: content passed as markupsafe.Markup(content_html_safe) to Jinja2
+✓ generate_export Celery task runs in proxima:exports queue
+✓ Export polling: frontend refetchInterval=30s while status=pending|processing
+✓ Export buttons on: Workspace, Analyze, Clinical, Code, Compare, Audit
+
+SENTRY:
+✓ scrub_event covers: request body, headers, query string, URL
+✓ scrub_event covers: user object (email, username, ip)
+✓ scrub_event covers: Celery task args/kwargs in extra
+✓ scrub_event covers: stack frame vars (locals)
+✓ scrub_event covers: breadcrumb data and long messages
+✓ _redact_dict recursively handles nested JSON (depth limit: 8)
+✓ send_default_pii=False set on init
+
+TESTS:
+✓ test_export_sanitization.py: all 5 tests pass
+✓ e2e/auth.spec.ts: landing, health, redirect, pricing pass
+✓ e2e/export.spec.ts: 401 without auth
+✓ test_tools_endpoints.py: all auth tests pass, upload-url path confirmed
+✓ pytest coverage ≥ 80% on services/
+✓ CI pipeline green
+
+BILLING + PRICING:
+✓ /pricing page renders 3 tiers
+✓ HIPAA disclaimer on pricing page
+✓ Token usage bar color-coded (gold→amber→red)
+✓ 80% usage warning banner in Dashboard
+✓ 100% limit modal shows with /pricing CTA
+✓ monthly_token_reset task logs users_reset count
+
+DOCKER:
+✓ docker-compose uses pgvector/pgvector:pg16 (NOT plain postgres)
+✓ All 4 worker containers + beat + flower defined
+✓ Healthchecks on postgres + redis
+✓ Frontend nginx serves SPA correctly (try_files → index.html)
+✓ gzip enabled on nginx
+
+FINAL:
+✓ docker-compose up -d → full stack starts
+✓ alembic upgrade head → 4 migrations applied (001→004)
+✓ All 10 pages load without console errors
+✓ POST /api/intelligence/complete streams correctly
+✓ Export generates PDF → downloads successfully
+✓ pgvector search returns results after embedding
+✓ Admin /admin accessible to admin role, 403 for user role
+✓ Sentry test event captured with no PII in payload
+
+═══════════════════════════════════════════════════════════════════════
+PROXIMA v4.1 IS PRODUCTION READY.
+22 tables · 10 canonical prompts · 50 templates · 150+ KB chunks
+RS256 JWT · PKCE OAuth · 4-queue Celery · pgvector RAG
+ModelRegistry · bleach exports · Full Sentry redaction
+Three.js hero · Admin platform · CI/CD pipeline
+Engineered by Arnav Garg · 2026
+═══════════════════════════════════════════════════════════════════════

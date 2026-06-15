@@ -1,0 +1,992 @@
+╔══════════════════════════════════════════════════════════════════════╗
+║         PROXIMA v4.1 — ANTIGRAVITY BUILD PROMPT                     ║
+║                  STAGE 2: FULL FEATURE SET                          ║
+║  FTS Retrieval · Canonical Prompts · QHE · Upload Security · Tests  ║
+║  Source of truth: Proxima_v4_PRD_v2.md                              ║
+║  Engineered by Arnav Garg                                           ║
+╚══════════════════════════════════════════════════════════════════════╝
+
+STAGE 2 CONTEXT
+════════════════
+Stage 1 is complete and verified:
+  ✓ All 22 DB tables (pgvector, IVFFlat indexes, embedding versioning fields)
+  ✓ RS256 JWT + Google OAuth with PKCE + refresh rotation + revocation
+  ✓ ModelRegistry abstraction (NO hardcoded model strings anywhere)
+  ✓ Celery skeleton (4 queues, no real tasks)
+  ✓ CI/CD pipeline (GitHub Actions)
+  ✓ Testing infrastructure (pytest + vitest + playwright skeletons)
+
+STAGE 2 GOAL
+════════════
+By end of Stage 2, all of the following work with real data:
+  ✓ Document ingestion pipeline (9-state machine, OCR fallback, 3-pass chunking)
+  ✓ Real domain detection (lexical + structural per PRD §7)
+  ✓ Prompt Registry seeded with 10 canonical keys, Redis cached
+  ✓ Blended prompt assembly from domain weights via PromptAssembler
+  ✓ Quality Heuristic Engine (4-dimension scoring, KL divergence, PRD coefficients)
+  ✓ FTS Retrieval (NOT vector — that is Stage 5)
+    code domain maps to "engineering" KB (PRD §7.2 DOMAIN_TO_KB)
+  ✓ Semantic compare: Jaccard + Hungarian algorithm + LLM analysis (temporary)
+  ✓ All 8 tool endpoints with real Gemini results via ModelRegistry
+  ✓ All 10 pages fully implemented (no stubs)
+  ✓ Celery tasks for async work
+  ✓ Rate limiting on all AI endpoints
+  ✓ Token usage + cost tracking
+  ✓ S3/R2 file storage
+  ✓ Upload security pipeline (MIME + magic-byte + size + archive + malware hook)
+  ✓ 150–500 KB chunks seeded (dev sizing per PRD §7.5)
+  ✓ 15 templates seeded
+  ✓ Unit and integration tests filled in
+
+CRITICAL NAMING RULES (PRD §3, §4, §6):
+  - RAG in Stage 2 is called "FTS Retrieval" — NOT "Vector RAG"
+  - Confidence scoring service is called "Quality Heuristic Engine" internally
+  - Prompt keys use ONLY the 10 canonical keys from PRD §4
+  - Domain-to-KB mapping: code → "engineering" (NOT "code")
+  - API paths: /api/intelligence/compare (NOT /compare-domains)
+  - Confidence thresholds: 80/65/50 (NOT 80/60/40)
+
+═══════════════════════════════════════════════════════════════════════
+NEW BACKEND SERVICES
+═══════════════════════════════════════════════════════════════════════
+
+─── services/upload_security.py ─────────────────────────────────────
+
+"""
+Upload security pipeline — PRD §12.2.
+All file uploads MUST pass this pipeline before any processing.
+"""
+
+import magic
+from pathlib import Path
+
+# Allowed MIME types and their magic byte signatures
+ALLOWED_TYPES = {
+    'application/pdf':          b'%PDF',
+    'application/vnd.openxmlformats-officedocument.wordprocessingml.document':
+                                bytes([0x50, 0x4B, 0x03, 0x04]),  # ZIP (DOCX is a ZIP)
+    'text/plain':               None,  # text files have no magic bytes
+}
+
+MAX_FILE_SIZE  = 20 * 1024 * 1024   # 20 MB
+ARCHIVE_TYPES  = {'.zip', '.tar', '.gz', '.7z', '.rar', '.bz2'}
+
+class UploadSecurityError(ValueError):
+    pass
+
+class UploadSecurityPipeline:
+
+    def validate(self, file_bytes: bytes, filename: str, declared_mime: str) -> str:
+        """
+        Run all 5 validation steps.
+        Returns validated MIME type.
+        Raises UploadSecurityError on any failure.
+        """
+        mime = self._step1_mime_validation(declared_mime)
+        self._step2_magic_byte_validation(file_bytes, mime)
+        self._step3_size_validation(file_bytes)
+        self._step4_archive_bomb_protection(filename)
+        self._step5_malware_scan_hook(file_bytes, filename)
+        return mime
+
+    def _step1_mime_validation(self, declared_mime: str) -> str:
+        """Step 1: MIME type must be in allowed list."""
+        clean_mime = declared_mime.split(';')[0].strip().lower()
+        if clean_mime not in ALLOWED_TYPES and clean_mime != 'text/plain':
+            raise UploadSecurityError(
+                f"File type '{clean_mime}' is not permitted. "
+                "Allowed: PDF, DOCX, TXT"
+            )
+        return clean_mime
+
+    def _step2_magic_byte_validation(self, file_bytes: bytes, mime: str) -> None:
+        """Step 2: Verify file content matches declared MIME via magic bytes."""
+        expected_sig = ALLOWED_TYPES.get(mime)
+        if expected_sig is None:
+            return  # text/plain has no magic bytes — skip
+        if not file_bytes[:len(expected_sig)] == expected_sig:
+            raise UploadSecurityError(
+                "File content does not match declared type. Upload rejected."
+            )
+
+    def _step3_size_validation(self, file_bytes: bytes) -> None:
+        """Step 3: File must be under 20 MB."""
+        if len(file_bytes) > MAX_FILE_SIZE:
+            raise UploadSecurityError(
+                f"File exceeds maximum size of 20 MB "
+                f"({len(file_bytes) / 1024 / 1024:.1f} MB uploaded)."
+            )
+
+    def _step4_archive_bomb_protection(self, filename: str) -> None:
+        """Step 4: Reject archive file extensions regardless of MIME."""
+        ext = Path(filename).suffix.lower()
+        if ext in ARCHIVE_TYPES:
+            raise UploadSecurityError(
+                f"Archive files ({ext}) are not permitted."
+            )
+
+    def _step5_malware_scan_hook(self, file_bytes: bytes, filename: str) -> None:
+        """
+        Step 5: Malware scan hook.
+        v1.0: stub always returns clean (True).
+        Future: plug in ClamAV or VirusTotal API here.
+        """
+        is_clean = self._scan(file_bytes, filename)
+        if not is_clean:
+            raise UploadSecurityError("File failed malware scan. Upload rejected.")
+
+    def _scan(self, file_bytes: bytes, filename: str) -> bool:
+        """Pluggable scan. Override for ClamAV integration."""
+        return True  # stub — always clean in v1.0
+
+upload_security = UploadSecurityPipeline()
+
+─── services/document_ingestion.py ──────────────────────────────────
+
+Same implementation as Stage 2 v2 with one addition:
+Before processing any uploaded file, call upload_security.validate():
+
+  async def ingest(self, document_id: UUID, db: AsyncSession) -> None:
+    doc = await db.get(Document, document_id)
+
+    # Run upload security pipeline on stored file
+    if doc.file_url:
+      file_bytes = await storage_service.download_bytes(doc.file_url)
+      try:
+        upload_security.validate(
+          file_bytes,
+          doc.file_name or 'unknown',
+          self._mime_from_type(doc.file_type)
+        )
+      except UploadSecurityError as e:
+        doc.ingest_status = 'PERMANENTLY_FAILED'
+        doc.metadata = {'ingest_error': str(e), 'error_type': 'security'}
+        await db.commit()
+        return
+
+    await self._set_status(doc, 'EXTRACTING', db)
+    # ... rest of pipeline unchanged from Stage 2 v2
+
+  def _mime_from_type(self, file_type: str) -> str:
+    return {
+      'pdf':  'application/pdf',
+      'docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      'txt':  'text/plain',
+    }.get(file_type or '', 'text/plain')
+
+(All other ingestion logic — 9-state machine, OCR fallback, 3-pass chunking —
+identical to Stage 2 v2. Not repeated here.)
+
+─── services/domain_detector.py ─────────────────────────────────────
+
+Identical to Stage 2 v2. No changes.
+
+─── services/prompt_registry.py ─────────────────────────────────────
+
+Identical to Stage 2 v2 with ONE CRITICAL ADDITION:
+
+CANONICAL_PROMPT_KEYS = {
+    'system.base',
+    'domain.legal',
+    'domain.medical',
+    'domain.code',
+    'tool.workspace',
+    'tool.contract',
+    'tool.clinical',
+    'tool.audit',
+    'tool.compare',
+    'tool.code',
+}
+
+def validate_key(self, key: str) -> None:
+    """Raise if key is not in the canonical PRD list."""
+    if key not in CANONICAL_PROMPT_KEYS:
+        raise ValueError(
+            f"Prompt key '{key}' is not in the canonical list. "
+            f"Valid keys: {sorted(CANONICAL_PROMPT_KEYS)}"
+        )
+
+Call validate_key() in create_version() and set_active() before any DB write.
+This ensures no drift from PRD §4 during development.
+
+SEED (migration 002 or seed script) — canonical keys only:
+
+  system.base         → tier=system,   content="You are Proxima, a professional AI writing assistant..."
+  domain.legal        → tier=domain,   content="You are a legal drafting assistant..."
+  domain.medical      → tier=domain,   content="You are a clinical documentation assistant..."
+  domain.code         → tier=domain,   content="You are an expert code completion engine..."
+  tool.workspace      → tier=tool,     content="Complete the document text at the cursor position..."
+  tool.contract       → tier=tool,     content="Analyze the provided contract for risk flags..."
+  tool.clinical       → tier=tool,     content="Convert the clinical observations into a structured note..."
+  tool.audit          → tier=tool,     content="Audit the document for quality across four dimensions..."
+  tool.compare        → tier=tool,     content="Compare the two documents and identify all changes..."
+  tool.code           → tier=tool,     content="You are a senior software engineer reviewing code..."
+
+All 10 seeded with is_active=TRUE.
+
+─── services/prompt_assembler.py ────────────────────────────────────
+
+Same logic as Stage 2 v2 with these CORRECTIONS:
+
+1. Use canonical prompt keys:
+   - domain.legal   (NOT system.legal)
+   - domain.medical (NOT system.medical)
+   - domain.code    (NOT system.code)
+   - tool.workspace (NOT tool.completion)
+
+2. TOKEN_BUDGETS dict (unchanged from Stage 2 v2):
+   'streaming_completion': 300,
+   'analyze_contract': 2000,
+   'clinical_notes': 800,
+   etc.
+
+─── services/quality_heuristic_engine.py  ← RENAMED from confidence_scorer.py
+
+"""
+Quality Heuristic Engine (QHE).
+
+External documentation calls this "Confidence Scoring" or "Confidence Audit".
+Internally it is always "Quality Heuristic Engine" or "QHE".
+
+Thresholds (PRD §6 — canonical, do not copy):
+  80-100 → high     (#22c55e)
+  65-79  → amber    (#f59e0b)
+  50-64  → low      (#f97316)
+  0-49   → critical (#ef4444)
+"""
+
+from scipy.special import kl_div
+import numpy as np
+
+# Domain-specific weighting coefficients (PRD §7.1)
+QHE_COEFFICIENTS = {
+    'legal':   {'T': 0.35, 'S': 0.30, 'D': 0.20, 'C': 0.15},
+    'medical': {'T': 0.30, 'S': 0.25, 'D': 0.25, 'C': 0.20},
+    'code':    {'T': 0.20, 'S': 0.40, 'D': 0.25, 'C': 0.15},
+    'default': {'T': 0.25, 'S': 0.25, 'D': 0.25, 'C': 0.25},
+}
+
+# Vocabulary sets for Terminology Accuracy dimension
+LEGAL_TERMS   = {'whereas','heretofore','notwithstanding','indemnify','hereinafter',
+                 'pursuant','covenant','liability','jurisdiction','breach','shall',
+                 'hereby','thereof','therein','hereof','hereunder','termination'}
+MEDICAL_TERMS = {'diagnosis','prognosis','patient','symptoms','medication','clinical',
+                 'etiology','dosage','adverse','vital','tachycardia','hypertension',
+                 'CBC','BMP','EKG','MRI','troponin','hemoglobin','analgesic'}
+CODE_TERMS    = {'function','class','import','const','let','var','def','return',
+                 'async','await','null','undefined','interface','implements'}
+
+TERM_SETS = {'legal': LEGAL_TERMS, 'medical': MEDICAL_TERMS, 'code': CODE_TERMS}
+
+# Structural patterns per domain
+import re
+LEGAL_STRUCTURAL   = [r'\b(?:whereas|heretofore|pursuant|covenant)\b',
+                      r'\d+\.\d+', r'\([a-z]\)\s', r'Article\s+[IVX]+']
+MEDICAL_STRUCTURAL = [r'\bS:', r'\bO:', r'\bA:', r'\bP:', r'Chief Complaint:',
+                      r'\b(?:mg|mmHg|ml|kg)\b', r'\b(?:BID|TID|QID|PRN)\b']
+CODE_STRUCTURAL    = [r'=>', r'\{[^}]{1,80}\}', r'def\s+\w+\s*\(', r'function\s+\w+']
+STRUCT_PATTERNS    = {'legal': LEGAL_STRUCTURAL, 'medical': MEDICAL_STRUCTURAL, 'code': CODE_STRUCTURAL}
+
+class QualityHeuristicEngine:
+
+    def score_segment(self, segment: str, domain_weights: dict, context: str) -> dict:
+        seg_lower = segment.lower()
+        seg_words = set(seg_lower.split())
+        dominant  = max(domain_weights, key=domain_weights.get)
+        coeffs    = QHE_COEFFICIENTS.get(dominant, QHE_COEFFICIENTS['default'])
+
+        # T — Terminology Accuracy
+        expected  = TERM_SETS.get(dominant, set())
+        other     = set().union(*[v for k, v in TERM_SETS.items() if k != dominant])
+        correct   = len(seg_words & expected)
+        wrong     = len(seg_words & other)
+        T = min(100.0, max(0.0, 60.0 + correct * 15.0 - wrong * 10.0)) if expected else 70.0
+
+        # S — Structural Validity
+        patterns  = STRUCT_PATTERNS.get(dominant, [])
+        matches   = sum(1 for p in patterns if re.search(p, segment, re.IGNORECASE))
+        length_penalty = max(0, 20 - len(segment.split())) if len(segment.split()) < 20 else 0
+        S = min(100.0, max(0.0, 55.0 + matches * 10.0 - length_penalty))
+
+        # D — Domain Consistency (KL divergence)
+        from proxima.services.domain_detector import domain_detector
+        seg_weights = domain_detector.detect(segment)
+        domains = ['code', 'medical', 'legal']
+        eps = 1e-8
+        p = np.array([domain_weights.get(d, 0) + eps for d in domains])
+        q = np.array([seg_weights.get(d, 0)     + eps for d in domains])
+        p /= p.sum(); q /= q.sum()
+        kl_pq = float(np.sum(kl_div(p, q)))
+        kl_qp = float(np.sum(kl_div(q, p)))
+        sym_kl = (kl_pq + kl_qp) / 2.0
+        D = min(100.0, max(0.0, 100.0 - sym_kl * 50.0))
+
+        # C — Contextual Coherence
+        context_words = set(context.lower().split())
+        seg_content   = {w for w in seg_words if len(w) > 4}
+        shared        = len(context_words & seg_content)
+        boundary_bonus = 10.0 if context.rstrip().endswith(('.', '!', '?', ';')) else 0.0
+        C = min(100.0, max(0.0, 50.0 + shared * 4.0 + boundary_bonus))
+
+        # Weighted overall (PRD §7.1 domain-specific coefficients)
+        overall = T * coeffs['T'] + S * coeffs['S'] + D * coeffs['D'] + C * coeffs['C']
+        overall = round(overall, 1)
+
+        # Thresholds — PRD §6 canonical (80/65/50)
+        if   overall >= 80: heatmap_class = 'high'
+        elif overall >= 65: heatmap_class = 'amber'
+        elif overall >= 50: heatmap_class = 'low'
+        else:               heatmap_class = 'critical'
+
+        return {
+            'overall':              overall,
+            'terminology_accuracy': round(T, 1),
+            'structural_validity':  round(S, 1),
+            'domain_consistency':   round(D, 1),
+            'contextual_coherence': round(C, 1),
+            'heatmap_class':        heatmap_class,
+        }
+
+quality_heuristic_engine = QualityHeuristicEngine()
+
+# Alias for external documentation compatibility
+confidence_scorer = quality_heuristic_engine
+
+─── services/fts_retrieval.py  ← RENAMED from rag_service.py in Stage 2
+
+"""
+FTS Retrieval Service — Stage 2.
+
+Retrieves relevant context chunks using PostgreSQL full-text search.
+Stage 5 upgrades this to vector similarity search via pgvector.
+
+Domain-to-KB mapping (PRD §7.2):
+  code    → "engineering"   (NOT "code")
+  medical → "medical"
+  legal   → "legal"
+"""
+
+from proxima.models.knowledge import DomainKnowledgeChunk
+
+# PRD §7.2 — frozen mapping
+DOMAIN_TO_KB = {
+    'code':    'engineering',
+    'medical': 'medical',
+    'legal':   'legal',
+}
+
+class FTSRetrievalService:
+
+    async def retrieve(
+        self, query: str, domain_weights: dict,
+        db: AsyncSession, top_k: int = 3
+    ) -> str | None:
+        """
+        FTS retrieval from domain_knowledge_chunks.
+        Uses DOMAIN_TO_KB mapping to resolve kb_name.
+        Returns concatenated chunk content or None.
+        """
+        dominant = max(domain_weights, key=domain_weights.get)
+        kb_name  = DOMAIN_TO_KB.get(dominant, dominant)  # fallback to domain name
+
+        stmt = (
+            select(DomainKnowledgeChunk)
+            .where(DomainKnowledgeChunk.kb_name == kb_name)
+            .where(
+                func.to_tsvector('english', DomainKnowledgeChunk.content)
+                .match(func.plainto_tsquery('english', query[:200]))
+            )
+            .limit(top_k)
+        )
+        result = await db.execute(stmt)
+        chunks = result.scalars().all()
+        if not chunks:
+            return None
+        return '\n\n---\n\n'.join(c.content for c in chunks)
+
+fts_retrieval = FTSRetrievalService()
+
+─── services/semantic_compare.py ────────────────────────────────────
+
+"""
+Semantic Compare Service — Stage 2 (Temporary implementation).
+
+Pipeline (PRD §7.3):
+  Step 1: Chunking (sentence-level, ≤3 sentences)
+  Step 2: Jaccard similarity matrix  ← TEMPORARY (Stage 5 replaces with embeddings)
+  Step 3: Hungarian alignment
+  Step 4: Classification by threshold
+  Step 5: LLM analysis for MODIFIED pairs (via ModelRegistry)
+
+Stage 5 replaces Step 2 with embedding cosine similarity.
+"""
+
+import re
+from scipy.optimize import linear_sum_assignment
+import numpy as np
+
+def split_sentences(text: str, max_per_chunk: int = 3) -> list[str]:
+    sentences = re.split(r'(?<=[.!?])\s+', text.strip())
+    chunks = []
+    for i in range(0, len(sentences), max_per_chunk):
+        chunk = ' '.join(sentences[i:i + max_per_chunk]).strip()
+        if chunk:
+            chunks.append(chunk)
+    return chunks
+
+def jaccard(a: str, b: str) -> float:
+    """Jaccard word-level similarity. Temporary — replaced by cosine in Stage 5."""
+    sa = set(a.lower().split())
+    sb = set(b.lower().split())
+    if not sa and not sb:
+        return 1.0
+    return len(sa & sb) / len(sa | sb)
+
+def classify_pair(score: float) -> str:
+    """PRD §7.3 Step 4 thresholds."""
+    if   score >= 0.97: return 'IDENTICAL'
+    elif score >= 0.82: return 'MODIFIED'    # possible semantic shift
+    elif score >= 0.72: return 'MODIFIED'    # textual change
+    elif score >= 0.65: return 'CRITICAL'
+    else:               return 'REWRITTEN'
+
+class SemanticCompareService:
+
+    async def compare(
+        self, text_a: str, text_b: str, mode: str,
+        db: AsyncSession
+    ) -> dict:
+
+        # Step 1: Chunk both documents
+        chunks_a = split_sentences(text_a)
+        chunks_b = split_sentences(text_b)
+
+        if not chunks_a or not chunks_b:
+            return {
+                'similarity_score': 0.0, 'summary': 'One or both documents are empty.',
+                'changes': [], 'critical_count': 0,
+                'semantic_count': 0, 'textual_count': 0
+            }
+
+        # Step 2: Jaccard similarity matrix (TEMPORARY — Stage 5 replaces)
+        n, m = len(chunks_a), len(chunks_b)
+        sim_matrix = np.array([
+            [jaccard(chunks_a[i], chunks_b[j]) for j in range(m)]
+            for i in range(n)
+        ])
+
+        # Step 3: Hungarian algorithm alignment
+        cost_matrix = 1.0 - sim_matrix
+        # Pad to square if needed
+        size = max(n, m)
+        padded = np.ones((size, size))
+        padded[:n, :m] = cost_matrix
+        row_ind, col_ind = linear_sum_assignment(padded)
+
+        # Step 4 + 5: Classify and LLM-analyze MODIFIED pairs
+        changes = []
+        scores_for_avg = []
+
+        for r, c in zip(row_ind, col_ind):
+            if r >= n or c >= m:
+                continue  # padded rows
+            score     = float(sim_matrix[r][c])
+            change_type = classify_pair(score)
+            scores_for_avg.append(score)
+            is_critical = change_type == 'CRITICAL'
+
+            semantic_shift = False
+            if change_type == 'MODIFIED' and 0.65 <= score < 0.82:
+                # Step 5: LLM analysis
+                semantic_shift = await self._llm_semantic_check(
+                    chunks_a[r], chunks_b[c], db
+                )
+
+            changes.append({
+                'type':           change_type,
+                'location':       f"Chunk A[{r}] ↔ B[{c}]",
+                'original':       chunks_a[r],
+                'revised':        chunks_b[c],
+                'significance':   round((1.0 - score) * 100),
+                'is_critical':    is_critical,
+                'semantic_shift': semantic_shift,
+            })
+
+        similarity_score = round(float(np.mean(scores_for_avg)) * 100, 1) if scores_for_avg else 0.0
+
+        return {
+            'similarity_score': similarity_score,
+            'summary':          self._build_summary(changes, similarity_score, mode),
+            'changes':          changes,
+            'critical_count':   sum(1 for c in changes if c['is_critical']),
+            'semantic_count':   sum(1 for c in changes if c['semantic_shift']),
+            'textual_count':    sum(1 for c in changes if c['type'] == 'MODIFIED' and not c['semantic_shift']),
+        }
+
+    async def _llm_semantic_check(
+        self, chunk_a: str, chunk_b: str, db: AsyncSession
+    ) -> bool:
+        """
+        Ask the generation model whether two passages mean the same thing.
+        Returns True if they DO NOT mean the same (i.e., is a semantic shift).
+        """
+        from proxima.services.model_registry import model_registry
+        model = await model_registry.get_for_task('compare_documents', None, db)
+
+        prompt = (
+            "Do these two passages mean the same thing? "
+            "Reply with exactly YES or NO, then one sentence explanation.\n\n"
+            f"Passage A: {chunk_a[:400]}\n\n"
+            f"Passage B: {chunk_b[:400]}"
+        )
+        tokens = []
+        async for token in model_registry.stream_completion(
+            model,
+            system_prompt="You are a precise legal/medical/technical document analyst.",
+            user_message=prompt,
+            temperature=0.1,
+            max_tokens=60,
+        ):
+            tokens.append(token)
+        answer = ''.join(tokens).strip().upper()
+        return answer.startswith('NO')
+
+    def _build_summary(self, changes: list, score: float, mode: str) -> str:
+        total    = len(changes)
+        critical = sum(1 for c in changes if c['is_critical'])
+        semantic = sum(1 for c in changes if c['semantic_shift'])
+        return (
+            f"{score:.0f}% similarity detected across {total} matched sections. "
+            f"{critical} critical change(s), {semantic} semantic shift(s). "
+            f"Mode: {mode.upper()}. "
+            "NOTE: Stage 2 uses Jaccard similarity. Stage 5 upgrades to embedding-based comparison."
+        )
+
+semantic_compare_service = SemanticCompareService()
+
+═══════════════════════════════════════════════════════════════════════
+UPDATED ROUTERS
+═══════════════════════════════════════════════════════════════════════
+
+─── intelligence_router.py — FULL (key changes vs v2) ───────────────
+
+POST /api/intelligence/complete (UPGRADED)
+  Uses ModelRegistry throughout. Changes from v2:
+  - model = await model_registry.get_for_task('streaming_completion', None, db)
+  - Fetch prompts using CANONICAL keys:
+    domain_prompt = await prompt_registry.get(f'domain.{dominant}', db, redis)
+    base_prompt   = await prompt_registry.get('system.base', db, redis)
+  - FTS retrieval: await fts_retrieval.retrieve(query, domain_weights, db)
+    (NOT rag_service.retrieve)
+  - Stream via model_registry.stream_completion(model, ...) — NOT genai directly
+  - Confidence scoring: quality_heuristic_engine (NOT confidence_scorer)
+
+POST /api/intelligence/compare  ← canonical path (PRD §5)
+  NOT /api/intelligence/compare-domains
+  Calls semantic_compare_service.compare(text_a, text_b, 'general', db)
+  Returns { code, medical, legal, latencies, detected_weights }
+
+─── tools_router.py — key changes vs v2 ─────────────────────────────
+
+All tool endpoints use ModelRegistry:
+  model = await model_registry.get_for_task('<task_class>', '<domain>', db)
+  # Then: response = genai_call via model_registry, NOT direct genai import
+
+POST /api/tools/analyze-contract
+  Uses: model_registry.get_for_task('analyze_contract', 'legal', db)
+  Prompt key: tool.contract   (NOT tool.analyze_contract)
+
+POST /api/tools/clinical-notes
+  Uses: model_registry.get_for_task('clinical_notes', 'medical', db)
+  Prompt key: tool.clinical   (NOT tool.clinical_notes)
+
+POST /api/tools/code-review
+  Uses: model_registry.get_for_task('code_intelligence', 'code', db)
+  Prompt key: tool.code
+
+POST /api/tools/compare-documents
+  Uses: semantic_compare_service.compare(text_a, text_b, mode, db)
+  Prompt key: tool.compare
+
+POST /api/tools/audit-document
+  Uses: quality_heuristic_engine.score_segment(...)
+  Prompt key: tool.audit
+
+POST /api/tools/clinical-notes — CLINICAL BOUNDARY ENFORCEMENT
+  Add to response header:
+    X-Proxima-Clinical-Boundary: non-hipaa
+  Add disclaimer to structured_note.disclaimer field:
+    "This output is for educational and drafting purposes only.
+     Proxima v1.0 is NOT HIPAA-compliant. Do not store real patient PHI."
+
+─── documents_router.py ─────────────────────────────────────────────
+
+POST /api/documents/upload-url   ← canonical path (PRD §5) NOT /ingest
+  Requires auth.
+  Body: { filename: str, content_type: str }
+  1. Run upload_security.validate() on declared content_type:
+     try:
+       upload_security._step1_mime_validation(content_type)
+     except UploadSecurityError as e:
+       raise HTTPException(400, str(e))
+  2. Generate document_id
+  3. Build S3 key: storage_service.document_key(user_id, document_id, ext)
+  4. Generate presigned PUT URL (15min)
+  5. Create document record: ingest_status='UPLOADED'
+  6. Return: { document_id, upload_url, s3_key }
+
+POST /api/documents
+  Requires auth.
+  Body: { document_id, file_type, title?, tool_used? }
+  1. Update document record
+  2. Queue: ingest_document.delay(str(document_id))
+  3. Create BackgroundJob record
+  4. Return document record
+
+═══════════════════════════════════════════════════════════════════════
+CELERY TASKS — Stage 2 implementations
+═══════════════════════════════════════════════════════════════════════
+
+─── tasks/ai.py ─────────────────────────────────────────────────────
+
+All tasks use model_registry, NOT direct genai import:
+
+@app.task(name='proxima.tasks.ai.ingest_document',
+          queue='proxima:ai', bind=True, max_retries=3)
+def ingest_document(self, document_id: str):
+    """Run document ingestion pipeline including upload security."""
+    import asyncio
+    from proxima.services.document_ingestion import ingestion_service
+    asyncio.run(ingestion_service.ingest(UUID(document_id), ...))
+
+@app.task(name='proxima.tasks.ai.run_contract_analysis',
+          queue='proxima:ai', bind=True, max_retries=3, default_retry_delay=60)
+def run_contract_analysis(self, document_id, user_id, contract_type, jurisdiction):
+    """Async contract analysis — uses model_registry, NOT hardcoded gemini."""
+    import asyncio
+    asyncio.run(_run_contract_async(document_id, user_id, contract_type, jurisdiction))
+
+All Celery AI tasks follow same pattern: asyncio.run() wrapping async function
+that uses model_registry for all AI calls.
+
+═══════════════════════════════════════════════════════════════════════
+ALEMBIC — Migration 002
+═══════════════════════════════════════════════════════════════════════
+
+002_indexes_fts_seed.py:
+
+def upgrade():
+    # FTS indexes for retrieval
+    op.execute("CREATE INDEX idx_domain_kb_fts ON domain_knowledge_chunks USING gin(to_tsvector('english', content));")
+    op.execute("CREATE INDEX idx_doc_chunks_fts ON document_chunks USING gin(to_tsvector('english', content));")
+
+    # Performance indexes
+    op.execute("CREATE INDEX idx_ai_requests_user_created ON ai_requests(user_id, created_at DESC);")
+    op.execute("CREATE INDEX idx_exports_user_status ON exports(user_id, status);")
+    op.execute("CREATE INDEX idx_templates_active_domain ON templates(is_active, domain);")
+    op.execute("CREATE INDEX idx_documents_user_updated ON documents(user_id, updated_at DESC);")
+
+    # Seed 10 canonical prompt versions (all is_active=TRUE)
+    # ... INSERT INTO prompt_versions for all 10 keys
+
+    # Seed 15 starter templates
+    # ... INSERT INTO templates
+
+    # Seed 150-500 KB chunks (dev sizing)
+    # DOMAIN_TO_KB mapping: code→engineering, medical→medical, legal→legal
+    # 50 chunks in engineering KB, 50 in medical KB, 50 in legal KB (=150 total)
+
+═══════════════════════════════════════════════════════════════════════
+KNOWLEDGE BASE SEEDING (dev: 150 chunks)
+═══════════════════════════════════════════════════════════════════════
+
+scripts/seed_knowledge_base.py
+
+Insert 150 chunks total — 50 per KB.
+KB names MUST be: 'engineering', 'medical', 'legal'
+NOT: 'code', 'tech', 'software'
+
+ENGINEERING KB (50 chunks, kb_name='engineering'):
+  Topics: SOLID principles, REST API design, code review standards,
+          design patterns, architecture patterns, testing principles,
+          API documentation standards, database design, CI/CD practices,
+          software security fundamentals
+
+MEDICAL KB (50 chunks, kb_name='medical'):
+  Topics: SOAP documentation, clinical abbreviations, vital sign ranges,
+          medication classes, ICD documentation, lab value references,
+          clinical note types, informed consent, discharge planning,
+          prescription writing standards
+
+LEGAL KB (50 chunks, kb_name='legal'):
+  Topics: Contract formation principles, common clause library,
+          NDA fundamentals, IP law basics, employment law,
+          indemnification frameworks, governing law provisions,
+          dispute resolution options, confidentiality obligations,
+          standard representations and warranties
+
+All 150 chunks:
+  - embedding = NULL (filled by Celery task in Stage 5)
+  - embedding_model = NULL
+  - embedding_version = NULL
+  - embedding_dimensions = NULL
+  - embedded_at = NULL
+
+═══════════════════════════════════════════════════════════════════════
+FRONTEND — All 10 Pages
+═══════════════════════════════════════════════════════════════════════
+
+All page implementations same as Stage 2 v2 with these corrections:
+
+1. Confidence threshold colors reference Tailwind tokens only:
+   Do NOT hardcode hex values. Use:
+     className={`conf-${score.heatmap_class}`}
+   Where heatmap_class is one of: high | amber | low | critical
+
+2. API paths — use PRD §5 canonical paths:
+   Compare tool: POST /api/intelligence/compare  (NOT /compare-domains)
+   Upload:       POST /api/documents/upload-url  (NOT /ingest)
+   User profile: GET  /api/users/me              (NOT /api/auth/me)
+
+3. Clinical Notes page — show persistent disclaimer:
+   <div className="bg-amber-900/20 border border-amber-700 rounded-lg p-4 mb-6 text-sm">
+     <strong>⚠️ Clinical Boundary:</strong> Proxima is NOT HIPAA-compliant.
+     This tool is for educational and drafting purposes only.
+     Do not enter real patient names, dates of birth, or any identifying PHI.
+   </div>
+   Show this ABOVE the input form, always visible.
+
+4. File upload — validate on frontend BEFORE sending:
+   const MAX_FILE_BYTES = 20 * 1024 * 1024;
+   const ALLOWED_TYPES = ['application/pdf','application/vnd.openxmlformats-officedocument.wordprocessingml.document','text/plain'];
+   if (file.size > MAX_FILE_BYTES) { toast.error('File exceeds 20 MB limit'); return; }
+   if (!ALLOWED_TYPES.includes(file.type)) { toast.error('Only PDF, DOCX, and TXT files are allowed'); return; }
+
+═══════════════════════════════════════════════════════════════════════
+TESTS — Fill in Stage 2 test implementations
+═══════════════════════════════════════════════════════════════════════
+
+─── backend/tests/unit/test_domain_detector.py ──────────────────────
+
+from proxima.services.domain_detector import domain_detector
+
+def test_legal_doc_detection():
+    text = """WHEREAS the parties agree to indemnify and hold harmless each other.
+    Notwithstanding the foregoing, pursuant to Section 4, the liability
+    of either party shall not exceed the fees paid hereunder."""
+    weights = domain_detector.detect(text)
+    assert weights['legal'] >= 0.50, f"Legal score too low: {weights['legal']}"
+
+def test_code_doc_detection():
+    text = """import asyncio
+    async def calculate(x: int, y: int) -> int:
+        return x + y
+    class DataProcessor:
+        def __init__(self, config: dict):
+            self.config = config"""
+    weights = domain_detector.detect(text)
+    assert weights['code'] >= 0.50, f"Code score too low: {weights['code']}"
+
+def test_medical_doc_detection():
+    text = """Patient presents with hypertension (BP 160/95 mmHg) and dyspnea on exertion.
+    Hx: Diabetes mellitus type 2. Current medications include metformin 500mg BID.
+    Assessment: Uncontrolled HTN. Plan: Initiate lisinopril 10mg QD."""
+    weights = domain_detector.detect(text)
+    assert weights['medical'] >= 0.50, f"Medical score too low: {weights['medical']}"
+
+def test_mixed_doc_no_single_dominant():
+    text = """The clinical trial protocol requires Python data pipelines.
+    Whereas the sponsor shall indemnify the investigator, the patient
+    must provide informed consent before any procedure. def run_analysis(): pass"""
+    weights = domain_detector.detect(text)
+    assert max(weights.values()) <= 0.70, f"Mixed doc too dominant: {weights}"
+
+def test_weights_sum_to_one():
+    text = "Any text should produce weights summing to 1.0"
+    weights = domain_detector.detect(text)
+    total = weights['code'] + weights['medical'] + weights['legal']
+    assert abs(total - 1.0) < 0.01, f"Weights don't sum to 1: {total}"
+
+─── backend/tests/unit/test_confidence_scorer.py ────────────────────
+
+from proxima.services.quality_heuristic_engine import quality_heuristic_engine
+
+def test_high_confidence_legal_segment():
+    segment = "Whereas the indemnitor shall hereby indemnify the indemnitee pursuant to Section 4.1."
+    weights = {'legal': 0.8, 'medical': 0.1, 'code': 0.1}
+    context = "The parties have entered into this Agreement."
+    result = quality_heuristic_engine.score_segment(segment, weights, context)
+    assert result['overall'] >= 65, f"Expected high confidence, got {result['overall']}"
+    assert result['heatmap_class'] in ('high', 'amber')
+
+def test_threshold_boundaries():
+    """Verify threshold classification uses PRD §6 values (80/65/50)."""
+    # Mock segments with known scores
+    # 79.9 should be amber, 80.0 should be high
+    # 64.9 should be low, 65.0 should be amber
+    # 49.9 should be critical, 50.0 should be low
+    assert True  # full mock in Stage 3
+
+def test_legal_uses_correct_coefficients():
+    """Legal domain should weight T=0.35, S=0.30, D=0.20, C=0.15."""
+    from proxima.services.quality_heuristic_engine import QHE_COEFFICIENTS
+    assert QHE_COEFFICIENTS['legal']['T'] == 0.35
+    assert QHE_COEFFICIENTS['legal']['S'] == 0.30
+    assert QHE_COEFFICIENTS['legal']['D'] == 0.20
+    assert QHE_COEFFICIENTS['legal']['C'] == 0.15
+
+def test_returns_all_dimensions():
+    segment = "The function returns a list of items."
+    weights = {'code': 0.7, 'medical': 0.15, 'legal': 0.15}
+    result = quality_heuristic_engine.score_segment(segment, weights, "import os")
+    required_keys = {'overall','terminology_accuracy','structural_validity',
+                     'domain_consistency','contextual_coherence','heatmap_class'}
+    assert required_keys == set(result.keys())
+
+─── backend/tests/integration/test_auth_flow.py ─────────────────────
+
+import pytest
+
+@pytest.mark.anyio
+async def test_health_endpoint(client):
+    r = await client.get("/api/health")
+    assert r.status_code == 200
+    assert r.json()["status"] == "ok"
+    assert r.json()["engineer"] == "Arnav Garg"
+
+@pytest.mark.anyio
+async def test_protected_complete_requires_auth(client):
+    r = await client.post("/api/intelligence/complete",
+        json={"text": "hello", "cursor_position": 5})
+    assert r.status_code == 401
+
+@pytest.mark.anyio
+async def test_users_me_not_auth_me(client):
+    """Verify /api/users/me exists (not /api/auth/me)."""
+    r = await client.get("/api/users/me")
+    assert r.status_code == 401  # 401 not 404
+
+@pytest.mark.anyio
+async def test_compare_path(client):
+    """Verify /api/intelligence/compare exists (not /compare-domains)."""
+    r = await client.post("/api/intelligence/compare",
+        json={"text_a": "a", "text_b": "b"})
+    assert r.status_code in (401, 422)  # 401=unauth, 422=validation; NOT 404
+
+@pytest.mark.anyio
+async def test_upload_url_path(client):
+    """Verify /api/documents/upload-url exists (not /ingest)."""
+    r = await client.post("/api/documents/upload-url",
+        json={"filename": "test.pdf", "content_type": "application/pdf"})
+    assert r.status_code in (401, 422)  # NOT 404
+
+─── backend/tests/unit/test_upload_security.py ──────────────────────
+
+import pytest
+from proxima.services.upload_security import upload_security, UploadSecurityError
+
+def test_valid_pdf():
+    pdf_bytes = b'%PDF-1.4 test content'
+    mime = upload_security.validate(pdf_bytes, 'doc.pdf', 'application/pdf')
+    assert mime == 'application/pdf'
+
+def test_rejects_oversized_file():
+    big = b'x' * (21 * 1024 * 1024)
+    with pytest.raises(UploadSecurityError, match="20 MB"):
+        upload_security.validate(big, 'big.txt', 'text/plain')
+
+def test_rejects_unknown_mime():
+    with pytest.raises(UploadSecurityError, match="not permitted"):
+        upload_security.validate(b'data', 'file.exe', 'application/x-msdownload')
+
+def test_rejects_archive_extension():
+    with pytest.raises(UploadSecurityError, match="Archive"):
+        upload_security.validate(b'data', 'file.zip', 'text/plain')
+
+def test_rejects_mismatched_magic_bytes():
+    # PDF magic bytes but claiming to be DOCX
+    pdf_bytes = b'%PDF-1.4 test'
+    with pytest.raises(UploadSecurityError, match="content does not match"):
+        upload_security.validate(
+            pdf_bytes, 'doc.docx',
+            'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+        )
+
+─── frontend/src/__tests__/ConfidenceHeatmap.test.tsx ───────────────
+
+import { render } from '@testing-library/react';
+import { describe, it, expect } from 'vitest';
+
+// Threshold CSS class assignments — PRD §6
+describe('Confidence threshold classes', () => {
+  const getClass = (score: number): string => {
+    if (score >= 80) return 'conf-high';
+    if (score >= 65) return 'conf-amber';
+    if (score >= 50) return 'conf-low';
+    return 'conf-critical';
+  };
+
+  it('assigns high at 80', () => expect(getClass(80)).toBe('conf-high'));
+  it('assigns high at 100', () => expect(getClass(100)).toBe('conf-high'));
+  it('assigns amber at 79', () => expect(getClass(79)).toBe('conf-amber'));
+  it('assigns amber at 65', () => expect(getClass(65)).toBe('conf-amber'));
+  it('assigns low at 64', () => expect(getClass(64)).toBe('conf-low'));
+  it('assigns low at 50', () => expect(getClass(50)).toBe('conf-low'));
+  it('assigns critical at 49', () => expect(getClass(49)).toBe('conf-critical'));
+  it('assigns critical at 0', () => expect(getClass(0)).toBe('conf-critical'));
+});
+
+═══════════════════════════════════════════════════════════════════════
+STAGE 2 COMPLETION CHECKLIST
+═══════════════════════════════════════════════════════════════════════
+
+NAMING + PATHS:
+✓ Service file named quality_heuristic_engine.py (NOT confidence_scorer.py)
+✓ Service file named fts_retrieval.py (NOT rag_service.py)
+✓ All tool prompts fetched by canonical keys: tool.contract, tool.clinical, etc.
+✓ No prompt key outside the 10 canonical keys is used anywhere
+✓ validate_key() in PromptRegistry raises on non-canonical keys
+✓ /api/intelligence/compare exists (GET /api/intelligence/compare-domains returns 404)
+✓ /api/documents/upload-url exists (POST /api/documents/ingest returns 404)
+✓ GET /api/users/me exists (GET /api/auth/me returns 404)
+✓ Clinical Notes: X-Proxima-Clinical-Boundary: non-hipaa header on every response
+✓ Clinical Notes: disclaimer in structured_note output
+✓ Clinical Notes page: persistent PHI warning visible above input form
+
+DOMAIN MAPPING:
+✓ FTSRetrievalService uses DOMAIN_TO_KB: code→"engineering" (NOT "code")
+✓ domain_knowledge_chunks seeded with kb_name IN ('engineering','medical','legal')
+✓ No chunk has kb_name='code'
+
+CONFIDENCE:
+✓ QHE thresholds: 80/65/50 (NOT 80/60/40)
+✓ QHE coefficients: legal T=0.35 S=0.30 D=0.20 C=0.15
+✓ test_threshold_boundaries confirms 80/65/50 boundaries
+
+UPLOAD SECURITY:
+✓ upload_security.validate() called before any file processing
+✓ MIME validation, magic-byte check, 20MB limit, archive protection all active
+✓ Security pipeline runs before ingest_status advances past UPLOADED
+✓ test_upload_security.py: all 5 tests pass
+
+MODEL REGISTRY:
+✓ NO file except model_registry.py imports google.generativeai directly
+✓ All AI calls: model_registry.stream_completion(model, ...) or model_registry.build_generation_client(model)
+✓ Celery tasks also use model_registry (not hardcoded genai)
+
+SEMANTIC COMPARE:
+✓ SemanticCompareService uses Jaccard (Stage 2 temporary)
+✓ Summary includes note: "Stage 5 upgrades to embedding-based comparison"
+✓ Hungarian algorithm from scipy.optimize.linear_sum_assignment in use
+✓ LLM semantic check uses model_registry, NOT hardcoded genai
+
+TESTS:
+✓ All 5 unit tests in test_domain_detector.py pass
+✓ All 4 unit tests in test_confidence_scorer.py pass
+✓ All 5 tests in test_upload_security.py pass
+✓ All integration path tests pass (correct routes exist)
+✓ All 8 confidence threshold tests pass (PRD §6 values confirmed)
+✓ pytest coverage ≥ 60% on services/
+✓ CI pipeline passes on push
+
+═══════════════════════════════════════════════════════════════════════

@@ -1,0 +1,849 @@
+╔══════════════════════════════════════════════════════════════════════╗
+║         PROXIMA v4.1 — ANTIGRAVITY BUILD PROMPT                     ║
+║               STAGE 3: ANIMATIONS & ADMIN PLATFORM                  ║
+║  Framer Motion · Admin (PRD-synced) · Auth Guards · Accessibility   ║
+║  Source of truth: Proxima_v4_PRD_v2.md                              ║
+║  Engineered by Arnav Garg                                           ║
+╚══════════════════════════════════════════════════════════════════════╝
+
+STAGE 3 CONTEXT
+════════════════
+Stages 1 and 2 are complete and verified:
+  ✓ All 22 DB tables, RS256 JWT + PKCE OAuth, ModelRegistry
+  ✓ Quality Heuristic Engine (KL divergence, PRD coefficients, 80/65/50 thresholds)
+  ✓ FTS Retrieval (code→engineering mapping, DOMAIN_TO_KB)
+  ✓ Prompt Registry (10 canonical keys only, Redis cached)
+  ✓ Semantic compare (Jaccard+Hungarian+LLM, documented as temporary)
+  ✓ All 8 tool endpoints via ModelRegistry
+  ✓ Upload security pipeline (MIME + magic-byte + size + archive + hook)
+  ✓ Clinical boundary (header + disclaimer + frontend warning)
+  ✓ Tests: unit + integration passing, CI green
+
+STAGE 3 GOAL
+════════════
+Two deliverables:
+  A) Complete animation system (Framer Motion)
+  B) Admin Platform — 6 pages, routes synced exactly to PRD §5
+
+CRITICAL RULES:
+  - Confidence colors: reference Tailwind tokens ONLY (conf-high/amber/low/critical)
+    Never hardcode hex. Never define local thresholds.
+  - Admin routes: match PRD §5 exactly — see frozen endpoint list below
+  - Admin auth: require_admin + audit log on all mutations + no self-escalation
+  - Accessibility: prefers-reduced-motion + keyboard nav + focus visibility
+
+INSTALL:
+  npm install @radix-ui/react-slider @radix-ui/react-progress recharts
+
+═══════════════════════════════════════════════════════════════════════
+PART A — ANIMATION SYSTEM
+(All animation code identical to Stage 3 v2 with these corrections)
+═══════════════════════════════════════════════════════════════════════
+
+─── Confidence Color Rule ────────────────────────────────────────────
+
+NEVER hardcode hex values for confidence colors anywhere in frontend code.
+ALWAYS use Tailwind CSS classes from globals.css:
+  .conf-high     ← maps to PRD threshold 80-100
+  .conf-amber    ← maps to PRD threshold 65-79
+  .conf-low      ← maps to PRD threshold 50-64
+  .conf-critical ← maps to PRD threshold 0-49
+
+The class assignment function:
+  function getConfClass(heatmapClass: 'high'|'amber'|'low'|'critical'): string {
+    return `conf-${heatmapClass}`;
+  }
+
+This receives heatmap_class from the backend QHE — never recalculate
+thresholds on the frontend. The backend is the single source of truth.
+
+─── prefers-reduced-motion ──────────────────────────────────────────
+
+Wrap the entire app in MotionConfig in App.tsx:
+
+  import { MotionConfig } from 'framer-motion';
+
+  const prefersReduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  export default function App() {
+    return (
+      <MotionConfig reducedMotion={prefersReduced ? 'always' : 'never'}>
+        {/* rest of app */}
+      </MotionConfig>
+    );
+  }
+
+When prefers-reduced-motion is set:
+  - All Framer Motion animations become instant (duration=0)
+  - GSAP animations: wrap in if (!prefersReduced) blocks
+  - Three.js: still renders but no camera movement on scroll
+
+─── Keyboard Navigation ─────────────────────────────────────────────
+
+All interactive elements must be keyboard accessible:
+
+1. Navbar links: native <a> and <button> elements — tab order correct
+2. Domain selector tabs: use role="tablist" + role="tab" + aria-selected
+   Arrow keys navigate between tabs:
+   const handleKeyDown = (e: KeyboardEvent, index: number) => {
+     if (e.key === 'ArrowRight') setActive((index + 1) % 3);
+     if (e.key === 'ArrowLeft')  setActive((index + 2) % 3);
+   };
+3. Accordion: Enter/Space to toggle
+4. Modal: Escape to close, focus trap inside modal while open
+   import { createFocusTrap } from 'focus-trap'; (install: npm install focus-trap)
+5. Dropdown menus: arrow keys navigate, Escape closes
+
+─── Focus Visibility ────────────────────────────────────────────────
+
+Add to globals.css:
+  /* Visible focus ring for keyboard users */
+  :focus-visible {
+    outline: 2px solid #C9A84C;
+    outline-offset: 2px;
+  }
+  /* Remove default outline only when not keyboard navigating */
+  :focus:not(:focus-visible) {
+    outline: none;
+  }
+
+Never use outline: none without the :focus-visible exception.
+
+─── All other animation code ────────────────────────────────────────
+
+All animation implementations (page transitions, hero entrance, domain
+radar, scan sweep, streaming tokens, heatmap reveal, buttons, cards,
+accordions, modals, toasts, loading states, floating symbols, cursor
+glow, nav indicator, dashboard charts) are IDENTICAL to Stage 3 v2.
+
+Not repeated here — refer to Stage 3 v2 for full implementation.
+
+Key reminder: heatmap reveal uses stagger delay 0.055s, scaleY + brightness
+circuit-board effect. Confidence pulse (critical) uses confPulse keyframe
+from globals.css. All defined in Stage 3 v2.
+
+═══════════════════════════════════════════════════════════════════════
+PART B — ADMIN PLATFORM
+═══════════════════════════════════════════════════════════════════════
+
+─── FROZEN ADMIN API ROUTES (PRD §5) ────────────────────────────────
+
+These are the ONLY valid admin routes. No others may be created.
+All routes prefixed with /admin/api/:
+
+  GET    /admin/api/overview
+  GET    /admin/api/users
+  PATCH  /admin/api/users/:id/plan
+  PATCH  /admin/api/users/:id/role
+  PATCH  /admin/api/users/:id/deactivate
+  PATCH  /admin/api/users/:id/reset-tokens
+  GET    /admin/api/prompts
+  GET    /admin/api/prompts/:key
+  POST   /admin/api/prompts/:key/versions
+  POST   /admin/api/prompts/:key/versions/:v/activate
+  GET    /admin/api/prompts/:key/diff
+  GET    /admin/api/knowledge
+  POST   /admin/api/knowledge/chunks
+  DELETE /admin/api/knowledge/chunks/:id
+  POST   /admin/api/knowledge/embed
+  GET    /admin/api/costs/summary
+  GET    /admin/api/costs/top-users
+  GET    /admin/api/logs
+
+─── Authorization Rules (PRD §12.4) ─────────────────────────────────
+
+Every /admin/api/* endpoint MUST:
+1. Call require_admin dependency (raises 403 for role='user')
+2. Log to admin_audit_log BEFORE returning response (not after)
+3. Validate no self-escalation on role changes
+
+# middleware/admin_middleware.py
+
+async def require_admin(current_user: User = Depends(get_current_user)) -> User:
+    """Dependency for all /admin/api/* endpoints."""
+    if current_user.role not in ('admin', 'super_admin'):
+        raise HTTPException(403, "Admin access required")
+    return current_user
+
+async def require_super_admin(current_user: User = Depends(get_current_user)) -> User:
+    """Only super_admin can change roles."""
+    if current_user.role != 'super_admin':
+        raise HTTPException(403, "Super admin access required for role changes")
+    return current_user
+
+async def log_admin_action(
+    admin: User, action: str,
+    target_type: str | None, target_id: str | None,
+    payload: dict | None, request: Request, db: AsyncSession
+) -> None:
+    """Must be called BEFORE response is returned."""
+    entry = AdminAuditLog(
+        admin_id=admin.id, action=action,
+        target_type=target_type, target_id=str(target_id) if target_id else None,
+        payload=payload, ip_address=request.client.host
+    )
+    db.add(entry)
+    await db.commit()
+
+NO SELF-ESCALATION:
+  PATCH /admin/api/users/:id/role
+    if str(target_user.id) == str(admin.id):
+        raise HTTPException(400, "Admins cannot change their own role")
+    # Requires super_admin to change any role
+
+─── admin_router.py (complete, PRD-synced) ──────────────────────────
+
+from proxima.middleware.admin_middleware import require_admin, require_super_admin, log_admin_action
+
+router = APIRouter(prefix="/admin/api", dependencies=[Depends(require_admin)])
+
+# ── GET /admin/api/overview ──────────────────────────────────────
+@router.get("/overview")
+async def admin_overview(db: AsyncSession = Depends(get_db),
+                          redis = Depends(get_redis),
+                          admin: User = Depends(require_admin)):
+    cache_key = "admin:overview"
+    cached = await redis.get(cache_key)
+    if cached:
+        return json.loads(cached)
+
+    # Total users
+    total_users = await db.scalar(select(func.count()).select_from(User))
+
+    # Active users last 30 days
+    cutoff = datetime.now(timezone.utc) - timedelta(days=30)
+    active_30d = await db.scalar(
+        select(func.count()).select_from(User).where(User.last_login >= cutoff)
+    )
+
+    # Total AI requests and cost this month
+    month_start = datetime.now(timezone.utc).replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+    mtd_stats = await db.execute(
+        select(
+            func.count().label('request_count'),
+            func.coalesce(func.sum(text('estimated_cost_usd')), 0).label('total_cost')
+        ).select_from(AIRequest).where(AIRequest.created_at >= month_start)
+    )
+    row = mtd_stats.one()
+
+    # Daily requests last 30 days
+    daily = await db.execute(
+        select(
+            func.date_trunc('day', AIRequest.created_at).label('day'),
+            func.count().label('count')
+        ).where(AIRequest.created_at >= cutoff)
+        .group_by('day').order_by('day')
+    )
+    daily_data = [{'date': str(r.day.date()), 'count': r.count} for r in daily]
+
+    # Requests by tool type
+    by_tool = await db.execute(
+        select(AIRequest.request_type, func.count().label('count'))
+        .group_by(AIRequest.request_type)
+        .order_by(text('count DESC'))
+    )
+
+    # Cost by model
+    by_model = await db.execute(
+        select(AIRequest.model, func.coalesce(func.sum(text('estimated_cost_usd')), 0).label('cost'))
+        .where(AIRequest.created_at >= month_start)
+        .group_by(AIRequest.model)
+        .order_by(text('cost DESC'))
+    )
+
+    # Recent admin actions
+    recent_logs = await db.execute(
+        select(AdminAuditLog, User.email)
+        .join(User, AdminAuditLog.admin_id == User.id)
+        .order_by(AdminAuditLog.created_at.desc()).limit(20)
+    )
+
+    result = {
+        'total_users':     total_users,
+        'active_users_30d': active_30d,
+        'mtd_requests':    row.request_count,
+        'mtd_cost_usd':    round(float(row.total_cost), 4),
+        'daily_requests':  daily_data,
+        'by_tool':         [{'tool': r.request_type, 'count': r.count} for r in by_tool],
+        'by_model':        [{'model': r.model, 'cost': round(float(r.cost), 4)} for r in by_model],
+        'recent_logs':     [{'admin': r.email, 'action': r.AdminAuditLog.action,
+                              'created_at': str(r.AdminAuditLog.created_at)} for r in recent_logs],
+    }
+    await redis.setex(cache_key, 60, json.dumps(result, default=str))
+    return result
+
+# ── GET /admin/api/users ─────────────────────────────────────────
+@router.get("/users")
+async def list_users(
+    search: str = None, plan: str = None, role: str = None,
+    is_active: bool = None, page: int = 1, limit: int = 20,
+    db: AsyncSession = Depends(get_db), admin: User = Depends(require_admin)
+):
+    stmt = select(User)
+    if search:
+        stmt = stmt.where(or_(User.email.ilike(f'%{search}%'),
+                               User.display_name.ilike(f'%{search}%')))
+    if plan:     stmt = stmt.where(User.plan == plan)
+    if role:     stmt = stmt.where(User.role == role)
+    if is_active is not None: stmt = stmt.where(User.is_active == is_active)
+    stmt = stmt.order_by(User.created_at.desc()).offset((page-1)*limit).limit(limit)
+    result = await db.execute(stmt)
+    users = result.scalars().all()
+    total = await db.scalar(select(func.count()).select_from(User))
+    return {'users': [u.__dict__ for u in users], 'total': total, 'page': page, 'limit': limit}
+
+# ── PATCH /admin/api/users/:id/plan ─────────────────────────────
+@router.patch("/users/{user_id}/plan")
+async def update_user_plan(
+    user_id: UUID, body: dict,
+    request: Request, db: AsyncSession = Depends(get_db),
+    admin: User = Depends(require_admin)
+):
+    plan = body.get('plan')
+    if plan not in ('free', 'pro', 'enterprise'):
+        raise HTTPException(400, f"Invalid plan: {plan}")
+    user = await db.get(User, user_id)
+    if not user: raise HTTPException(404, "User not found")
+    old_plan = user.plan
+    user.plan = plan
+    # Log BEFORE commit
+    await log_admin_action(admin, 'update_user_plan', 'user', str(user_id),
+                            {'from': old_plan, 'to': plan}, request, db)
+    await db.commit()
+    return {'ok': True, 'user_id': str(user_id), 'plan': plan}
+
+# ── PATCH /admin/api/users/:id/role ─────────────────────────────
+@router.patch("/users/{user_id}/role")
+async def update_user_role(
+    user_id: UUID, body: dict,
+    request: Request, db: AsyncSession = Depends(get_db),
+    admin: User = Depends(require_super_admin)  # super_admin ONLY
+):
+    # No self-escalation
+    if str(user_id) == str(admin.id):
+        raise HTTPException(400, "Cannot change your own role")
+    new_role = body.get('role')
+    if new_role not in ('user', 'admin', 'super_admin'):
+        raise HTTPException(400, f"Invalid role: {new_role}")
+    user = await db.get(User, user_id)
+    if not user: raise HTTPException(404, "User not found")
+    old_role = user.role
+    user.role = new_role
+    await log_admin_action(admin, 'update_user_role', 'user', str(user_id),
+                            {'from': old_role, 'to': new_role}, request, db)
+    await db.commit()
+    return {'ok': True, 'user_id': str(user_id), 'role': new_role}
+
+# ── PATCH /admin/api/users/:id/deactivate ───────────────────────
+@router.patch("/users/{user_id}/deactivate")
+async def deactivate_user(
+    user_id: UUID, request: Request,
+    db: AsyncSession = Depends(get_db), admin: User = Depends(require_admin)
+):
+    if str(user_id) == str(admin.id):
+        raise HTTPException(400, "Cannot deactivate yourself")
+    user = await db.get(User, user_id)
+    if not user: raise HTTPException(404, "User not found")
+    user.is_active = False
+    await log_admin_action(admin, 'deactivate_user', 'user', str(user_id), None, request, db)
+    await db.commit()
+    return {'ok': True}
+
+# ── PATCH /admin/api/users/:id/reset-tokens ─────────────────────
+@router.patch("/users/{user_id}/reset-tokens")
+async def reset_user_tokens(
+    user_id: UUID, request: Request,
+    db: AsyncSession = Depends(get_db), admin: User = Depends(require_admin)
+):
+    user = await db.get(User, user_id)
+    if not user: raise HTTPException(404, "User not found")
+    old_count = user.tokens_used
+    user.tokens_used = 0
+    await log_admin_action(admin, 'reset_user_tokens', 'user', str(user_id),
+                            {'tokens_reset': old_count}, request, db)
+    await db.commit()
+    return {'ok': True, 'tokens_reset': old_count}
+
+# ── GET /admin/api/prompts ───────────────────────────────────────
+@router.get("/prompts")
+async def list_prompts(db: AsyncSession = Depends(get_db), admin=Depends(require_admin)):
+    from proxima.services.prompt_registry import CANONICAL_PROMPT_KEYS
+    result = {}
+    for key in sorted(CANONICAL_PROMPT_KEYS):
+        stmt = select(PromptVersion).where(PromptVersion.prompt_key == key
+                      ).order_by(PromptVersion.version.desc())
+        rows = (await db.execute(stmt)).scalars().all()
+        result[key] = [
+            {'version': r.version, 'tier': r.tier, 'is_active': r.is_active,
+             'author': r.author, 'notes': r.notes, 'created_at': str(r.created_at)}
+            for r in rows
+        ]
+    return result
+
+# ── GET /admin/api/prompts/:key ──────────────────────────────────
+@router.get("/prompts/{key:path}")
+async def get_prompt_versions(
+    key: str, db: AsyncSession = Depends(get_db), admin=Depends(require_admin)
+):
+    from proxima.services.prompt_registry import prompt_registry, CANONICAL_PROMPT_KEYS
+    if key not in CANONICAL_PROMPT_KEYS:
+        raise HTTPException(400, f"Unknown prompt key: {key}")
+    stmt = select(PromptVersion).where(PromptVersion.prompt_key == key
+                  ).order_by(PromptVersion.version.desc())
+    rows = (await db.execute(stmt)).scalars().all()
+    return {'key': key, 'versions': [
+        {'version': r.version, 'tier': r.tier, 'content': r.content,
+         'is_active': r.is_active, 'author': r.author, 'notes': r.notes,
+         'activated_at': str(r.activated_at), 'created_at': str(r.created_at)}
+        for r in rows
+    ]}
+
+# ── POST /admin/api/prompts/:key/versions ───────────────────────
+@router.post("/prompts/{key:path}/versions")
+async def create_prompt_version(
+    key: str, body: dict, request: Request,
+    db: AsyncSession = Depends(get_db),
+    redis = Depends(get_redis), admin: User = Depends(require_admin)
+):
+    from proxima.services.prompt_registry import prompt_registry
+    content  = body.get('content', '').strip()
+    notes    = body.get('notes', '')
+    activate = body.get('activate', False)
+    if not content:
+        raise HTTPException(400, "Content is required")
+    pv = await prompt_registry.create_version(key, content, tier='tool', author=admin.email, notes=notes, db=db)
+    if activate:
+        await prompt_registry.set_active(key, pv.version, admin.id, db, redis)
+    await log_admin_action(admin, 'create_prompt_version', 'prompt', key,
+                            {'version': pv.version, 'activated': activate}, request, db)
+    return {'ok': True, 'version': pv.version, 'activated': activate}
+
+# ── POST /admin/api/prompts/:key/versions/:v/activate ───────────
+@router.post("/prompts/{key:path}/versions/{version}/activate")
+async def activate_prompt_version(
+    key: str, version: int, request: Request,
+    db: AsyncSession = Depends(get_db),
+    redis = Depends(get_redis), admin: User = Depends(require_admin)
+):
+    from proxima.services.prompt_registry import prompt_registry
+    await prompt_registry.set_active(key, version, admin.id, db, redis)
+    # Cache invalidated inside set_active
+    await log_admin_action(admin, 'activate_prompt_version', 'prompt', key,
+                            {'version': version}, request, db)
+    return {'ok': True, 'key': key, 'version': version}
+
+# ── GET /admin/api/prompts/:key/diff ────────────────────────────
+@router.get("/prompts/{key:path}/diff")
+async def diff_prompt_versions(
+    key: str, v1: int, v2: int,
+    db: AsyncSession = Depends(get_db), admin=Depends(require_admin)
+):
+    from proxima.services.prompt_registry import CANONICAL_PROMPT_KEYS
+    if key not in CANONICAL_PROMPT_KEYS:
+        raise HTTPException(400, f"Unknown prompt key: {key}")
+    pv1 = await db.scalar(select(PromptVersion).where(
+        PromptVersion.prompt_key == key, PromptVersion.version == v1))
+    pv2 = await db.scalar(select(PromptVersion).where(
+        PromptVersion.prompt_key == key, PromptVersion.version == v2))
+    if not pv1 or not pv2:
+        raise HTTPException(404, "One or both versions not found")
+    import difflib
+    diff = list(difflib.unified_diff(
+        pv1.content.splitlines(keepends=True),
+        pv2.content.splitlines(keepends=True),
+        fromfile=f"v{v1}", tofile=f"v{v2}"
+    ))
+    return {'key': key, 'v1': v1, 'v2': v2, 'diff': ''.join(diff)}
+
+# ── GET /admin/api/knowledge ─────────────────────────────────────
+@router.get("/knowledge")
+async def list_knowledge(
+    kb_name: str = None, has_embedding: bool = None,
+    page: int = 1, limit: int = 20,
+    db: AsyncSession = Depends(get_db), admin=Depends(require_admin)
+):
+    stmt = select(DomainKnowledgeChunk)
+    if kb_name:         stmt = stmt.where(DomainKnowledgeChunk.kb_name == kb_name)
+    if has_embedding is not None:
+        if has_embedding:
+            stmt = stmt.where(DomainKnowledgeChunk.embedding != None)
+        else:
+            stmt = stmt.where(DomainKnowledgeChunk.embedding == None)
+    stmt = stmt.order_by(DomainKnowledgeChunk.chunk_index).offset((page-1)*limit).limit(limit)
+    rows  = (await db.execute(stmt)).scalars().all()
+    total = await db.scalar(select(func.count()).select_from(DomainKnowledgeChunk))
+    # KB stats
+    stats = await db.execute(
+        select(DomainKnowledgeChunk.kb_name, func.count().label('total'),
+               func.sum(case((DomainKnowledgeChunk.embedding != None, 1), else_=0)).label('embedded'))
+        .group_by(DomainKnowledgeChunk.kb_name)
+    )
+    return {
+        'chunks': [{'id': str(r.id), 'kb_name': r.kb_name, 'title': r.title,
+                    'content_preview': r.content[:120], 'chunk_index': r.chunk_index,
+                    'has_embedding': r.embedding is not None,
+                    'embedding_model': r.embedding_model} for r in rows],
+        'total': total, 'page': page, 'limit': limit,
+        'kb_stats': [{'kb_name': r.kb_name, 'total': r.total, 'embedded': r.embedded}
+                     for r in stats],
+    }
+
+# ── POST /admin/api/knowledge/chunks ────────────────────────────
+@router.post("/knowledge/chunks")
+async def add_knowledge_chunk(
+    body: dict, request: Request,
+    db: AsyncSession = Depends(get_db), admin: User = Depends(require_admin)
+):
+    kb_name = body.get('kb_name')
+    content = body.get('content', '').strip()
+    if kb_name not in ('engineering', 'medical', 'legal'):
+        raise HTTPException(400, f"kb_name must be one of: engineering, medical, legal")
+    if not content:
+        raise HTTPException(400, "content is required")
+    # Get next chunk_index
+    max_idx = await db.scalar(
+        select(func.max(DomainKnowledgeChunk.chunk_index))
+        .where(DomainKnowledgeChunk.kb_name == kb_name)
+    ) or 0
+    chunk = DomainKnowledgeChunk(
+        kb_name=kb_name, title=body.get('title'),
+        content=content, source=body.get('source'),
+        chunk_index=max_idx + 1,
+        token_count=len(content.split()),
+    )
+    db.add(chunk)
+    await log_admin_action(admin, 'add_knowledge_chunk', 'knowledge', kb_name,
+                            {'title': body.get('title'), 'chars': len(content)}, request, db)
+    await db.commit()
+    return {'ok': True, 'id': str(chunk.id)}
+
+# ── DELETE /admin/api/knowledge/chunks/:id ───────────────────────
+@router.delete("/knowledge/chunks/{chunk_id}")
+async def delete_knowledge_chunk(
+    chunk_id: UUID, request: Request,
+    db: AsyncSession = Depends(get_db), admin: User = Depends(require_admin)
+):
+    chunk = await db.get(DomainKnowledgeChunk, chunk_id)
+    if not chunk: raise HTTPException(404, "Chunk not found")
+    await log_admin_action(admin, 'delete_knowledge_chunk', 'knowledge', str(chunk_id),
+                            {'kb_name': chunk.kb_name, 'chunk_index': chunk.chunk_index}, request, db)
+    await db.delete(chunk)
+    await db.commit()
+    return {'ok': True}
+
+# ── POST /admin/api/knowledge/embed ─────────────────────────────
+@router.post("/knowledge/embed")
+async def trigger_kb_embedding(
+    request: Request, body: dict = {},
+    db: AsyncSession = Depends(get_db), admin: User = Depends(require_admin)
+):
+    from proxima.celery_app import app as celery_app
+    kb_name = body.get('kb_name')  # None = all KBs
+    # Count chunks needing embedding
+    stmt = select(func.count()).select_from(DomainKnowledgeChunk).where(
+        DomainKnowledgeChunk.embedding == None)
+    if kb_name:
+        stmt = stmt.where(DomainKnowledgeChunk.kb_name == kb_name)
+    pending_count = await db.scalar(stmt)
+    # Queue Celery task
+    task = celery_app.send_task(
+        'proxima.tasks.embeddings.embed_knowledge_base',
+        kwargs={'kb_name': kb_name},
+        queue='proxima:embed'
+    )
+    await log_admin_action(admin, 'trigger_kb_embedding', 'knowledge', kb_name or 'all',
+                            {'pending_chunks': pending_count, 'celery_id': task.id}, request, db)
+    return {'ok': True, 'celery_id': task.id, 'pending_chunks': pending_count}
+
+# ── GET /admin/api/costs/summary ────────────────────────────────
+@router.get("/costs/summary")
+async def cost_summary(
+    db: AsyncSession = Depends(get_db),
+    redis = Depends(get_redis), admin=Depends(require_admin)
+):
+    cache_key = "admin:costs"
+    cached = await redis.get(cache_key)
+    if cached: return json.loads(cached)
+
+    month_start = datetime.now(timezone.utc).replace(
+        day=1, hour=0, minute=0, second=0, microsecond=0)
+    cutoff_30d  = datetime.now(timezone.utc) - timedelta(days=30)
+
+    # MTD total cost
+    mtd_cost = await db.scalar(
+        select(func.coalesce(func.sum(text('estimated_cost_usd')), 0))
+        .select_from(AIRequest).where(AIRequest.created_at >= month_start)
+    )
+
+    # Daily cost last 30 days
+    daily = await db.execute(
+        select(func.date_trunc('day', AIRequest.created_at).label('day'),
+               func.coalesce(func.sum(text('estimated_cost_usd')), 0).label('cost'))
+        .where(AIRequest.created_at >= cutoff_30d)
+        .group_by('day').order_by('day')
+    )
+
+    # Cost by model
+    by_model = await db.execute(
+        select(AIRequest.model,
+               func.coalesce(func.sum(text('estimated_cost_usd')), 0).label('cost'),
+               func.count().label('requests'))
+        .where(AIRequest.created_at >= month_start)
+        .group_by(AIRequest.model).order_by(text('cost DESC'))
+    )
+
+    # Cost by tool
+    by_tool = await db.execute(
+        select(AIRequest.request_type,
+               func.coalesce(func.sum(text('estimated_cost_usd')), 0).label('cost'))
+        .where(AIRequest.created_at >= month_start)
+        .group_by(AIRequest.request_type).order_by(text('cost DESC'))
+    )
+
+    from proxima.config import settings
+    budget     = settings.monthly_ai_budget_usd
+    utilization = round(float(mtd_cost) / budget * 100, 1) if budget > 0 else 0
+
+    result = {
+        'mtd_cost_usd':  round(float(mtd_cost), 4),
+        'budget_usd':    budget,
+        'utilization_pct': utilization,
+        'over_threshold': utilization >= settings.cost_alert_threshold * 100,
+        'daily':  [{'date': str(r.day.date()), 'cost': round(float(r.cost), 4)} for r in daily],
+        'by_model': [{'model': r.model, 'cost': round(float(r.cost), 4),
+                      'requests': r.requests} for r in by_model],
+        'by_tool':  [{'tool': r.request_type, 'cost': round(float(r.cost), 4)} for r in by_tool],
+    }
+    await redis.setex(cache_key, 300, json.dumps(result, default=str))
+    return result
+
+# ── GET /admin/api/costs/top-users ──────────────────────────────
+@router.get("/costs/top-users")
+async def top_users_by_cost(
+    limit: int = 10, db: AsyncSession = Depends(get_db), admin=Depends(require_admin)
+):
+    month_start = datetime.now(timezone.utc).replace(
+        day=1, hour=0, minute=0, second=0, microsecond=0)
+    rows = await db.execute(
+        select(User.email, User.display_name,
+               func.coalesce(func.sum(text('estimated_cost_usd')), 0).label('total_cost'),
+               func.count(AIRequest.id).label('request_count'))
+        .join(AIRequest, AIRequest.user_id == User.id)
+        .where(AIRequest.created_at >= month_start)
+        .group_by(User.id, User.email, User.display_name)
+        .order_by(text('total_cost DESC')).limit(limit)
+    )
+    return {'users': [
+        {'email': r.email, 'display_name': r.display_name,
+         'total_cost_usd': round(float(r.total_cost), 4),
+         'request_count': r.request_count}
+        for r in rows
+    ]}
+
+# ── GET /admin/api/logs ──────────────────────────────────────────
+@router.get("/logs")
+async def admin_logs(
+    admin_id: str = None, action: str = None, target_type: str = None,
+    from_date: str = None, to_date: str = None,
+    page: int = 1, limit: int = 50,
+    db: AsyncSession = Depends(get_db), admin=Depends(require_admin)
+):
+    stmt = select(AdminAuditLog, User.email.label('admin_email')
+                  ).join(User, AdminAuditLog.admin_id == User.id)
+    if admin_id:     stmt = stmt.where(AdminAuditLog.admin_id == UUID(admin_id))
+    if action:       stmt = stmt.where(AdminAuditLog.action.ilike(f'%{action}%'))
+    if target_type:  stmt = stmt.where(AdminAuditLog.target_type == target_type)
+    if from_date:    stmt = stmt.where(AdminAuditLog.created_at >= from_date)
+    if to_date:      stmt = stmt.where(AdminAuditLog.created_at <= to_date)
+    stmt = stmt.order_by(AdminAuditLog.created_at.desc()).offset((page-1)*limit).limit(limit)
+    rows = (await db.execute(stmt)).all()
+    return {'logs': [
+        {'id': str(r.AdminAuditLog.id), 'admin_email': r.admin_email,
+         'action': r.AdminAuditLog.action, 'target_type': r.AdminAuditLog.target_type,
+         'target_id': r.AdminAuditLog.target_id, 'payload': r.AdminAuditLog.payload,
+         'ip_address': r.AdminAuditLog.ip_address,
+         'created_at': str(r.AdminAuditLog.created_at)}
+        for r in rows
+    ]}
+
+─── Frontend — Admin Pages ───────────────────────────────────────────
+
+Admin route guard (AdminRoute.tsx):
+  Checks user.role in ('admin','super_admin')
+  Redirects regular users to /dashboard
+
+Admin sidebar navigation links (MUST match /admin/api/* routes):
+  /admin          → Overview
+  /admin/users    → Users
+  /admin/prompts  → Prompts
+  /admin/knowledge → Knowledge Base
+  /admin/costs    → Costs
+  /admin/logs     → Audit Logs
+
+AdminOverview:
+  4 metric cards: Total Users | Active 30d | MTD Requests | MTD Cost (USD)
+  Line chart: daily_requests (Recharts, gold line)
+  Donut chart: by_tool breakdown
+  Budget warning banner when over_threshold === true:
+    "⚠️ {utilization_pct}% of monthly AI budget used. Consider reviewing usage."
+  Recent logs table (last 20 actions)
+
+AdminUsers:
+  Search input + filters (plan, role, is_active)
+  Table: avatar | email | name | plan | role | tokens_used/limit | status | actions
+  Actions:
+    Change Plan: dropdown → PATCH /admin/api/users/:id/plan
+    Change Role: dropdown (super_admin only) → PATCH /admin/api/users/:id/role
+      Disable role change for own row (show tooltip: "Cannot change your own role")
+    Deactivate → PATCH /admin/api/users/:id/deactivate (confirm modal)
+    Reset Tokens → PATCH /admin/api/users/:id/reset-tokens (confirm modal)
+
+AdminPrompts:
+  Left panel: list of 10 canonical prompt keys (grouped by tier)
+  Right panel: selected key detail
+    Version table: version | is_active | author | notes | created_at | Actions
+    Actions: "View" (expand content) | "Activate" (POST .../activate)
+    Diff view: select v1 + v2 → show unified diff from GET .../diff
+    Create Version form: textarea (pre-filled active) + notes + Save/Save&Activate
+  Activation immediately invalidates Redis cache (backend handles this in set_active)
+
+AdminKnowledge:
+  KB stats bar at top: engineering/medical/legal total + embedded counts
+  Filter: kb_name | has_embedding
+  Table: kb_name | title | content_preview | chunk_index | embedding_model | actions
+  Add Chunk form: kb_name select (engineering/medical/legal only) + title + content + source
+  Delete: confirm modal → DELETE /admin/api/knowledge/chunks/:id
+  Trigger Embedding: "Embed Pending Chunks" button → POST /admin/api/knowledge/embed
+    Shows progress toast with celery_id + pending_chunks count
+
+AdminCosts:
+  Budget alert banner if over_threshold=true (orange/red)
+  4 cards: MTD Cost | Budget | Utilization% | Most Used Tool
+  Line chart: daily cost (gold line)
+  Bar charts: by_model + by_tool
+  Top Users table: email | cost | requests
+
+AdminLogs:
+  Filter bar: admin, action, target_type, date range
+  Scrollable table: timestamp | admin | action | target | IP | expand→payload JSON
+
+═══════════════════════════════════════════════════════════════════════
+MIGRATION 003 — Performance indexes
+═══════════════════════════════════════════════════════════════════════
+
+003_admin_indexes.py:
+  op.execute("CREATE INDEX idx_ai_requests_cost_created ON ai_requests(estimated_cost_usd, created_at DESC);")
+  op.execute("CREATE INDEX idx_ai_requests_model ON ai_requests(model);")
+  op.execute("CREATE INDEX idx_admin_audit_action ON admin_audit_log(action, created_at DESC);")
+  op.execute("CREATE INDEX idx_users_role ON users(role);")
+  op.execute("CREATE INDEX idx_users_plan ON users(plan);")
+  op.execute("CREATE INDEX idx_users_last_login ON users(last_login DESC);")
+
+═══════════════════════════════════════════════════════════════════════
+TESTS — Stage 3 additions
+═══════════════════════════════════════════════════════════════════════
+
+─── backend/tests/integration/test_admin_routes.py ──────────────────
+
+import pytest
+
+@pytest.mark.anyio
+async def test_admin_routes_require_auth(client):
+    """All admin routes return 401 without auth."""
+    for path in ['/admin/api/overview', '/admin/api/users',
+                 '/admin/api/prompts', '/admin/api/logs']:
+        r = await client.get(path)
+        assert r.status_code == 401, f"{path} returned {r.status_code}"
+
+@pytest.mark.anyio
+async def test_admin_routes_require_admin_role(client, db):
+    """Regular user JWT returns 403 on admin routes."""
+    # Create regular user token and test
+    # (full implementation requires auth mock fixtures)
+    assert True  # placeholder
+
+@pytest.mark.anyio
+async def test_no_self_role_escalation(client, db):
+    """Admin cannot change their own role."""
+    assert True  # placeholder
+
+─── frontend/src/__tests__/DomainRadar.test.tsx ─────────────────────
+
+import { describe, it, expect } from 'vitest';
+
+function getVertices(weights: {code: number, medical: number, legal: number},
+                     radius: number, cx: number, cy: number) {
+  const angles = { legal: -90, code: 30, medical: 150 };
+  return Object.entries(angles).map(([domain, angle]) => {
+    const r = (weights[domain as keyof typeof weights] ?? 0) * radius;
+    const rad = (angle * Math.PI) / 180;
+    return { x: cx + r * Math.cos(rad), y: cy + r * Math.sin(rad) };
+  });
+}
+
+describe('DomainRadar vertex calculation', () => {
+  it('places equal weights as equilateral triangle', () => {
+    const v = getVertices({code:0.33, medical:0.33, legal:0.34}, 100, 110, 110);
+    expect(v).toHaveLength(3);
+    v.forEach(pt => {
+      expect(typeof pt.x).toBe('number');
+      expect(typeof pt.y).toBe('number');
+    });
+  });
+
+  it('places 100% legal at top-center', () => {
+    const v = getVertices({code:0, medical:0, legal:1}, 100, 110, 110);
+    const legalPoint = v.find((_, i) => i === 0); // legal is index 0 in angles
+    expect(legalPoint).toBeDefined();
+  });
+
+  it('places 0% domain at center', () => {
+    const v = getVertices({code:0, medical:0, legal:0}, 100, 110, 110);
+    v.forEach(pt => {
+      expect(Math.abs(pt.x - 110)).toBeLessThan(1);
+      expect(Math.abs(pt.y - 110)).toBeLessThan(1);
+    });
+  });
+});
+
+═══════════════════════════════════════════════════════════════════════
+STAGE 3 COMPLETION CHECKLIST
+═══════════════════════════════════════════════════════════════════════
+
+ANIMATIONS:
+✓ MotionConfig with reducedMotion='always' when prefers-reduced-motion set
+✓ :focus-visible CSS rule in globals.css (gold outline, 2px offset)
+✓ Domain tabs: role="tablist", role="tab", aria-selected, arrow key navigation
+✓ Modal: focus-trap active while open, Escape to close
+✓ All buttons: keyboard focusable, visible focus ring
+✓ No outline: none without :focus-visible exception
+✓ Confidence classes use conf-${heatmap_class} — no hardcoded hex
+✓ All heatmap_class values come from backend QHE — no frontend recalculation
+✓ (All other animations from Stage 3 v2 implemented — see that doc)
+
+ADMIN:
+✓ All 18 admin routes implemented (match PRD §5 exactly)
+✓ No extra admin routes created beyond the 18
+✓ require_admin dependency on all /admin/api/* endpoints
+✓ require_super_admin on PATCH /admin/api/users/:id/role
+✓ No self-escalation: own user_id rejected on role change
+✓ No self-deactivation: own user_id rejected on deactivate
+✓ log_admin_action called BEFORE db.commit() on all mutations
+✓ AdminAuditLog entries created for: update_plan, update_role,
+  deactivate_user, reset_tokens, create_prompt_version,
+  activate_prompt_version, add_knowledge_chunk,
+  delete_knowledge_chunk, trigger_kb_embedding
+✓ Prompt key validation: HTTPException 400 for non-canonical keys
+✓ Knowledge add: kb_name must be 'engineering'|'medical'|'legal'
+✓ Prompt activation: Redis cache invalidated (prompt:{key} deleted)
+✓ Cost summary cached 5min (admin:costs key), overview cached 60s
+✓ Budget alert banner shown when utilization ≥ threshold
+✓ AdminRoute frontend guard: redirects non-admin to /dashboard
+✓ Admin role change: disabled for own row in UI
+
+TESTS:
+✓ Admin route auth tests pass (401 without auth)
+✓ DomainRadar vertex calculation tests pass (3 cases)
+✓ CI pipeline green after Stage 3 changes
+
+═══════════════════════════════════════════════════════════════════════

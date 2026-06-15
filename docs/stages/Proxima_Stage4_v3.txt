@@ -1,0 +1,927 @@
+╔══════════════════════════════════════════════════════════════════════╗
+║         PROXIMA v4.1 — ANTIGRAVITY BUILD PROMPT                     ║
+║              STAGE 4: CINEMATIC LANDING HERO                        ║
+║  Three.js · GSAP · Performance (60fps multi-device) · Accessibility ║
+║  Source of truth: Proxima_v4_PRD_v2.md                              ║
+║  Engineered by Arnav Garg                                           ║
+╚══════════════════════════════════════════════════════════════════════╝
+
+STAGE 4 CONTEXT
+════════════════
+Stages 1, 2, and 3 are complete and verified:
+  ✓ All 22 DB tables, RS256 JWT + PKCE OAuth, ModelRegistry
+  ✓ All 10 pages, all 8 tools, QHE, FTS Retrieval, Prompt Registry
+  ✓ Upload security pipeline, clinical boundary enforcement
+  ✓ Full Framer Motion animation system + Admin Platform (18 routes)
+  ✓ CI/CD green, tests passing
+
+STAGE 4 GOAL
+════════════
+Replace the static landing hero with a cinematic 3D experience.
+
+SCOPE — LANDING.TSX ONLY. No other file is modified.
+All other pages, all API calls, all backend code: UNTOUCHED.
+
+PERFORMANCE TARGETS (PRD — non-negotiable):
+  ✓ 60 FPS on Apple M1 MacBook Pro (2021)
+  ✓ 60 FPS on mid-range Windows laptop (Intel i5, GTX 1650 equivalent)
+  ✓ 60 FPS on recent Android flagship (Snapdragon 8 Gen 2 equivalent)
+    — achieved via StaticHero on mobile (Three.js not loaded)
+
+ACCESSIBILITY REQUIREMENTS:
+  ✓ prefers-reduced-motion: Three.js canvas stops animating, camera fixed
+  ✓ Keyboard navigation: all CTAs reachable via Tab, Enter to activate
+  ✓ Focus visibility: gold outline on all interactive elements
+  ✓ aria-label on canvas: aria-label="Proxima 3D background visualization" role="img"
+  ✓ Screen reader: canvas marked aria-hidden="false" with descriptive label
+
+LAZY LOADING REQUIREMENT (explicit):
+  Three.js bundle MUST be loaded ONLY on the Landing page.
+  It MUST NOT be downloaded when user navigates to any other page.
+  Implementation: React.lazy() + dynamic import + Suspense.
+  Verified: build output shows 'vendor-three' chunk NOT in main bundle.
+
+INSTALL:
+  npm install three@0.165.0 @types/three@0.165.0
+  npm install @react-three/fiber@8.16.8 @react-three/drei@9.105.4
+  npm install gsap@3.12.5
+  npm install focus-trap  ← already installed in Stage 3
+
+═══════════════════════════════════════════════════════════════════════
+ARCHITECTURE — THREE LAYERS
+═══════════════════════════════════════════════════════════════════════
+
+Layer 1 (z-index: 0)  — Three.js WebGL Canvas (full viewport)
+Layer 2 (z-index: 10) — Depth overlays (vignette + radial gradient)
+Layer 3 (z-index: 20) — Text content (Framer Motion, Stage 3 entrance)
+
+Hero section is PINNED by GSAP ScrollTrigger for 250% of viewport height.
+Camera travels from z=80 to z=20 as user scrolls through the pin.
+Text fades at 40-55% progress. Canvas fades at 80-100% progress.
+
+═══════════════════════════════════════════════════════════════════════
+FILE STRUCTURE (Stage 4 additions only)
+═══════════════════════════════════════════════════════════════════════
+
+src/components/HeroCinematic/
+  index.tsx              ← ProximaCinematicHero — main export (lazy-loaded)
+  ProximaScene.tsx       ← Canvas + scene composition + camera control
+  ParticleField.tsx      ← 12,000 points, gaussian distribution
+  DocumentPlanes.tsx     ← 3 floating semi-transparent planes
+  FilamentLines.tsx      ← 10 gold connecting lines, lerp-shifting
+  useSceneScroll.ts      ← GSAP ScrollTrigger → camera progress ref
+  useMouseParallax.ts    ← mouse → 3D tilt + text counter-parallax
+  webglDetect.ts         ← WebGL + mobile detection
+  StaticHero.tsx         ← Fallback: Framer Motion hero (no Three.js)
+
+src/pages/Landing.tsx    ← MODIFIED: conditional cinematic vs static hero
+
+═══════════════════════════════════════════════════════════════════════
+webglDetect.ts
+═══════════════════════════════════════════════════════════════════════
+
+export function isWebGLAvailable(): boolean {
+  try {
+    const canvas = document.createElement('canvas');
+    return !!(
+      window.WebGLRenderingContext &&
+      (canvas.getContext('webgl') || canvas.getContext('experimental-webgl'))
+    );
+  } catch {
+    return false;
+  }
+}
+
+export function isMobile(): boolean {
+  return (
+    window.innerWidth < 768 ||
+    /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(
+      navigator.userAgent
+    )
+  );
+}
+
+export function prefersReducedMotion(): boolean {
+  return window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+}
+
+═══════════════════════════════════════════════════════════════════════
+ParticleField.tsx
+═══════════════════════════════════════════════════════════════════════
+
+import { useRef, useMemo } from 'react';
+import { useFrame } from '@react-three/fiber';
+import * as THREE from 'three';
+import { prefersReducedMotion } from './webglDetect';
+
+// Box-Muller gaussian transform
+function gaussian(): number {
+  let u = 0, v = 0;
+  while (u === 0) u = Math.random();
+  while (v === 0) v = Math.random();
+  return Math.sqrt(-2.0 * Math.log(u)) * Math.cos(2.0 * Math.PI * v);
+}
+
+export function ParticleField({
+  mouseRef,
+}: {
+  mouseRef: React.MutableRefObject<{ x: number; y: number }>;
+}) {
+  const meshRef = useRef<THREE.Points>(null);
+  const reduced = prefersReducedMotion();
+  const COUNT   = 12000;
+
+  const positions = useMemo(() => {
+    const arr = new Float32Array(COUNT * 3);
+    for (let i = 0; i < COUNT; i++) {
+      const r     = Math.abs(gaussian() * 35);
+      const theta = Math.random() * Math.PI * 2;
+      const phi   = Math.acos(2 * Math.random() - 1);
+      arr[i * 3]     = r * Math.sin(phi) * Math.cos(theta);
+      arr[i * 3 + 1] = r * Math.sin(phi) * Math.sin(theta);
+      arr[i * 3 + 2] = r * Math.cos(phi);
+    }
+    return arr;
+  }, []);
+
+  useFrame(() => {
+    if (!meshRef.current || reduced) return;  // freeze when reduced-motion
+    meshRef.current.rotation.y += 0.00018;
+    meshRef.current.rotation.x += 0.00006;
+    // Mouse parallax — smooth lerp
+    meshRef.current.rotation.x +=
+      (mouseRef.current.y * 0.15 - meshRef.current.rotation.x) * 0.03;
+    meshRef.current.rotation.y +=
+      (mouseRef.current.x * 0.15 - meshRef.current.rotation.y) * 0.03;
+  });
+
+  return (
+    <points ref={meshRef}>
+      <bufferGeometry>
+        <bufferAttribute
+          attach="attributes-position"
+          count={COUNT}
+          array={positions}
+          itemSize={3}
+        />
+      </bufferGeometry>
+      <pointsMaterial
+        color="#F0EFE9"
+        size={0.06}
+        sizeAttenuation={true}
+        transparent={true}
+        opacity={0.45}
+        fog={true}
+      />
+    </points>
+  );
+}
+
+═══════════════════════════════════════════════════════════════════════
+DocumentPlanes.tsx
+═══════════════════════════════════════════════════════════════════════
+
+import { useRef, useMemo } from 'react';
+import { useFrame } from '@react-three/fiber';
+import * as THREE from 'three';
+import { prefersReducedMotion } from './webglDetect';
+
+function createGridTexture(): THREE.CanvasTexture {
+  const canvas = document.createElement('canvas');
+  canvas.width = 256; canvas.height = 352;
+  const ctx = canvas.getContext('2d')!;
+  ctx.fillStyle = 'rgba(240,239,233,0.03)';
+  ctx.fillRect(0, 0, 256, 352);
+  ctx.strokeStyle = 'rgba(201,168,76,0.06)';
+  ctx.lineWidth = 0.5;
+  for (let y = 20; y < 352; y += 20) {
+    ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(256, y); ctx.stroke();
+  }
+  ctx.strokeStyle = 'rgba(201,168,76,0.12)';
+  ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.moveTo(32, 0); ctx.lineTo(32, 352); ctx.stroke();
+  return new THREE.CanvasTexture(canvas);
+}
+
+const PLANE_CONFIGS = [
+  { pos: [-14,  4, -22] as [number,number,number], rot: [ 0.12,  0.18,  0.05] as [number,number,number], drift: 0.9,  depth: 0.015 },
+  { pos: [ 11, -5, -38] as [number,number,number], rot: [-0.06, -0.14,  0.09] as [number,number,number], drift: 0.65, depth: 0.009 },
+  { pos: [ -4,  9, -55] as [number,number,number], rot: [ 0.09,  0.11, -0.11] as [number,number,number], drift: 0.45, depth: 0.005 },
+];
+
+export function DocumentPlanes({
+  mouseRef,
+}: {
+  mouseRef: React.MutableRefObject<{ x: number; y: number }>;
+}) {
+  const refs    = [useRef<THREE.Mesh>(null), useRef<THREE.Mesh>(null), useRef<THREE.Mesh>(null)];
+  const texture = useMemo(() => createGridTexture(), []);
+  const reduced = prefersReducedMotion();
+
+  useFrame(({ clock }) => {
+    if (reduced) return;  // freeze when reduced-motion
+    const t = clock.getElapsedTime();
+    refs.forEach((ref, i) => {
+      if (!ref.current) return;
+      const cfg = PLANE_CONFIGS[i];
+      ref.current.position.y   = cfg.pos[1] + Math.sin(t * 0.28 + i * 2.1) * cfg.drift;
+      ref.current.rotation.z   = cfg.rot[2] + Math.sin(t * 0.18 + i * 2.1) * 0.003;
+      ref.current.position.x   = cfg.pos[0] + mouseRef.current.x * cfg.depth * 60;
+      ref.current.position.y  += mouseRef.current.y * cfg.depth * 40;
+    });
+  });
+
+  return (
+    <>
+      {PLANE_CONFIGS.map((cfg, i) => (
+        <mesh key={i} ref={refs[i]} position={cfg.pos} rotation={cfg.rot}>
+          <planeGeometry args={[8, 11]} />
+          <meshStandardMaterial
+            map={texture}
+            transparent={true}
+            opacity={0.055}
+            side={THREE.DoubleSide}
+            depthWrite={false}
+          />
+        </mesh>
+      ))}
+    </>
+  );
+}
+
+═══════════════════════════════════════════════════════════════════════
+FilamentLines.tsx
+═══════════════════════════════════════════════════════════════════════
+
+import { useRef, useMemo } from 'react';
+import { useFrame } from '@react-three/fiber';
+import * as THREE from 'three';
+import { prefersReducedMotion } from './webglDetect';
+
+const LINE_COUNT = 10;
+
+export function FilamentLines() {
+  const ref     = useRef<THREE.LineSegments>(null);
+  const reduced = prefersReducedMotion();
+
+  const { positions, targets, speeds } = useMemo(() => {
+    const rand      = (r: number) => (Math.random() - 0.5) * r;
+    const positions = new Float32Array(LINE_COUNT * 6).map(() => rand(40));
+    const targets   = new Float32Array(LINE_COUNT * 6).map(() => rand(40));
+    const speeds    = Array.from({ length: LINE_COUNT * 6 },
+                                 () => 0.0008 + Math.random() * 0.0015);
+    return { positions, targets, speeds };
+  }, []);
+
+  useFrame(() => {
+    if (!ref.current || reduced) return;
+    const attr = ref.current.geometry.attributes.position;
+    const arr  = attr.array as Float32Array;
+    for (let i = 0; i < LINE_COUNT * 6; i++) {
+      arr[i] += (targets[i] - arr[i]) * speeds[i];
+      if (Math.abs(arr[i] - targets[i]) < 0.5)
+        targets[i] = (Math.random() - 0.5) * 40;
+    }
+    attr.needsUpdate = true;
+  });
+
+  return (
+    <lineSegments ref={ref}>
+      <bufferGeometry>
+        <bufferAttribute
+          attach="attributes-position"
+          count={LINE_COUNT * 2}
+          array={positions}
+          itemSize={3}
+        />
+      </bufferGeometry>
+      <lineBasicMaterial color="#C9A84C" transparent={true} opacity={0.12} fog={true} />
+    </lineSegments>
+  );
+}
+
+═══════════════════════════════════════════════════════════════════════
+ProximaScene.tsx
+═══════════════════════════════════════════════════════════════════════
+
+import { useEffect } from 'react';
+import { useThree, useFrame } from '@react-three/fiber';
+import * as THREE from 'three';
+import { ParticleField }  from './ParticleField';
+import { DocumentPlanes } from './DocumentPlanes';
+import { FilamentLines }  from './FilamentLines';
+import { prefersReducedMotion } from './webglDetect';
+
+export function ProximaScene({
+  cameraProgressRef,
+  mouseRef,
+}: {
+  cameraProgressRef: React.MutableRefObject<number>;
+  mouseRef: React.MutableRefObject<{ x: number; y: number }>;
+}) {
+  const { scene, camera } = useThree();
+  const reduced = prefersReducedMotion();
+
+  useEffect(() => {
+    scene.fog = new THREE.FogExp2(0x0a0a0a, 0.0085);
+  }, [scene]);
+
+  useFrame(() => {
+    if (reduced) return;  // camera fixed when reduced-motion
+    const p = cameraProgressRef.current;
+    // Camera journey: z 80→20, y 0→4, slight tilt
+    (camera as THREE.PerspectiveCamera).position.z = 80 - p * 60;
+    (camera as THREE.PerspectiveCamera).position.y = p * 4;
+    (camera as THREE.PerspectiveCamera).rotation.x = -p * 0.05;
+  });
+
+  return (
+    <>
+      <ambientLight intensity={0.25} color="#F0EFE9" />
+      <pointLight position={[0, 0, 0]}    color="#C9A84C" intensity={0.4} distance={65} decay={2} />
+      <pointLight position={[20, 10, -20]} color="#ffffff" intensity={0.15} distance={80} decay={2} />
+      <ParticleField  mouseRef={mouseRef} />
+      <DocumentPlanes mouseRef={mouseRef} />
+      <FilamentLines />
+    </>
+  );
+}
+
+═══════════════════════════════════════════════════════════════════════
+useSceneScroll.ts
+═══════════════════════════════════════════════════════════════════════
+
+import { useEffect, useRef } from 'react';
+import gsap from 'gsap';
+import { ScrollTrigger } from 'gsap/ScrollTrigger';
+import { prefersReducedMotion } from './webglDetect';
+
+gsap.registerPlugin(ScrollTrigger);
+
+export function useSceneScroll(heroId: string) {
+  const progressRef = useRef(0);
+  const reduced     = prefersReducedMotion();
+
+  useEffect(() => {
+    if (reduced) return;  // no scroll-driven camera when reduced-motion
+
+    const tl = gsap.timeline({
+      scrollTrigger: {
+        trigger:   `#${heroId}`,
+        start:     'top top',
+        end:       '+=250%',
+        pin:       true,
+        pinSpacing: true,
+        scrub:     1.8,
+        onUpdate: (self) => { progressRef.current = self.progress; },
+      },
+    });
+
+    // Text exits at 40-55% progress
+    tl.to('.hero-text-layer', { opacity: 0, y: -24, duration: 0.3 }, 0.4);
+    // Canvas fades at 80-100% progress
+    tl.to('.hero-canvas-wrapper', { opacity: 0.6, duration: 0.5 }, 0.65);
+
+    return () => { ScrollTrigger.getAll().forEach(st => st.kill()); };
+  }, [heroId, reduced]);
+
+  return progressRef;
+}
+
+═══════════════════════════════════════════════════════════════════════
+useMouseParallax.ts
+═══════════════════════════════════════════════════════════════════════
+
+import { useEffect, useRef } from 'react';
+import { prefersReducedMotion } from './webglDetect';
+
+export function useMouseParallax() {
+  const mouseRef = useRef({ x: 0, y: 0 });
+  const textRef  = useRef<HTMLDivElement>(null);
+  const reduced  = prefersReducedMotion();
+  let lastUpdate = 0;
+
+  useEffect(() => {
+    if (reduced) return;  // no parallax when reduced-motion
+
+    const handler = (e: MouseEvent) => {
+      const now = performance.now();
+      if (now - lastUpdate < 16) return;
+      lastUpdate = now;
+      mouseRef.current.x = (e.clientX / window.innerWidth  - 0.5) * 2;
+      mouseRef.current.y = (e.clientY / window.innerHeight - 0.5) * 2;
+      if (textRef.current) {
+        const tx = mouseRef.current.x * -7;
+        const ty = mouseRef.current.y * -5;
+        textRef.current.style.transform = `translate(${tx}px, ${ty}px)`;
+      }
+    };
+    window.addEventListener('mousemove', handler, { passive: true });
+    return () => window.removeEventListener('mousemove', handler);
+  }, [reduced]);
+
+  return { mouseRef, textRef };
+}
+
+═══════════════════════════════════════════════════════════════════════
+StaticHero.tsx — Fallback (extracted from Stage 3 Landing.tsx)
+═══════════════════════════════════════════════════════════════════════
+
+/**
+ * StaticHero renders when:
+ *   1. WebGL is unavailable
+ *   2. Viewport < 768px (mobile)
+ *   3. User prefers reduced motion
+ *   4. ProximaCinematicHero is loading (Suspense fallback)
+ *
+ * This is the Framer Motion hero from Stage 3, extracted into its own component.
+ */
+
+import { motion } from 'framer-motion';
+import { FloatingSymbols } from '../FloatingSymbols';
+
+export function StaticHero() {
+  return (
+    <section
+      className="relative h-screen flex items-center overflow-hidden bg-void"
+      style={{ paddingLeft: 'clamp(32px, 8vw, 128px)' }}
+    >
+      <FloatingSymbols />
+
+      {/* Subtle gradient bg */}
+      <div className="absolute inset-0 pointer-events-none" style={{
+        background: 'radial-gradient(ellipse 110% 55% at 50% -5%, rgba(201,168,76,0.04) 0%, transparent 60%)',
+      }} />
+
+      <div style={{ maxWidth: 680, position: 'relative', zIndex: 10 }}>
+        <motion.p
+          className="text-gold-primary font-label text-xs uppercase tracking-widest mb-5"
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.15, duration: 0.45, ease: [0,0,0.2,1] }}
+        >
+          AI Writing Intelligence
+        </motion.p>
+
+        <h1
+          className="font-display text-text-primary mb-4"
+          style={{
+            fontSize: 'clamp(64px, 10vw, 120px)',
+            lineHeight: 1.02,
+            letterSpacing: '-0.03em',
+            perspective: '400px',
+          }}
+        >
+          {'PROXIMA'.split('').map((l, i) => (
+            <motion.span
+              key={i}
+              style={{ display: 'inline-block' }}
+              initial={{ opacity: 0, y: 30, rotateX: -25 }}
+              animate={{ opacity: 1, y: 0, rotateX: 0 }}
+              transition={{ delay: 0.25 + i * 0.05, duration: 0.4, ease: [0,0,0.2,1] }}
+            >
+              {l}
+            </motion.span>
+          ))}
+        </h1>
+
+        <motion.p
+          className="font-sans text-text-secondary mb-3"
+          style={{ fontSize: 'clamp(18px, 3vw, 26px)', fontWeight: 300 }}
+          initial={{ opacity: 0, y: 16 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.65, duration: 0.45, ease: [0,0,0.2,1] }}
+        >
+          Your document. Every domain. Zero guesswork.
+        </motion.p>
+
+        <motion.p
+          className="font-sans text-text-secondary text-base leading-relaxed mb-8 max-w-lg"
+          initial={{ opacity: 0, y: 14 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.78, duration: 0.4, ease: [0,0,0.2,1] }}
+        >
+          The first AI writing platform that reads your entire document,
+          detects its domain composition, and completes it with
+          transparent confidence scoring.
+        </motion.p>
+
+        <motion.div
+          className="flex items-center gap-4 flex-wrap"
+          initial={{ opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.9, duration: 0.4, ease: [0,0,0.2,1] }}
+        >
+          <a
+            href="/api/auth/google"
+            className="btn-primary text-base py-3 px-8"
+            aria-label="Sign in with Google to start using Proxima for free"
+          >
+            Start Free
+          </a>
+          <button
+            className="btn-ghost text-base"
+            onClick={() => document.getElementById('demo')?.scrollIntoView({ behavior: 'smooth' })}
+            aria-label="Scroll to live demo section"
+          >
+            See it in action ↓
+          </button>
+        </motion.div>
+
+        <motion.div
+          className="bg-gold-primary/30 mt-10"
+          style={{ height: 1, width: 0 }}
+          animate={{ width: 64 }}
+          transition={{ delay: 1.1, duration: 0.55, ease: [0,0,0.2,1] }}
+          aria-hidden="true"
+        />
+      </div>
+    </section>
+  );
+}
+
+═══════════════════════════════════════════════════════════════════════
+HeroCinematic/index.tsx — Main Export
+═══════════════════════════════════════════════════════════════════════
+
+import { useEffect, useMemo } from 'react';
+import { Canvas } from '@react-three/fiber';
+import { motion } from 'framer-motion';
+import gsap from 'gsap';
+import { ProximaScene }     from './ProximaScene';
+import { useSceneScroll }   from './useSceneScroll';
+import { useMouseParallax } from './useMouseParallax';
+import { prefersReducedMotion } from './webglDetect';
+
+export function ProximaCinematicHero() {
+  const progressRef = useSceneScroll('proxima-hero');
+  const { mouseRef, textRef } = useMouseParallax();
+  const reduced = useMemo(() => prefersReducedMotion(), []);
+
+  // Canvas entrance — fade in before text
+  useEffect(() => {
+    gsap.fromTo('.hero-canvas-wrapper',
+      { opacity: 0 },
+      { opacity: 1, duration: 1.4, ease: 'power2.out' }
+    );
+  }, []);
+
+  // Scroll hint auto-hides on first scroll
+  useEffect(() => {
+    const handler = () => {
+      gsap.to('.hero-scroll-hint', { opacity: 0, duration: 0.3 });
+      window.removeEventListener('scroll', handler);
+    };
+    window.addEventListener('scroll', handler, { passive: true });
+    return () => window.removeEventListener('scroll', handler);
+  }, []);
+
+  return (
+    <section
+      id="proxima-hero"
+      style={{ height: '100vh', position: 'relative', overflow: 'hidden', background: '#0A0A0A' }}
+    >
+      {/* LAYER 1: Three.js Canvas */}
+      <div
+        className="hero-canvas-wrapper absolute inset-0 z-0"
+        style={{ opacity: 0 }}  // starts transparent, GSAP fades in
+      >
+        <Canvas
+          camera={{ position: [0, 0, 80], fov: 58, near: 0.1, far: 200 }}
+          dpr={[1, 1.5]}            // cap pixel ratio for performance
+          gl={{
+            antialias: window.devicePixelRatio < 2,  // skip AA on Retina
+            alpha: false,
+            powerPreference: 'high-performance',
+          }}
+          style={{ background: '#0A0A0A' }}
+          frameloop={reduced ? 'demand' : 'always'}  // pause render when reduced-motion
+          aria-label="Proxima 3D background visualization"
+          role="img"
+        >
+          <ProximaScene cameraProgressRef={progressRef} mouseRef={mouseRef} />
+        </Canvas>
+      </div>
+
+      {/* LAYER 2: Depth overlay */}
+      <div
+        className="absolute inset-0 z-10 pointer-events-none"
+        aria-hidden="true"
+        style={{
+          background: `
+            radial-gradient(ellipse 110% 55% at 50% -5%, rgba(201,168,76,0.04) 0%, transparent 60%),
+            radial-gradient(ellipse at 35% 55%, transparent 28%, rgba(10,10,10,0.68) 100%)
+          `,
+        }}
+      />
+
+      {/* LAYER 3: Text content */}
+      <div
+        ref={textRef}
+        className="hero-text-layer absolute inset-0 z-20 flex items-center"
+        style={{
+          paddingLeft: 'clamp(32px, 8vw, 128px)',
+          willChange: 'transform',
+        }}
+      >
+        <div style={{ maxWidth: 680 }}>
+          <motion.p
+            className="hero-eyebrow text-gold-primary font-label text-xs uppercase tracking-widest mb-5"
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.6, duration: 0.45, ease: [0,0,0.2,1] }}
+          >
+            AI Writing Intelligence
+          </motion.p>
+
+          <h1
+            className="font-display text-text-primary mb-4"
+            style={{
+              fontSize: 'clamp(72px, 10vw, 120px)',
+              lineHeight: 1.02,
+              letterSpacing: '-0.03em',
+              perspective: '400px',
+            }}
+            aria-label="PROXIMA"
+          >
+            {'PROXIMA'.split('').map((l, i) => (
+              <motion.span
+                key={i}
+                className="hero-title-letter"
+                style={{ display: 'inline-block' }}
+                aria-hidden="true"
+                initial={{ opacity: 0, y: 30, rotateX: -25 }}
+                animate={{ opacity: 1, y: 0, rotateX: 0 }}
+                transition={{ delay: 0.8 + i * 0.05, duration: 0.4, ease: [0,0,0.2,1] }}
+              >
+                {l}
+              </motion.span>
+            ))}
+          </h1>
+
+          <motion.p
+            className="font-sans text-text-secondary mb-3"
+            style={{ fontSize: 'clamp(20px, 3vw, 28px)', fontWeight: 300 }}
+            initial={{ opacity: 0, y: 16 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 1.2, duration: 0.45, ease: [0,0,0.2,1] }}
+          >
+            Your document. Every domain. Zero guesswork.
+          </motion.p>
+
+          <motion.p
+            className="font-sans text-text-secondary text-base leading-relaxed mb-8 max-w-lg"
+            initial={{ opacity: 0, y: 14 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 1.35, duration: 0.4, ease: [0,0,0.2,1] }}
+          >
+            The first AI writing platform that reads your entire document,
+            detects its domain composition, and completes it with
+            transparent confidence scoring.
+          </motion.p>
+
+          <motion.div
+            className="flex items-center gap-4 flex-wrap"
+            initial={{ opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 1.5, duration: 0.4, ease: [0,0,0.2,1] }}
+          >
+            <a
+              href="/api/auth/google"
+              className="btn-primary text-base py-3 px-8"
+              aria-label="Sign in with Google to start using Proxima for free"
+            >
+              Start Free
+            </a>
+            <button
+              className="btn-ghost text-base"
+              onClick={() =>
+                document.getElementById('demo')?.scrollIntoView({ behavior: 'smooth' })
+              }
+              aria-label="Scroll to live demo section"
+            >
+              See it in action ↓
+            </button>
+          </motion.div>
+
+          <motion.div
+            className="bg-gold-primary/30 mt-10"
+            style={{ height: 1, width: 0 }}
+            animate={{ width: 64 }}
+            transition={{ delay: 1.7, duration: 0.55, ease: [0,0,0.2,1] }}
+            aria-hidden="true"
+          />
+        </div>
+      </div>
+
+      {/* Scroll hint */}
+      <div
+        className="hero-scroll-hint absolute bottom-8 left-1/2 -translate-x-1/2 z-20
+                   flex flex-col items-center gap-2 pointer-events-none"
+        aria-hidden="true"
+      >
+        <span className="text-text-muted text-xs font-label uppercase tracking-widest">
+          Scroll
+        </span>
+        <motion.div
+          className="w-px h-8 bg-gold-primary/40"
+          animate={{ scaleY: [1, 0.4, 1], opacity: [0.4, 1, 0.4] }}
+          transition={{ duration: 1.6, repeat: Infinity, ease: 'easeInOut' }}
+        />
+      </div>
+    </section>
+  );
+}
+
+═══════════════════════════════════════════════════════════════════════
+Landing.tsx — MODIFIED hero section
+═══════════════════════════════════════════════════════════════════════
+
+/**
+ * THREE.JS LAZY LOADING CONTRACT:
+ *
+ * ProximaCinematicHero is loaded via React.lazy().
+ * This creates a separate webpack/Rollup chunk ('vendor-three').
+ * The chunk is downloaded ONLY when Landing renders the cinematic hero.
+ * When WebGL is unavailable or on mobile: StaticHero renders immediately
+ * and the Three.js chunk is NEVER downloaded.
+ *
+ * Verification: run `npm run build` and check dist/ — the vendor-three
+ * chunk should NOT appear in any other page's dependency graph.
+ */
+
+import { lazy, Suspense, useMemo } from 'react';
+import { StaticHero } from '../components/HeroCinematic/StaticHero';
+import { isWebGLAvailable, isMobile, prefersReducedMotion } from '../components/HeroCinematic/webglDetect';
+
+// Lazy import — Three.js chunk loaded only when this component mounts
+const ProximaCinematicHero = lazy(() =>
+  import('../components/HeroCinematic').then(m => ({
+    default: m.ProximaCinematicHero,
+  }))
+);
+
+export default function Landing() {
+  // Evaluate once on mount
+  const useCinematic = useMemo(
+    () => isWebGLAvailable() && !isMobile(),
+    []
+  );
+
+  // prefers-reduced-motion: use StaticHero even on desktop
+  // (ProximaCinematicHero internally freezes animations, but StaticHero
+  // is lighter — avoid loading Three.js at all if reduced-motion)
+  const useReducedHero = useMemo(() => prefersReducedMotion(), []);
+
+  return (
+    <main>
+      {/* HERO — lazy cinematic OR instant static */}
+      {useCinematic && !useReducedHero ? (
+        <Suspense fallback={<StaticHero />}>
+          <ProximaCinematicHero />
+        </Suspense>
+      ) : (
+        <StaticHero />
+      )}
+
+      {/* All sections below hero — UNCHANGED from Stage 3 */}
+      <LiveDemoSection />
+      <ThreePillarsSection />
+      <ToolsGridSection />
+      <CTASection />
+    </main>
+  );
+}
+
+═══════════════════════════════════════════════════════════════════════
+VITE CONFIG — manualChunks (ensure Three.js isolation)
+═══════════════════════════════════════════════════════════════════════
+
+// vite.config.ts — update build.rollupOptions.output.manualChunks:
+manualChunks: {
+  'vendor-react':  ['react', 'react-dom', 'react-router-dom'],
+  'vendor-motion': ['framer-motion'],
+  'vendor-three':  ['three', '@react-three/fiber', '@react-three/drei'],  // ISOLATED chunk
+  'vendor-gsap':   ['gsap'],
+  'vendor-charts': ['recharts'],
+  'vendor-query':  ['@tanstack/react-query'],
+  'vendor-utils':  ['axios', 'marked', 'pdfjs-dist', 'mammoth'],
+}
+
+The 'vendor-three' chunk must ONLY be referenced by the Landing page chunk.
+No other page imports anything from HeroCinematic/.
+
+═══════════════════════════════════════════════════════════════════════
+PERFORMANCE VERIFICATION GUIDE
+═══════════════════════════════════════════════════════════════════════
+
+After implementation, verify 60fps on all target devices:
+
+M1 MacBook Pro (2021):
+  Open Chrome DevTools → Performance tab
+  Record 5s while scrolling through hero
+  Verify: frames column shows ≥55fps consistently
+  If below: reduce COUNT from 12000 to 8000
+
+Mid-range Windows (i5 + GTX 1650):
+  Same DevTools check
+  If below 55fps:
+    Lower DPR cap: dpr={[1, 1.2]} instead of [1, 1.5]
+    Reduce LINE_COUNT from 10 to 6
+
+Android flagship (Snapdragon 8 Gen 2):
+  StaticHero renders (no Three.js) — always 60fps
+  Verify: isMobile() returns true on Android
+  Verify: vendor-three chunk NOT in network tab on mobile
+
+prefers-reduced-motion:
+  macOS: System Preferences → Accessibility → Reduce Motion
+  Verify: particles freeze, camera stays at z=80, text still animates in
+  Verify: scroll trigger does NOT pin the hero
+
+═══════════════════════════════════════════════════════════════════════
+ACCESSIBILITY VERIFICATION
+═══════════════════════════════════════════════════════════════════════
+
+Screen reader (VoiceOver / NVDA):
+  Canvas announces: "Proxima 3D background visualization" (from aria-label)
+  "PROXIMA" heading readable (aria-label="PROXIMA" on h1, letters aria-hidden)
+  "Start Free" CTA: reads "Sign in with Google to start using Proxima for free"
+  "See it in action ↓": reads "Scroll to live demo section"
+  Decorative rule div: aria-hidden="true" (not announced)
+  Scroll hint: aria-hidden="true" (not announced)
+
+Keyboard navigation:
+  Tab 1: "Start Free" CTA focused (gold outline visible)
+  Tab 2: "See it in action ↓" button focused
+  Enter on both: correct action fires
+  No keyboard trap in hero section
+
+prefers-reduced-motion (verified above):
+  No spinning, no parallax, no scroll-driven camera movement
+  All text still visible and readable
+
+═══════════════════════════════════════════════════════════════════════
+STAGE 4 COMPLETION CHECKLIST
+═══════════════════════════════════════════════════════════════════════
+
+LAZY LOADING:
+✓ ProximaCinematicHero imported via React.lazy()
+✓ npm run build: vendor-three chunk exists as separate file
+✓ vendor-three is NOT in main bundle (verify with rollup-plugin-visualizer)
+✓ On mobile: isMobile()=true → StaticHero renders → no Three.js network request
+✓ On no-WebGL: StaticHero renders → no Three.js network request
+✓ Suspense fallback: StaticHero shown while ProximaCinematicHero loads
+
+PERFORMANCE:
+✓ 12,000 particles: 1 draw call (Points geometry)
+✓ 3 document planes: 3 draw calls
+✓ 10 filament lines: 1 draw call (LineSegments)
+✓ Total scene: ~5 draw calls
+✓ DPR capped at 1.5x (dpr={[1, 1.5]})
+✓ Anti-aliasing skipped on Retina (devicePixelRatio >= 2)
+✓ Mouse handler throttled to 16ms (60fps)
+✓ frameloop='demand' when prefers-reduced-motion (no unnecessary renders)
+✓ 60fps verified on M1 MacBook (Chrome DevTools)
+✓ 60fps achievable on mid-range Windows (adjust particles if needed)
+✓ Mobile: StaticHero always renders (Three.js never runs on mobile)
+
+THREE.JS SCENE:
+✓ Canvas fades in over 1.4s (GSAP, before text)
+✓ Particle field: gaussian distribution (not uniform)
+✓ Particles tilt with mouse (lerp factor 0.03)
+✓ 3 document planes visible (barely), drift with sin wave
+✓ Mouse parallax on planes (depth factor per plane)
+✓ Gold filament lines shift slowly (lerp to random targets)
+✓ FogExp2 depth: distant particles fade to void
+✓ Warm gold point light at origin
+✓ GSAP ScrollTrigger: hero pinned 250% height
+✓ Progress 0→1 drives camera z 80→20, y 0→4
+✓ Text fades at 40-55% progress
+✓ Canvas fades to 0.6 at 80-100% progress
+✓ After pin: page scrolls to #demo normally
+✓ Scroll hint fades on first scroll event
+
+REDUCED-MOTION:
+✓ prefersReducedMotion()=true → StaticHero renders (Three.js not loaded)
+✓ If somehow cinematic loads: useFrame returns early (frozen camera + particles)
+✓ useSceneScroll returns early (no GSAP pin, no scroll-driven camera)
+✓ useMouseParallax returns early (no parallax movement)
+✓ GSAP entrance still runs (text appears — motion is meaningful here)
+
+ACCESSIBILITY:
+✓ <Canvas aria-label="Proxima 3D background visualization" role="img">
+✓ <h1 aria-label="PROXIMA"> with individual letters aria-hidden="true"
+✓ "Start Free" a: aria-label with full description
+✓ "See it in action" button: aria-label with full description
+✓ Decorative elements: aria-hidden="true"
+✓ Tab order: Start Free → See it in action → (next section)
+✓ Focus visible: gold outline on both CTAs (from Stage 3 globals.css)
+✓ No keyboard traps in hero section
+
+BUILD:
+✓ npm run build succeeds without errors or warnings
+✓ tsc --noEmit passes
+✓ CI pipeline green after Stage 4 changes
+
+═══════════════════════════════════════════════════════════════════════
