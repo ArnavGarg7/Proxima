@@ -18,7 +18,7 @@ export default function Workspace() {
     setStreaming(true);
     try {
       // Stage 1 stub: simulate streaming from intelligence router
-      const response = await api.post('/api/intelligence/complete', { text: content }, { responseType: 'stream' });
+      await api.post('/api/intelligence/complete', { text: content }, { responseType: 'stream' });
       // In a real implementation we would read the stream chunk by chunk
       setContent(content + '\n[... streaming response ...]');
     } catch (err) {

@@ -1,4 +1,5 @@
 import { render, screen, act } from '@testing-library/react';
+import '@testing-library/jest-dom';
 import { describe, it, expect, beforeEach } from 'vitest';
 import { useAuthStore } from '@/store/useAuthStore';
 import Navbar from '@/components/Navbar';
