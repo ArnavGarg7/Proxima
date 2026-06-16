@@ -23,4 +23,28 @@ async def health_check():
         "version": "4.0"
     }
 
-# We will include routers here once they are built
+# Import all routers
+from proxima.routers import (
+    auth_router,
+    users_router,
+    documents_router,
+    tools_router,
+    templates_router,
+    exports_router,
+    sessions_router,
+    jobs_router,
+    admin_router,
+    intelligence_router
+)
+
+# Register routers
+app.include_router(auth_router)
+app.include_router(users_router)
+app.include_router(documents_router)
+app.include_router(tools_router)
+app.include_router(templates_router)
+app.include_router(exports_router)
+app.include_router(sessions_router)
+app.include_router(jobs_router)
+app.include_router(admin_router)
+app.include_router(intelligence_router)
