@@ -21,7 +21,7 @@ def app():
     return main_app
 
 @pytest_asyncio.fixture(scope="function")
-async def client():
+async def client(app):
     async with AsyncClient(
         transport=ASGITransport(app=app),
         base_url="http://test"
@@ -32,6 +32,6 @@ async def client():
 async def db():
     from proxima.database import engine
     from sqlalchemy.ext.asyncio import AsyncSession
-    async with AsyncSession(engine) as session:
+    async with AsyncSession(engine, expire_on_commit=False) as session:
         yield session
         await session.rollback()
