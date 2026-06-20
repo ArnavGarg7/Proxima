@@ -20,3 +20,4 @@ async def client():
 async def db():
     async with AsyncSessionLocal() as session:
         yield session
+        await session.rollback()

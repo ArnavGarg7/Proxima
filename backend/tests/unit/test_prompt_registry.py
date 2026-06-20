@@ -46,7 +46,7 @@ async def test_prompt_caching(db):
     from proxima.models.ai import PromptVersion
     from sqlalchemy import select, update
     
-    await db.execute(update(PromptVersion).where(PromptVersion.name == "cache_test").values(template="Secret DB update"))
+    await db.execute(update(PromptVersion).where(PromptVersion.prompt_key == "cache_test").values(content="Secret DB update"))
     await db.commit()
     
     p2 = await registry.get_prompt("cache_test")

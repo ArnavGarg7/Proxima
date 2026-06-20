@@ -31,7 +31,7 @@ async def test_search_fts_execution(db):
     from sqlalchemy import select
     
     result = await db.execute(select(User).limit(1))
-    user = result.scalar_first()
+    user = result.scalars().first()
     if not user:
         user = User(email="fts@example.com", name="FTS User")
         db.add(user)

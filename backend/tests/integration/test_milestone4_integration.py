@@ -11,7 +11,7 @@ async def test_full_retrieval_to_qhe_flow(db):
     
     # Setup test user and doc
     result = await db.execute(select(User).limit(1))
-    user = result.scalar_first()
+    user = result.scalars().first()
     if not user:
         user = User(email="flow@example.com", name="Flow User")
         db.add(user)

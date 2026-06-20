@@ -12,7 +12,7 @@ async def test_intelligence_complete_endpoint(db, app):
     
     # Setup user
     result = await db.execute(select(User).limit(1))
-    user = result.scalar_first()
+    user = result.scalars().first()
     if not user:
         user = User(email="m5@example.com", name="M5 User")
         db.add(user)

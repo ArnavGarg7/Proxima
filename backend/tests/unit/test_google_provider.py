@@ -14,9 +14,9 @@ def provider():
 @pytest.mark.asyncio
 async def test_complete_success(provider):
     mock_model = MagicMock()
-    mock_response = AsyncMock()
+    mock_response = MagicMock()
     mock_response.text = "Hello from mock Gemini"
-    mock_model.generate_content_async.return_value = mock_response
+    mock_model.generate_content_async = AsyncMock(return_value=mock_response)
 
     with patch('google.generativeai.GenerativeModel', return_value=mock_model):
         result = await provider.complete("gemini-2.5-flash", "Sys prompt", "User msg", 0.7, 1000)
@@ -25,7 +25,7 @@ async def test_complete_success(provider):
 @pytest.mark.asyncio
 async def test_complete_timeout(provider):
     mock_model = MagicMock()
-    mock_model.generate_content_async.side_effect = asyncio.TimeoutError()
+    mock_model.generate_content_async = AsyncMock(side_effect=asyncio.TimeoutError())
 
     with patch('google.generativeai.GenerativeModel', return_value=mock_model):
         with pytest.raises(HTTPException) as exc:
@@ -44,7 +44,7 @@ async def test_stream_completion_success(provider):
         yield Chunk("Hello ")
         yield Chunk("World")
 
-    mock_model.generate_content_async.return_value = mock_stream()
+    mock_model.generate_content_async = AsyncMock(return_value=mock_stream())
 
     with patch('google.generativeai.GenerativeModel', return_value=mock_model):
         chunks = []

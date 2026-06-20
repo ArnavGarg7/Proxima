@@ -15,7 +15,7 @@ async def test_ingestion_text_extraction(chunking_service, db):
     from sqlalchemy import select
     
     result = await db.execute(select(User).limit(1))
-    user = result.scalar_first()
+    user = result.scalars().first()
     if not user:
         user = User(email="ingest@example.com", name="Ingest User")
         db.add(user)
@@ -50,7 +50,7 @@ async def test_ingestion_unsupported_format(chunking_service, db):
     from sqlalchemy import select
     
     result = await db.execute(select(User).limit(1))
-    user = result.scalar_first()
+    user = result.scalars().first()
     if not user:
         user = User(email="ingest@example.com", name="Ingest User")
         db.add(user)

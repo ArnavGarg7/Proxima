@@ -28,7 +28,7 @@ async def upload_document(
     from proxima.models.core import User
     
     result = await db.execute(select(User).limit(1))
-    user = result.scalar_first()
+    user = result.scalars().first()
     if not user:
         # Create a dummy user if db is completely empty
         user = User(email="test@example.com", name="Test User")
