@@ -8,6 +8,13 @@ from proxima.database import AsyncSessionLocal
 def anyio_backend():
     return "asyncio"
 
+@pytest.fixture(scope="session")
+def event_loop():
+    import asyncio
+    loop = asyncio.get_event_loop_policy().new_event_loop()
+    yield loop
+    loop.close()
+
 @pytest_asyncio.fixture(scope="function")
 async def client():
     async with AsyncClient(
@@ -18,6 +25,9 @@ async def client():
 
 @pytest_asyncio.fixture(scope="function")
 async def db():
-    async with AsyncSessionLocal() as session:
-        yield session
-        await session.rollback()
+    from proxima.database import engine
+    from sqlalchemy.ext.asyncio import AsyncSession
+    async with AsyncSession(engine) as session:
+        async with session.begin():
+            yield session
+            await session.rollback()

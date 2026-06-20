@@ -44,7 +44,7 @@ class PromptRegistryService:
         if cache_key in self._cache:
             return self._cache[cache_key]
 
-        query = select(PromptVersion).where(PromptVersion.name == prompt_key)
+        query = select(PromptVersion).where(PromptVersion.prompt_key == prompt_key)
         if version is not None:
             query = query.where(PromptVersion.version == version)
         else:
@@ -56,7 +56,7 @@ class PromptRegistryService:
         if not prompt_record:
             return None
             
-        content = prompt_record.template
+        content = prompt_record.content
         self._cache[cache_key] = content
         return content
 
@@ -64,17 +64,16 @@ class PromptRegistryService:
         """
         Saves a new prompt or creates a new version of an existing prompt.
         """
-        query = select(PromptVersion).where(PromptVersion.name == prompt_key).order_by(desc(PromptVersion.version)).limit(1)
+        query = select(PromptVersion).where(PromptVersion.prompt_key == prompt_key).order_by(desc(PromptVersion.version)).limit(1)
         result = await self.db.execute(query)
         latest = result.scalar_one_or_none()
         
         next_version = (latest.version + 1) if latest else 1
         
         new_prompt = PromptVersion(
-            name=prompt_key,
-            template=content,
-            version=next_version,
-            description=f"Auto-saved version {next_version}"
+            prompt_key=prompt_key,
+            content=content,
+            version=next_version
         )
         self.db.add(new_prompt)
         await self.db.commit()
