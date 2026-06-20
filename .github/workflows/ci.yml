@@ -53,7 +53,9 @@ jobs:
         REDIS_URL: redis://localhost:6379/0
         PYTHONPATH: backend
       run: |
-        pytest backend/tests/ --cov=backend/proxima
+        cd backend
+        alembic upgrade head
+        pytest tests/ --cov=proxima
 
   frontend-test:
     runs-on: ubuntu-latest
