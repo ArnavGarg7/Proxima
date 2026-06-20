@@ -55,7 +55,8 @@ jobs:
       run: |
         cd backend
         alembic upgrade head
-        pytest tests/ --cov=proxima
+        cd ..
+        pytest backend/tests/ --cov=backend/proxima
 
   frontend-test:
     runs-on: ubuntu-latest
