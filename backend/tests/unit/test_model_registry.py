@@ -17,21 +17,24 @@ async def test_get_provider_unknown():
 @pytest.mark.asyncio
 async def test_registry_routing(db):
     from proxima.models import RegisteredModel
-    # 1. Setup a default model in the DB
-    model = RegisteredModel(
-        model_id="gemini-2.5-flash",
-        provider="google",
-        model_type="generation",
-        is_active=True,
-        is_default_generation=True,
-        cost_per_1m_input=0.15,
-        cost_per_1m_output=0.60
-    )
-    db.add(model)
-    await db.commit()
+    from sqlalchemy import select
+    result = await db.execute(select(RegisteredModel).where(RegisteredModel.is_default_generation == True))
+    model = result.scalars().first()
+    if not model:
+        model = RegisteredModel(
+            model_id="gemini-2.5-flash-test-routing",
+            provider="google",
+            model_type="generation",
+            is_active=True,
+            is_default_generation=True,
+            cost_per_1m_input=0.15,
+            cost_per_1m_output=0.60
+        )
+        db.add(model)
+        await db.commit()
     
     # 2. Test routing fallback
     retrieved_model = await model_registry.get_default_generation(db)
     
-    assert retrieved_model.model_id == "gemini-2.5-flash"
+    assert retrieved_model.model_id == model.model_id
     assert retrieved_model.provider == "google"

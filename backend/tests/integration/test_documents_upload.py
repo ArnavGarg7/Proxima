@@ -30,7 +30,7 @@ async def test_document_upload_invalid_extension(client: AsyncClient):
 @pytest.mark.asyncio
 async def test_document_upload_magic_mismatch(client: AsyncClient):
     # Try to upload a text file masquerading as a PDF
-    content = b"I am definitely not a PDF file."
+    content = b"\x00\x01\x02\x03\x04\x05"
     files = {"file": ("fake.pdf", content, "application/pdf")}
     
     response = await client.post("/api/documents/upload", files=files)

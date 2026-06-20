@@ -15,6 +15,11 @@ def event_loop():
     yield loop
     loop.close()
 
+@pytest.fixture(scope="session")
+def app():
+    from proxima.main import app as main_app
+    return main_app
+
 @pytest_asyncio.fixture(scope="function")
 async def client():
     async with AsyncClient(
@@ -28,6 +33,5 @@ async def db():
     from proxima.database import engine
     from sqlalchemy.ext.asyncio import AsyncSession
     async with AsyncSession(engine) as session:
-        async with session.begin():
-            yield session
-            await session.rollback()
+        yield session
+        await session.rollback()

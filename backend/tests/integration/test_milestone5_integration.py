@@ -36,17 +36,20 @@ async def test_intelligence_complete_endpoint(db, app):
     await db.commit()
 
     # Setup RegisteredModel
-    model = RegisteredModel(
-        model_id="gemini-2.5-flash",
-        provider="google",
-        model_type="generation",
-        is_active=True,
-        is_default_generation=True,
-        cost_per_1m_input=0.15,
-        cost_per_1m_output=0.60
-    )
-    db.add(model)
-    await db.commit()
+    result = await db.execute(select(RegisteredModel).where(RegisteredModel.is_default_generation == True))
+    model = result.scalars().first()
+    if not model:
+        model = RegisteredModel(
+            model_id="gemini-2.5-flash-m5",
+            provider="google",
+            model_type="generation",
+            is_active=True,
+            is_default_generation=True,
+            cost_per_1m_input=0.15,
+            cost_per_1m_output=0.60
+        )
+        db.add(model)
+        await db.commit()
     
     # Mock the GoogleProvider's stream_completion so we don't hit real Gemini
     async def mock_stream_completion(*args, **kwargs):
