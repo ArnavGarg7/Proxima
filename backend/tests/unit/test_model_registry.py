@@ -13,3 +13,25 @@ async def test_get_provider_unknown():
     """Test that an unknown provider raises ValueError."""
     with pytest.raises(ValueError, match="Unknown provider: nonexistent"):
         model_registry._get_provider('nonexistent')
+
+@pytest.mark.asyncio
+async def test_registry_routing(db):
+    from proxima.models import RegisteredModel
+    # 1. Setup a default model in the DB
+    model = RegisteredModel(
+        model_id="gemini-2.5-flash",
+        provider="google",
+        model_type="generation",
+        is_active=True,
+        is_default_generation=True,
+        cost_per_1m_input=0.15,
+        cost_per_1m_output=0.60
+    )
+    db.add(model)
+    await db.commit()
+    
+    # 2. Test routing fallback
+    retrieved_model = await model_registry.get_default_generation(db)
+    
+    assert retrieved_model.model_id == "gemini-2.5-flash"
+    assert retrieved_model.provider == "google"

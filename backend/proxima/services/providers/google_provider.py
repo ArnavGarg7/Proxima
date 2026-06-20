@@ -1,31 +1,108 @@
 import google.generativeai as genai
 from proxima.config import settings
 import json
+import os
+import asyncio
+from typing import AsyncGenerator
+from fastapi import HTTPException
 
 class GoogleProvider:
     def __init__(self):
-        genai.configure(api_key=settings.gemini_api_key)
+        # We rely on settings.gemini_api_key which should be populated by env
+        self.api_key = settings.gemini_api_key
+        if self.api_key:
+            genai.configure(api_key=self.api_key)
 
-    async def stream_completion(self, model_id: str, system_prompt: str, user_message: str, temperature: float, max_tokens: int):
-        model = genai.GenerativeModel(model_id)
+    def _get_model_id(self, requested_id: str) -> str:
+        if not requested_id or "gemini" not in requested_id:
+            # Fallback for milestone 5
+            return os.getenv("DEFAULT_GEMINI_MODEL", "gemini-2.5-flash")
+        return requested_id
+
+    def _handle_error(self, e: Exception):
+        err_msg = str(e).lower()
+        if "api key" in err_msg or "unauthenticated" in err_msg or "401" in err_msg or "403" in err_msg:
+            raise HTTPException(status_code=401, detail="Invalid API key provided.")
+        elif "timeout" in err_msg:
+            raise HTTPException(status_code=504, detail="Provider timeout.")
+        elif "unavailable" in err_msg or "503" in err_msg or "500" in err_msg:
+            raise HTTPException(status_code=502, detail="Provider unavailable.")
+        else:
+            raise HTTPException(status_code=500, detail=f"Provider Error: {str(e)}")
+
+    async def complete(self, model_id: str, system_prompt: str, user_message: str, temperature: float, max_tokens: int) -> str:
+        if not self.api_key:
+            raise HTTPException(status_code=401, detail="Invalid API key provided. API key is missing.")
+
+        model_name = self._get_model_id(model_id)
+        model = genai.GenerativeModel(model_name)
         
-        response = await model.generate_content_async(
-            user_message,
-            stream=True,
-            generation_config={
-                'temperature': temperature,
-                'max_output_tokens': max_tokens,
-            },
-            system_instruction=system_prompt,
-        )
-        async for chunk in response:
-            if chunk.text:
-                yield chunk.text
+        try:
+            # Running synchronous generate_content in a thread since genai API can be tricky, 
+            # or use async if supported natively without blocking.
+            # `generate_content_async` exists.
+            response = await asyncio.wait_for(
+                model.generate_content_async(
+                    user_message,
+                    generation_config={
+                        'temperature': temperature,
+                        'max_output_tokens': max_tokens,
+                    },
+                    system_instruction=system_prompt,
+                ),
+                timeout=30.0
+            )
+            return response.text
+        except asyncio.TimeoutError:
+            raise HTTPException(status_code=504, detail="Provider timeout.")
+        except Exception as e:
+            self._handle_error(e)
+
+    async def stream_completion(self, model_id: str, system_prompt: str, user_message: str, temperature: float, max_tokens: int) -> AsyncGenerator[str, None]:
+        if not self.api_key:
+            raise HTTPException(status_code=401, detail="Invalid API key provided. API key is missing.")
+
+        model_name = self._get_model_id(model_id)
+        model = genai.GenerativeModel(model_name)
+        
+        try:
+            # We wrap the initial call in a timeout. The streaming iteration can also be timed out if needed.
+            response = await asyncio.wait_for(
+                model.generate_content_async(
+                    user_message,
+                    stream=True,
+                    generation_config={
+                        'temperature': temperature,
+                        'max_output_tokens': max_tokens,
+                    },
+                    system_instruction=system_prompt,
+                ),
+                timeout=10.0
+            )
+            
+            async for chunk in response:
+                if chunk.text:
+                    yield chunk.text
+        except asyncio.TimeoutError:
+            raise HTTPException(status_code=504, detail="Provider timeout.")
+        except Exception as e:
+            self._handle_error(e)
 
     async def get_embedding(self, model_id: str, text: str):
-        result = await genai.embed_content_async(
-            model=f"models/{model_id}",
-            content=text,
-            task_type="retrieval_document",
-        )
-        return result['embedding']
+        if not self.api_key:
+            raise HTTPException(status_code=401, detail="Invalid API key provided. API key is missing.")
+            
+        try:
+            result = await asyncio.wait_for(
+                genai.embed_content_async(
+                    model=f"models/{model_id}",
+                    content=text,
+                    task_type="retrieval_document",
+                ),
+                timeout=10.0
+            )
+            return result['embedding']
+        except asyncio.TimeoutError:
+            raise HTTPException(status_code=504, detail="Provider timeout.")
+        except Exception as e:
+            self._handle_error(e)
