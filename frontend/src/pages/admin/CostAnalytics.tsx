@@ -69,13 +69,13 @@ export default function CostAnalytics() {
                     fill="#8884d8"
                     dataKey="cost"
                     nameKey="model_id"
-                    label={(props: any) => `${props.model_id} ${((props.percent || 0) * 100).toFixed(0)}%`}
+                    label={(props: { model_id?: string; percent?: number }) => `${props.model_id || ''} ${((props.percent || 0) * 100).toFixed(0)}%`}
                   >
                     {cost_by_model.map((_, index) => (
                       <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                     ))}
                   </Pie>
-                  <Tooltip formatter={(value: any) => `$${Number(value).toFixed(4)}`} />
+                  <Tooltip formatter={(value: unknown) => `$${Number(value || 0).toFixed(4)}`} />
                   <Legend />
                 </PieChart>
               </ResponsiveContainer>
@@ -98,9 +98,9 @@ export default function CostAnalytics() {
                   margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
                 >
                   <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="email" tickFormatter={(val: any) => String(val).split('@')[0]} />
+                  <XAxis dataKey="email" tickFormatter={(val: unknown) => String(val || '').split('@')[0]} />
                   <YAxis />
-                  <Tooltip formatter={(value: any) => `$${Number(value).toFixed(4)}`} />
+                  <Tooltip formatter={(value: unknown) => `$${Number(value || 0).toFixed(4)}`} />
                   <Legend />
                   <Bar dataKey="cost" fill="#3b82f6" name="Total Cost ($)" />
                 </BarChart>
