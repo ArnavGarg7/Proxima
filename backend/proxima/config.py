@@ -1,4 +1,5 @@
 from pydantic_settings import BaseSettings
+from pydantic import field_validator
 
 class Settings(BaseSettings):
     database_url: str
@@ -39,6 +40,16 @@ class Settings(BaseSettings):
     @property
     def is_production(self) -> bool:
         return self.environment == "production"
+
+    @field_validator('jwt_private_key', 'jwt_public_key', mode='before')
+    @classmethod
+    def _normalize_pem(cls, value: str | None) -> str | None:
+        if not value:
+            return value
+        value = value.replace("\\n", "\n").strip()
+        if "-----BEGIN" in value and not value.endswith("\n"):
+            value += "\n"
+        return value
 
     class Config:
         env_file = ".env"

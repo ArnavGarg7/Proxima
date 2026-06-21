@@ -1,6 +1,24 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from proxima.config import settings
+from cryptography.hazmat.primitives import serialization
+import structlog
+
+logger = structlog.get_logger()
+
+def validate_rsa_keys(private_key: str, public_key: str) -> None:
+    if private_key and public_key:
+        try:
+            serialization.load_pem_private_key(private_key.encode(), password=None)
+            serialization.load_pem_public_key(public_key.encode())
+            logger.info("auth.keys_validated")
+        except Exception as e:
+            logger.error("auth.keys_invalid", error=str(e))
+            raise RuntimeError(f"Invalid JWT keys: {e}")
+
+# Fail-fast validation at startup
+validate_rsa_keys(settings.jwt_private_key, settings.jwt_public_key)
+
 
 app = FastAPI(
     title="Proxima API",
