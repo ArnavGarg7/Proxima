@@ -18,6 +18,11 @@ class AdminAuditLog(Base):
     details: Mapped[dict | None] = mapped_column(JSONB)
     ip_address: Mapped[str | None] = mapped_column(String(45))
     created_at: Mapped[datetime] = mapped_column(TIMESTAMPTZ, server_default=func.now())
+    __table_args__ = (
+        Index("idx_admin_audit_log_admin_id", "admin_user_id"),
+        Index("idx_admin_audit_log_action", "action"),
+        Index("idx_admin_audit_log_created_at", "created_at"),
+    )
 
 class AdminSession(Base):
     __tablename__ = "admin_sessions"

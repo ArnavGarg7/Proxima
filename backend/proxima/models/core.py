@@ -17,10 +17,15 @@ class User(Base):
     name: Mapped[str] = mapped_column(String(255), nullable=False)
     role: Mapped[str] = mapped_column(String(50), default='user', nullable=False)
     plan: Mapped[str] = mapped_column(String(50), default='free', nullable=False)
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True, server_default="true", nullable=False)
     tokens_used: Mapped[int] = mapped_column(Integer, default=0)
     tokens_limit: Mapped[int] = mapped_column(Integer, default=100000)
     created_at: Mapped[datetime] = mapped_column(TIMESTAMPTZ, server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(TIMESTAMPTZ, server_default=func.now(), onupdate=func.now())
+    __table_args__ = (
+        Index("idx_users_role", "role"),
+        Index("idx_users_created_at", "created_at"),
+    )
 
 class Session(Base):
     __tablename__ = "sessions"

@@ -1,7 +1,8 @@
 from fastapi import APIRouter, Depends, UploadFile, File, HTTPException, status, BackgroundTasks
 from sqlalchemy.ext.asyncio import AsyncSession
 from proxima.database import get_db
-from proxima.models.core import Document
+from proxima.models.core import Document, User
+from proxima.middleware.auth_middleware import get_current_user
 from proxima.services.upload_security import UploadSecurityService
 from proxima.services.storage_service import StorageService
 import uuid
@@ -21,29 +22,16 @@ async def upload_document(
     background_tasks: BackgroundTasks,
     file: UploadFile = File(...),
     db: AsyncSession = Depends(get_db),
-    # In a real app we'd have a user_id from auth context, here we mock it for the milestone
+    current_user: User = Depends(get_current_user),
 ):
-    # Mocking user_id: fetch first user from DB to satisfy FK constraints
-    from sqlalchemy import select
-    from proxima.models.core import User
-    
-    result = await db.execute(select(User).limit(1))
-    user = result.scalars().first()
-    if not user:
-        # Create a dummy user if db is completely empty
-        user = User(email="test@example.com", name="Test User")
-        db.add(user)
-        await db.commit()
-        await db.refresh(user)
-
-    mock_user_id = user.user_id
+    user_id = current_user.user_id
 
     # 1. Validate Upload
     await security_service.validate_upload(file)
 
     # 2. Database Record Creation (to get document_id)
     new_doc = Document(
-        user_id=mock_user_id,
+        user_id=user_id,
         title=file.filename,
         status="uploaded"
     )

@@ -5,6 +5,9 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 from proxima.database import get_db
+from proxima.models.core import User, Document
+from proxima.middleware.auth_middleware import get_current_user
+import uuid
 import json
 
 from proxima.services.domain_detector import DomainDetectorService
@@ -26,8 +29,14 @@ class IntelligenceCompletionRequest(BaseModel):
 async def intelligence_complete(
     request: Request,
     payload: IntelligenceCompletionRequest,
+    current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db)
 ):
+    # 0. Tenant Authorization Check
+    doc = await db.get(Document, uuid.UUID(payload.document_id))
+    if not doc or doc.user_id != current_user.user_id:
+        raise HTTPException(status_code=403, detail="Not authorized to access this document")
+
     # 1. Retrieval
     fts = FTSRetrievalService(db)
     results = await fts.search(payload.user_task, document_id=payload.document_id, limit=5)

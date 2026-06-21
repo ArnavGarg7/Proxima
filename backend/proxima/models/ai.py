@@ -44,6 +44,7 @@ class PromptVersion(Base):
     version: Mapped[int] = mapped_column(Integer, nullable=False)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
     created_at: Mapped[datetime] = mapped_column(TIMESTAMPTZ, server_default=func.now())
+    __table_args__ = (Index("idx_prompt_versions_key_active", "prompt_key", "is_active"),)
 
 class OutputSchema(Base):
     __tablename__ = "output_schemas"
@@ -83,6 +84,10 @@ class AIRequest(Base):
     tokens_output: Mapped[int] = mapped_column(Integer, default=0)
     computed_cost: Mapped[float] = mapped_column(Float, default=0.0)
     created_at: Mapped[datetime] = mapped_column(TIMESTAMPTZ, server_default=func.now())
+    __table_args__ = (
+        Index("idx_ai_requests_user_id", "user_id"),
+        Index("idx_ai_requests_model_id", "model_id"),
+    )
 
 class SegmentConfidenceScore(Base):
     __tablename__ = "segment_confidence_scores"

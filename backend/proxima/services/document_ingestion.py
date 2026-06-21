@@ -82,6 +82,8 @@ class DocumentIngestionService:
             return True
 
         except Exception as e:
+            import traceback
+            traceback.print_exc()
             # Ensure failed status is saved on error
             try:
                 document.status = "failed"

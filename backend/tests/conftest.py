@@ -35,3 +35,27 @@ async def db():
     async with AsyncSession(engine, expire_on_commit=False) as session:
         yield session
         await session.rollback()
+
+@pytest_asyncio.fixture(scope="function", autouse=True)
+async def auth_override(app, db):
+    from proxima.middleware.auth_middleware import get_current_user
+    from proxima.models.core import User
+    from sqlalchemy import select
+    import uuid
+    from fastapi import Request
+
+    async def mock_get_current_user(request: Request):
+        test_role = request.headers.get("X-Test-Role", "user")
+        
+        result = await db.execute(select(User).where(User.role == test_role).limit(1))
+        user = result.scalars().first()
+        if not user:
+            user = User(email=f"{test_role}@example.com", name=f"Test {test_role.capitalize()}", role=test_role)
+            db.add(user)
+            await db.commit()
+            await db.refresh(user)
+        return user
+
+    app.dependency_overrides[get_current_user] = mock_get_current_user
+    yield
+    app.dependency_overrides.pop(get_current_user, None)

@@ -1,24 +1,33 @@
-from fastapi import Request
-from starlette.middleware.base import BaseHTTPMiddleware
-from starlette.responses import JSONResponse
-from proxima.services.auth_service import decode_token
+from fastapi import Request, Depends, HTTPException
+from sqlalchemy.ext.asyncio import AsyncSession
+from proxima.models.core import User
+from proxima.models.admin import AdminAuditLog
+from proxima.middleware.auth_middleware import get_current_user
 
-class AdminMiddleware(BaseHTTPMiddleware):
-    async def dispatch(self, request: Request, call_next):
-        # Only enforce on /api/admin routes
-        if request.url.path.startswith("/api/admin"):
-            auth_header = request.headers.get("Authorization")
-            if not auth_header or not auth_header.startswith("Bearer "):
-                return JSONResponse({"detail": "Missing or invalid token"}, status_code=401)
-            
-            token = auth_header.split(" ")[1]
-            try:
-                payload = decode_token(token)
-                role = payload.get("role")
-                if role != "admin":
-                    return JSONResponse({"detail": "Admin access required"}, status_code=403)
-            except Exception:
-                return JSONResponse({"detail": "Invalid token"}, status_code=401)
-                
-        response = await call_next(request)
-        return response
+async def require_admin(current_user: User = Depends(get_current_user)) -> User:
+    """Dependency for all /admin/api/* endpoints."""
+    if current_user.role not in ('admin', 'super_admin'):
+        raise HTTPException(403, "Admin access required")
+    return current_user
+
+async def require_super_admin(current_user: User = Depends(get_current_user)) -> User:
+    """Only super_admin can change roles."""
+    if current_user.role != 'super_admin':
+        raise HTTPException(403, "Super admin access required for role changes")
+    return current_user
+
+async def log_admin_action(
+    admin: User, action: str,
+    target_type: str | None, target_id: str | None,
+    payload: dict | None, request: Request, db: AsyncSession
+) -> None:
+    """Must be called BEFORE response is returned."""
+    entry = AdminAuditLog(
+        admin_user_id=admin.user_id,
+        action=action,
+        target_resource=f"{target_type}:{target_id}" if target_type and target_id else (target_type or None),
+        details=payload,
+        ip_address=request.client.host if request.client else None
+    )
+    db.add(entry)
+    # The caller will commit
