@@ -1,8 +1,32 @@
 import pytest
 import pytest_asyncio
 from httpx import AsyncClient, ASGITransport
-from proxima.main import app
 from proxima.database import AsyncSessionLocal
+
+# Hardening: Inject dynamic RSA keys for testing BEFORE importing the app
+# This guarantees that tests will pass even if CI injects invalid or empty keys
+from cryptography.hazmat.primitives.asymmetric import rsa
+from cryptography.hazmat.primitives import serialization
+from proxima.config import settings
+
+test_private_key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+test_private_pem = test_private_key.private_bytes(
+    encoding=serialization.Encoding.PEM,
+    format=serialization.PrivateFormat.TraditionalOpenSSL,
+    encryption_algorithm=serialization.NoEncryption()
+).decode()
+test_public_key = test_private_key.public_key()
+test_public_pem = test_public_key.public_bytes(
+    encoding=serialization.Encoding.PEM,
+    format=serialization.PublicFormat.SubjectPublicKeyInfo
+).decode()
+
+settings.jwt_private_key = test_private_pem
+settings.jwt_public_key = test_public_pem
+settings.jwt_algorithm = "RS256"
+
+from proxima.main import app
+
 
 @pytest.fixture(scope="session")
 def anyio_backend():
