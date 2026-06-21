@@ -8,7 +8,7 @@ async def test_list_users(client: AsyncClient, db):
     
     # Create some mock users
     users = [
-        User(user_id=uuid.uuid4(), email=f"user_{i}@example.com", name=f"Name {i}", role="user" if i % 2 == 0 else "admin", is_active=True)
+        User(user_id=uuid.uuid4(), email=f"user_{uuid.uuid4()}@example.com", name=f"Name {i}", role="user" if i % 2 == 0 else "admin", is_active=True)
         for i in range(5)
     ]
     db.add_all(users)
@@ -26,15 +26,16 @@ async def test_list_users_filtering(client: AsyncClient, db):
     
     # Create specific user for search
     unique_id = uuid.uuid4()
-    target = User(user_id=unique_id, email=f"unique_{unique_id}@example.com", name="UniqueSearchName", role="user")
+    unique_name = f"UniqueSearchName_{unique_id}"
+    target = User(user_id=unique_id, email=f"unique_{unique_id}@example.com", name=unique_name, role="user")
     db.add(target)
     await db.commit()
     
-    response = await client.get("/api/admin/users?search=UniqueSearchName", headers={"X-Test-Role": "admin"})
+    response = await client.get(f"/api/admin/users?search={unique_name}", headers={"X-Test-Role": "admin"})
     assert response.status_code == 200
     data = response.json()
     assert len(data["items"]) == 1
-    assert data["items"][0]["name"] == "UniqueSearchName"
+    assert data["items"][0]["name"] == unique_name
     
 @pytest.mark.asyncio
 async def test_list_logs(client: AsyncClient, db):

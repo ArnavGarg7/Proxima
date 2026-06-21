@@ -35,3 +35,4 @@ pytest-cov==5.0.0
 greenlet==3.0.3
 python-magic==0.4.27
 aiofiles==23.2.1
+itsdangerous==2.2.0

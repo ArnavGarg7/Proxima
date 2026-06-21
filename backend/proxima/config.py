@@ -29,6 +29,8 @@ class Settings(BaseSettings):
     flower_password: str = "admin"
     openai_api_key: str = ""
     anthropic_api_key: str = ""
+    session_secret: str = ""
+    cors_origins: str = "http://localhost:5173"
 
     @property
     def storage_configured(self) -> bool:

@@ -17,7 +17,9 @@ export default function Navbar() {
       </div>
       <div className="flex items-center space-x-4">
         {user?.role === 'admin' && (
-          <span className="text-xs bg-red-900/30 text-red-400 px-2 py-1 rounded border border-red-900">ADMIN</span>
+          <Link to="/admin" className="text-xs bg-red-900/30 text-red-400 px-3 py-1.5 rounded border border-red-900 hover:bg-red-900/50 transition-colors font-medium">
+            Admin Dashboard
+          </Link>
         )}
         <span className="text-sm text-text-muted">{user?.email}</span>
         <button onClick={logout} className="btn-ghost text-sm">Sign Out</button>

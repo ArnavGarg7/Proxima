@@ -1,28 +1,57 @@
-import { useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useEffect, useState } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuthStore } from '@/store/useAuthStore';
 
+/**
+ * AuthCallback — handles the redirect back from the backend after Google OAuth.
+ *
+ * The backend has already:
+ *   1. Exchanged the OAuth code for tokens
+ *   2. Created/found the user
+ *   3. Set access_token and refresh_token HttpOnly cookies
+ *   4. Redirected here
+ *
+ * Our job: call /api/users/me (which reads the cookie) to hydrate the auth store.
+ */
 export default function AuthCallback() {
   const navigate = useNavigate();
-  const { login } = useAuthStore();
+  const [searchParams] = useSearchParams();
+  const { hydrate } = useAuthStore();
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    // In a real implementation, we'd exchange code here or verify the cookie
-    // For Stage 1 stub, we just simulate a successful login
-    login({
-      id: 'stub-user-123',
-      email: 'user@example.com',
-      name: 'Test User',
-      role: 'admin',
-      plan: 'pro'
+    const oauthError = searchParams.get('error');
+    if (oauthError) {
+      setError(oauthError);
+      setTimeout(() => navigate('/'), 3000);
+      return;
+    }
+
+    hydrate().then(() => {
+      const { isAuthenticated } = useAuthStore.getState();
+      if (isAuthenticated) {
+        navigate('/workspace', { replace: true });
+      } else {
+        setError('Authentication failed. Please try again.');
+        setTimeout(() => navigate('/'), 3000);
+      }
     });
-    
-    navigate('/workspace');
-  }, [login, navigate]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  if (error) {
+    return (
+      <div className="flex h-screen items-center justify-center flex-col gap-4">
+        <div className="text-red-400 text-lg">Login failed: {error}</div>
+        <div className="text-text-muted text-sm">Redirecting to home...</div>
+      </div>
+    );
+  }
 
   return (
-    <div className="flex h-screen items-center justify-center">
-      <div className="text-gold-primary animate-pulse">Authenticating...</div>
+    <div className="flex h-screen items-center justify-center flex-col gap-4">
+      <div className="w-8 h-8 border-2 border-gold-primary border-t-transparent rounded-full animate-spin" />
+      <div className="text-text-secondary text-sm">Completing sign-in...</div>
     </div>
   );
 }

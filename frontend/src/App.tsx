@@ -1,5 +1,6 @@
 import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { useAuthStore } from '@/store/useAuthStore';
+import { useEffect } from 'react';
 import Navbar from '@/components/Navbar';
 import Landing from '@/pages/Landing';
 import Workspace from '@/pages/Workspace';
@@ -17,9 +18,22 @@ import KnowledgeConsole from '@/pages/admin/Knowledge';
 import AuditLogsConsole from '@/pages/admin/AuditLogs';
 
 function AppContent() {
-  const { isAuthenticated } = useAuthStore();
+  const { isAuthenticated, isLoading, hydrate } = useAuthStore();
   const location = useLocation();
   const isAdminRoute = location.pathname.startsWith('/admin');
+
+  useEffect(() => {
+    hydrate();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  if (isLoading) {
+    return (
+      <div className="flex h-screen items-center justify-center">
+        <div className="w-8 h-8 border-2 border-gold-primary border-t-transparent rounded-full animate-spin" />
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen flex flex-col">

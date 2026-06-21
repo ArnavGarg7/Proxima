@@ -13,6 +13,7 @@ from uuid import UUID as PyUUID
 class User(Base):
     __tablename__ = "users"
     user_id: Mapped[PyUUID] = mapped_column(UUID(as_uuid=True), primary_key=True, server_default=text("gen_random_uuid()"))
+    google_id: Mapped[str | None] = mapped_column(String(255), unique=True, nullable=True)
     email: Mapped[str] = mapped_column(String(255), unique=True, nullable=False)
     name: Mapped[str] = mapped_column(String(255), nullable=False)
     role: Mapped[str] = mapped_column(String(50), default='user', nullable=False)
@@ -20,11 +21,13 @@ class User(Base):
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, server_default="true", nullable=False)
     tokens_used: Mapped[int] = mapped_column(Integer, default=0)
     tokens_limit: Mapped[int] = mapped_column(Integer, default=100000)
+    last_login_at: Mapped[datetime | None] = mapped_column(TIMESTAMPTZ, nullable=True)
     created_at: Mapped[datetime] = mapped_column(TIMESTAMPTZ, server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(TIMESTAMPTZ, server_default=func.now(), onupdate=func.now())
     __table_args__ = (
         Index("idx_users_role", "role"),
         Index("idx_users_created_at", "created_at"),
+        Index("idx_users_google_id", "google_id", unique=True),
     )
 
 class Session(Base):

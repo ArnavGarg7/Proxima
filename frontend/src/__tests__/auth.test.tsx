@@ -33,7 +33,7 @@ describe('Auth Store & Components', () => {
       </BrowserRouter>
     );
 
-    expect(screen.getByText('ADMIN')).toBeInTheDocument();
+    expect(screen.getByText('Admin Dashboard')).toBeInTheDocument();
     expect(screen.getByText('admin@proxima.test')).toBeInTheDocument();
   });
 });
