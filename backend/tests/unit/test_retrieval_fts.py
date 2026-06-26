@@ -54,7 +54,7 @@ async def test_search_fts_execution(db):
     fts = FTSRetrievalService(db)
     
     # 3. Perform search
-    results = await fts.search("PostgreSQL search")
+    results = await fts.search("PostgreSQL search", document_id=doc.document_id)
     
     assert len(results) > 0
     assert results[0]["content"] == "PostgreSQL full text search is powerful."

@@ -26,10 +26,6 @@ class ModelRegistry:
         if not model:
             raise RuntimeError("No active default generation model found in registry.")
             
-        # OVERRIDE: use Groq (llama-3.1-8b-instant) — Gemini/OpenAI quotas exhausted
-        model.provider = "openai"
-        model.model_id = "llama-3.1-8b-instant"
-        
         return model
 
     async def get_default_embedding(self, db: AsyncSession) -> RegisteredModel:

@@ -2,7 +2,7 @@ import json
 import re
 import math
 from langdetect import detect
-from proxima.services.model_registry import ModelRegistry
+from proxima.services.model_registry import model_registry
 from proxima.schemas.general_analysis import GeneralAnalysisResult
 
 class GeneralDocumentAnalyzer:
@@ -51,7 +51,7 @@ Word Count: {word_count}
 DOCUMENT TEXT:
 {full_text}
 """
-        model = await ModelRegistry.get_default_generation(db)
+        model = await model_registry.get_default_generation(db)
         
         try:
             response_json = await model.generate_json(
