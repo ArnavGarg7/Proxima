@@ -37,6 +37,10 @@ class DocumentCompareRequest(BaseModel):
     target_document_id: str
     template_origin: Optional[str] = None
 
+class AnalyzeDocumentRequest(BaseModel):
+    document_id: str
+    template_origin: Optional[str] = None
+
 class IntelligenceCompletionRequest(BaseModel):
     document_id: str
     user_task: str
@@ -144,12 +148,70 @@ async def intelligence_complete(
     # 3. Domain Detection
     detector = DomainDetectorService()
     scores = await detector.detect_domain(context_package)
-    if doc.status == "processing":
-        raise HTTPException(status_code=422, detail="Document is still processing")
+    top_domain = max(scores, key=scores.get)
+
+    # 4. Prompt Assembler
+    registry = PromptRegistryService(db)
+    assembler = PromptAssemblerService(registry)
+    final_prompt = await assembler.assemble_prompt(f"system_{top_domain}", context_package, actual_task)
+
+    # 5. Model Registry
+    model = await model_registry.get_default_generation(db)
+    
+    # 6. Gemini Provider & SSE Stream
+    qhe = QualityHeuristicEngine()
+
+    async def stream_generator():
+        ai_response_accumulator = ""
+        try:
+            async for chunk in model_registry.stream_completion(
+                model=model,
+                system_prompt=final_prompt,
+                user_message=actual_task,
+                temperature=payload.temperature,
+                max_tokens=payload.max_tokens
+            ):
+                if await request.is_disconnected():
+                    break
+                    
+                ai_response_accumulator += chunk
+                yield f"data: {json.dumps({'type': 'chunk', 'content': chunk})}\n\n"
+            
+            # 7. QHE Execution after completion
+            if ai_response_accumulator:
+                eval_result = qhe.evaluate_response(final_prompt, ai_response_accumulator, top_domain)
+                yield f"data: {json.dumps({'type': 'qhe', 'eval': eval_result})}\n\n"
+                
+            yield "data: [DONE]\n\n"
+            
+        except HTTPException as he:
+            yield f"data: {json.dumps({'type': 'error', 'detail': he.detail})}\n\n"
+        except asyncio.TimeoutError:
+            yield f"data: {json.dumps({'type': 'error', 'detail': 'Provider timeout.'})}\n\n"
+        except Exception as e:
+            yield f"data: {json.dumps({'type': 'error', 'detail': str(e)})}\n\n"
+
+    return StreamingResponse(stream_generator(), media_type="text/event-stream")
+
+@router.post("/analyze")
+async def intelligence_analyze(
+    request: Request,
+    payload: AnalyzeDocumentRequest,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    # 0. Tenant Authorization Check
+    doc = await db.get(Document, uuid.UUID(payload.document_id))
+    if not doc or doc.user_id != current_user.user_id:
+        raise HTTPException(status_code=403, detail="Not authorized to access this document")
+        
+    # Check explicitly for processing failures
+    if doc.status == "no_extractable_text":
+        raise HTTPException(status_code=422, detail="Document contains no extractable text")
     elif doc.status == "failed":
         raise HTTPException(status_code=422, detail="Document parsing failed")
-    elif doc.status == "no_extractable_text":
-        raise HTTPException(status_code=422, detail="Document contains no extractable text")
+    elif doc.status == "processing":
+        raise HTTPException(status_code=422, detail="Document is still processing")
 
     # Reconstruct text
     result = await db.execute(select(DocumentChunk).where(DocumentChunk.document_id == doc.document_id).order_by(DocumentChunk.chunk_index))
