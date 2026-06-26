@@ -15,7 +15,6 @@ export default function Dashboard() {
   const [userName, setUserName] = useState<string>('');
 
   useEffect(() => {
-    let intervalId: NodeJS.Timeout;
 
     const fetchDashboard = async (silent = false) => {
       try {
@@ -41,7 +40,7 @@ export default function Dashboard() {
     fetchDashboard();
     
     // Make dashboard "alive" by polling every 10 seconds
-    intervalId = setInterval(() => fetchDashboard(true), 10000);
+    const intervalId = setInterval(() => fetchDashboard(true), 10000);
 
     return () => clearInterval(intervalId);
   }, []);
