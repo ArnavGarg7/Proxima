@@ -6,7 +6,15 @@ import Landing from '@/pages/Landing';
 import Workspace from '@/pages/Workspace';
 import ProtectedRoute from '@/components/ProtectedRoute';
 import AuthCallback from '@/components/AuthCallback';
-import StubPage from '@/components/StubPage';
+import Dashboard from '@/pages/Dashboard';
+import Templates from '@/pages/Templates';
+import Analyze from '@/pages/Analyze';
+import Audit from '@/pages/Audit';
+import Compare from '@/pages/Compare';
+import CodeSuite from '@/pages/CodeSuite';
+import DomainRadar from '@/pages/DomainRadar';
+import Clinical from '@/pages/Clinical';
+import Legal from '@/pages/Legal';
 import AdminRoute from '@/components/AdminRoute';
 import AdminLayout from '@/components/AdminLayout';
 import Unauthorized from '@/pages/Unauthorized';
@@ -44,16 +52,17 @@ function AppContent() {
           <Route path="/auth/callback" element={<AuthCallback />} />
           <Route path="/unauthorized" element={<Unauthorized />} />
           
-          <Route element={<ProtectedRoute />}>
-            <Route path="/workspace" element={<Workspace />} />
-            <Route path="/analyze" element={<StubPage title="Contract Analyzer" />} />
-            <Route path="/clinical" element={<StubPage title="Clinical Notes" />} />
-            <Route path="/code" element={<StubPage title="Code Suite" />} />
-            <Route path="/compare" element={<StubPage title="Document Compare" />} />
-            <Route path="/templates" element={<StubPage title="Template Library" />} />
-            <Route path="/audit" element={<StubPage title="Confidence Audit" />} />
-            <Route path="/radar" element={<StubPage title="Domain Radar" />} />
-            <Route path="/dashboard" element={<StubPage title="Dashboard" />} />
+            <Route element={<ProtectedRoute />}>
+              <Route path="/workspace" element={<Workspace />} />
+              <Route path="/analyze" element={<Analyze />} />
+              <Route path="/legal" element={<Legal />} />
+              <Route path="/clinical" element={<Clinical />} />
+              <Route path="/code" element={<CodeSuite />} />
+              <Route path="/compare" element={<Compare />} />
+              <Route path="/templates" element={<Templates />} />
+              <Route path="/audit" element={<Audit />} />
+              <Route path="/radar" element={<DomainRadar />} />
+            <Route path="/dashboard" element={<Dashboard />} />
           </Route>
 
           <Route element={<AdminRoute />}>

@@ -36,3 +36,7 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
     </ErrorBoundary>
   </React.StrictMode>,
 );
+
+setTimeout(() => {
+  console.log("ROOT HTML:", document.getElementById('root')?.innerHTML);
+}, 2000);

@@ -1,0 +1,362 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Confidence Audit - PROXIMA</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=Playfair+Display:wght@700&amp;family=JetBrains+Mono:wght@400&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+          darkMode: "class",
+          theme: {
+            extend: {
+              "colors": {
+                      "on-secondary-fixed-variant": "#5a4308",
+                      "status-critical": "#991B1B",
+                      "on-surface-variant": "#d0c5b2",
+                      "tertiary": "#e2c469",
+                      "on-primary-fixed-variant": "#584400",
+                      "surface": "#111111",
+                      "text-primary": "#F0EFE9",
+                      "secondary": "#e4c27d",
+                      "surface-container-high": "#2a2a2a",
+                      "inverse-surface": "#e5e2e1",
+                      "surface-tint": "#e6c364",
+                      "on-tertiary-fixed": "#231b00",
+                      "on-primary-container": "#503d00",
+                      "inverse-primary": "#755b00",
+                      "gold-mist": "rgba(201,168,76,0.08)",
+                      "secondary-container": "#5c460b",
+                      "status-low": "#DC2626",
+                      "tertiary-container": "#c5a951",
+                      "outline-variant": "#4d4637",
+                      "on-surface": "#e5e2e1",
+                      "on-secondary-fixed": "#251a00",
+                      "inverse-on-surface": "#313030",
+                      "surface-container": "#201f1f",
+                      "background": "#131313",
+                      "editor-bg": "#FAFAF8",
+                      "secondary-fixed": "#ffdf9d",
+                      "error": "#ffb4ab",
+                      "surface-container-low": "#1c1b1b",
+                      "on-tertiary-fixed-variant": "#574500",
+                      "text-muted": "#555550",
+                      "border-strong": "#3A3A3A",
+                      "text-secondary": "#888880",
+                      "on-tertiary-container": "#4e3e00",
+                      "on-error-container": "#ffdad6",
+                      "primary-fixed-dim": "#e6c364",
+                      "surface-container-highest": "#353534",
+                      "elevated": "#1A1A1A",
+                      "surface-dim": "#131313",
+                      "status-amber": "#D97706",
+                      "on-tertiary": "#3c2f00",
+                      "on-secondary-container": "#d5b470",
+                      "on-primary": "#3d2e00",
+                      "secondary-fixed-dim": "#e4c27d",
+                      "outline": "#99907e",
+                      "on-background": "#e5e2e1",
+                      "on-error": "#690005",
+                      "on-primary-fixed": "#241a00",
+                      "status-high": "#16A34A",
+                      "surface-bright": "#3a3939",
+                      "tertiary-fixed": "#ffe084",
+                      "primary": "#e6c364",
+                      "tertiary-fixed-dim": "#e2c468",
+                      "surface-variant": "#353534",
+                      "primary-fixed": "#ffe08f",
+                      "on-secondary": "#3f2e00",
+                      "border": "#2A2A2A",
+                      "error-container": "#93000a",
+                      "primary-container": "#c9a84c",
+                      "surface-container-lowest": "#0e0e0e"
+              },
+              "borderRadius": {
+                      "DEFAULT": "0.125rem",
+                      "lg": "0.25rem",
+                      "xl": "0.5rem",
+                      "full": "0.75rem"
+              },
+              "spacing": {
+                      "base": "4px",
+                      "sidebar-right": "300px",
+                      "editor-gutter": "40px",
+                      "editor-max-width": "720px",
+                      "container-gap": "24px",
+                      "sidebar-left": "280px",
+                      "panel-padding": "20px"
+              },
+              "fontFamily": {
+                      "headline-lg": ["Inter"],
+                      "headline-xl": ["Inter"],
+                      "body-lg": ["Inter"],
+                      "body-md": ["Inter"],
+                      "label-lg": ["Inter"],
+                      "code-md": ["JetBrains Mono"],
+                      "display-lg": ["Playfair Display"],
+                      "label-sm": ["Inter"],
+                      "headline-xl-mobile": ["Inter"],
+                      "display-xl": ["Playfair Display"]
+              },
+              "fontSize": {
+                      "headline-lg": ["24px", { "lineHeight": "1.3", "fontWeight": "600" }],
+                      "headline-xl": ["32px", { "lineHeight": "1.25", "fontWeight": "700" }],
+                      "body-lg": ["17px", { "lineHeight": "1.65", "fontWeight": "400" }],
+                      "body-md": ["15px", { "lineHeight": "1.6", "fontWeight": "400" }],
+                      "label-lg": ["13px", { "lineHeight": "1.4", "letterSpacing": "0.04em", "fontWeight": "500" }],
+                      "code-md": ["14px", { "lineHeight": "1.6", "fontWeight": "400" }],
+                      "display-lg": ["48px", { "lineHeight": "1.15", "letterSpacing": "-0.02em", "fontWeight": "700" }],
+                      "label-sm": ["11px", { "lineHeight": "1.4", "letterSpacing": "0.08em", "fontWeight": "500" }],
+                      "headline-xl-mobile": ["28px", { "lineHeight": "1.25", "fontWeight": "700" }],
+                      "display-xl": ["72px", { "lineHeight": "1.1", "letterSpacing": "-0.02em", "fontWeight": "700" }]
+              }
+            }
+          }
+        }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        .material-symbols-outlined[data-weight="fill"] {
+            font-variation-settings: 'FILL' 1;
+        }
+        .gold-glow:focus-within {
+            box-shadow: inset 0 0 0 1px #C9A84C, 0 0 10px rgba(201,168,76,0.15);
+            border-color: #C9A84C;
+        }
+    </style>
+</head>
+<body class="bg-background text-text-primary min-h-screen flex flex-col antialiased">
+<!-- TopNavBar -->
+<nav class="fixed top-0 w-full h-[60px] z-50 bg-surface/80 backdrop-blur-xl border-b border-border flex items-center justify-between px-panel-padding">
+<div class="flex items-center gap-8">
+<div class="font-display-lg text-headline-lg text-on-surface uppercase tracking-tighter">
+                PROXIMA
+            </div>
+<div class="hidden md:flex gap-6">
+<a class="text-text-secondary hover:text-text-primary transition-colors hover:bg-gold-mist duration-200 px-2 py-1 rounded font-body-md text-body-md" href="#">Dashboard</a>
+<a class="text-text-secondary hover:text-text-primary transition-colors hover:bg-gold-mist duration-200 px-2 py-1 rounded font-body-md text-body-md" href="#">Workspace</a>
+<a class="text-text-secondary hover:text-text-primary transition-colors hover:bg-gold-mist duration-200 px-2 py-1 rounded font-body-md text-body-md" href="#">Contract Analyzer</a>
+<a class="text-text-secondary hover:text-text-primary transition-colors hover:bg-gold-mist duration-200 px-2 py-1 rounded font-body-md text-body-md" href="#">Clinical Notes</a>
+<a class="text-text-secondary hover:text-text-primary transition-colors hover:bg-gold-mist duration-200 px-2 py-1 rounded font-body-md text-body-md" href="#">Code Suite</a>
+<a class="text-text-secondary hover:text-text-primary transition-colors hover:bg-gold-mist duration-200 px-2 py-1 rounded font-body-md text-body-md" href="#">Library</a>
+</div>
+</div>
+<div class="flex items-center gap-4">
+<div class="relative gold-glow rounded bg-surface border border-border flex items-center px-3 py-1.5 w-64">
+<span class="material-symbols-outlined text-text-secondary text-sm mr-2" data-icon="search">search</span>
+<input class="bg-transparent border-none text-text-primary focus:ring-0 p-0 font-body-md text-sm w-full placeholder-text-muted" placeholder="Search..." type="text"/>
+</div>
+<button class="text-text-secondary hover:text-primary transition-colors p-1 rounded hover:bg-gold-mist">
+<span class="material-symbols-outlined" data-icon="notifications">notifications</span>
+</button>
+<button class="text-text-secondary hover:text-primary transition-colors p-1 rounded hover:bg-gold-mist">
+<span class="material-symbols-outlined" data-icon="settings">settings</span>
+</button>
+<div class="w-8 h-8 rounded-full bg-surface-container-high border border-border overflow-hidden ml-2">
+<img alt="User profile" class="w-full h-full object-cover" data-alt="A professional headshot of an individual, high contrast, moody lighting, fitting a cinematic dark tech UI theme. Neutral expression, isolated on a dark background." src="https://lh3.googleusercontent.com/aida-public/AB6AXuAWSjiWFQwzPIysIqbLbW653w8psloK_F1ja3XIBPdF4fY2hP3JNIZSnz4PGoH9Bh3isl75YC3k9IEewV5yO2lNOQth5DZ6diiFKW_1sN-SPBkgLx-iIEashhB5vY422m3cNBBvbuCT5ib5PV6REfvubjvrHwPbI41GmhMcDNZroRDPxrq7LFgMwgS7nCWdCoqpFEGkNASQFW6AfUv5ac-sfcF4E07JXkwX7kvmv7hsSgIXkWUA0POQpzZO_ZnQ5clYgeHgBJPuk7U"/>
+</div>
+</div>
+</nav>
+<div class="flex flex-1 pt-[60px]">
+<!-- Left SideNavBar -->
+<aside class="hidden md:flex fixed left-0 top-[60px] w-sidebar-left h-[calc(100vh-60px)] bg-surface-container border-r border-border flex-col py-panel-padding z-40">
+<div class="px-6 mb-8 flex items-center gap-3">
+<div class="w-10 h-10 rounded bg-elevated border border-border flex items-center justify-center overflow-hidden">
+<span class="material-symbols-outlined text-primary" data-icon="psychology">psychology</span>
+</div>
+<div>
+<h2 class="font-headline-lg text-headline-lg text-primary text-sm leading-tight">Intelligence Panel</h2>
+<p class="font-label-sm text-label-sm text-text-muted">V4.0 Active Analysis</p>
+</div>
+</div>
+<div class="px-4 mb-6">
+<button class="w-full bg-primary-container text-on-primary-container font-label-lg text-label-lg py-2 rounded hover:-translate-y-[1px] transition-transform font-medium">
+                    New Analysis
+                </button>
+</div>
+<nav class="flex-1 px-2 space-y-1">
+<a class="flex items-center gap-3 px-4 py-2 rounded font-label-lg text-label-lg text-text-secondary hover:bg-surface-container-high hover:text-on-surface transition-colors" href="#">
+<span class="material-symbols-outlined text-lg" data-icon="psychology">psychology</span>
+                    Intelligence
+                </a>
+<a class="flex items-center gap-3 px-4 py-2 rounded font-label-lg text-label-lg text-text-secondary hover:bg-surface-container-high hover:text-on-surface transition-colors" href="#">
+<span class="material-symbols-outlined text-lg" data-icon="description">description</span>
+                    Documents
+                </a>
+<a class="flex items-center gap-3 px-4 py-2 rounded font-label-lg text-label-lg text-text-secondary hover:bg-surface-container-high hover:text-on-surface transition-colors" href="#">
+<span class="material-symbols-outlined text-lg" data-icon="history">history</span>
+                    History
+                </a>
+<a class="flex items-center gap-3 px-4 py-2 rounded font-label-lg text-label-lg bg-gold-mist text-primary border-l-2 border-primary translate-x-1 duration-200" href="#">
+<span class="material-symbols-outlined text-lg" data-icon="verified_user">verified_user</span>
+                    Confidence Audit
+                </a>
+<a class="flex items-center gap-3 px-4 py-2 rounded font-label-lg text-label-lg text-text-secondary hover:bg-surface-container-high hover:text-on-surface transition-colors" href="#">
+<span class="material-symbols-outlined text-lg" data-icon="radar">radar</span>
+                    Domain Radar
+                </a>
+<a class="flex items-center gap-3 px-4 py-2 rounded font-label-lg text-label-lg text-text-secondary hover:bg-surface-container-high hover:text-on-surface transition-colors" href="#">
+<span class="material-symbols-outlined text-lg" data-icon="folder_copy">folder_copy</span>
+                    Templates
+                </a>
+</nav>
+<div class="px-2 mt-auto border-t border-border pt-4 space-y-1">
+<a class="flex items-center gap-3 px-4 py-2 rounded font-label-lg text-label-lg text-text-secondary hover:bg-surface-container-high hover:text-on-surface transition-colors" href="#">
+<span class="material-symbols-outlined text-lg" data-icon="help">help</span>
+                    Support
+                </a>
+<a class="flex items-center gap-3 px-4 py-2 rounded font-label-lg text-label-lg text-text-secondary hover:bg-surface-container-high hover:text-on-surface transition-colors" href="#">
+<span class="material-symbols-outlined text-lg" data-icon="archive">archive</span>
+                    Archive
+                </a>
+</div>
+</aside>
+<!-- Main Content Area -->
+<main class="flex-1 md:ml-[280px] p-container-gap bg-background min-h-[calc(100vh-60px)] flex flex-col items-center">
+<div class="w-full max-w-[1000px] space-y-container-gap">
+<!-- Header -->
+<header class="mb-8">
+<h1 class="font-headline-xl text-headline-xl text-text-primary mb-2">Confidence Audit</h1>
+<p class="font-body-md text-body-md text-text-secondary">Upload a document to run a comprehensive multi-dimensional compliance scan.</p>
+</header>
+<!-- Upload Zone -->
+<div class="w-full border-2 border-dashed border-border rounded-xl bg-surface-container-low hover:border-primary transition-colors flex flex-col items-center justify-center py-16 px-6 cursor-pointer group">
+<div class="w-16 h-16 rounded-full bg-surface border border-border flex items-center justify-center mb-4 group-hover:bg-gold-mist transition-colors">
+<span class="material-symbols-outlined text-text-secondary group-hover:text-primary text-3xl" data-icon="upload_file">upload_file</span>
+</div>
+<h3 class="font-headline-lg text-headline-lg text-text-primary text-lg mb-2">Drag &amp; Drop Document</h3>
+<p class="font-body-md text-body-md text-text-muted mb-6 text-center">Supports PDF, DOCX, TXT. Max file size: 50MB.</p>
+<button class="bg-transparent border border-border text-text-primary font-label-lg text-label-lg px-6 py-2 rounded hover:bg-surface-container-high transition-colors">
+                        Browse Files
+                    </button>
+</div>
+<!-- Audit Report Section (Simulated State) -->
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-container-gap mt-8">
+<!-- Overall Grade & Recommendations -->
+<div class="lg:col-span-1 space-y-container-gap">
+<!-- Grade Card -->
+<div class="bg-elevated border border-border rounded-xl p-6 relative overflow-hidden">
+<div class="absolute top-0 left-0 w-full h-[2px] bg-primary"></div>
+<h3 class="font-label-lg text-label-lg text-text-muted uppercase tracking-wider mb-4">Overall Confidence Grade</h3>
+<div class="flex items-end gap-4 mb-2">
+<span class="font-display-xl text-display-xl text-status-amber leading-none">B-</span>
+<span class="font-body-lg text-body-lg text-text-secondary pb-2">Requires Review</span>
+</div>
+<p class="font-body-md text-body-md text-text-muted mt-4 pt-4 border-t border-border">
+                                The document meets baseline structural criteria but flags significant terminology ambiguity in sections 3 and 4.
+                            </p>
+</div>
+<!-- Prioritized Recommendations -->
+<div class="bg-elevated border border-border rounded-xl p-6">
+<h3 class="font-label-lg text-label-lg text-text-muted uppercase tracking-wider mb-4 flex items-center gap-2">
+<span class="material-symbols-outlined text-sm" data-icon="list_alt">list_alt</span>
+                                Prioritized Actions
+                            </h3>
+<ul class="space-y-4">
+<li class="flex gap-3 items-start border-b border-border pb-3 last:border-0 last:pb-0">
+<span class="material-symbols-outlined text-status-critical text-sm mt-0.5" data-icon="warning">warning</span>
+<div>
+<p class="font-label-lg text-label-lg text-text-primary mb-1">Standardize Terminology</p>
+<p class="font-label-sm text-label-sm text-text-muted">Inconsistent use of 'Client' vs 'Purchaser' across 14 clauses.</p>
+</div>
+</li>
+<li class="flex gap-3 items-start border-b border-border pb-3 last:border-0 last:pb-0">
+<span class="material-symbols-outlined text-status-amber text-sm mt-0.5" data-icon="error">error</span>
+<div>
+<p class="font-label-lg text-label-lg text-text-primary mb-1">Clarify Liability Limits</p>
+<p class="font-label-sm text-label-sm text-text-muted">Section 4.2 contains overly broad indemnification language.</p>
+</div>
+</li>
+<li class="flex gap-3 items-start last:border-0 last:pb-0">
+<span class="material-symbols-outlined text-status-low text-sm mt-0.5" data-icon="info">info</span>
+<div>
+<p class="font-label-lg text-label-lg text-text-primary mb-1">Formatting Consistency</p>
+<p class="font-label-sm text-label-sm text-text-muted">Heading hierarchy breaks in Appendix B.</p>
+</div>
+</li>
+</ul>
+</div>
+</div>
+<!-- Dimension Scorecards & Heatmap -->
+<div class="lg:col-span-2 space-y-container-gap">
+<!-- Dimension Scorecards -->
+<div class="grid grid-cols-2 gap-4">
+<!-- Card 1 -->
+<div class="bg-elevated border border-border rounded-xl p-4 flex flex-col justify-between h-28">
+<div class="flex justify-between items-start">
+<span class="font-label-lg text-label-lg text-text-secondary">Terminology</span>
+<span class="px-2 py-0.5 rounded-full bg-status-amber/15 text-status-amber font-label-sm text-label-sm">64%</span>
+</div>
+<div class="w-full bg-surface-container h-1.5 rounded-full overflow-hidden mt-4">
+<div class="bg-status-amber h-full" style="width: 64%"></div>
+</div>
+</div>
+<!-- Card 2 -->
+<div class="bg-elevated border border-border rounded-xl p-4 flex flex-col justify-between h-28">
+<div class="flex justify-between items-start">
+<span class="font-label-lg text-label-lg text-text-secondary">Structure</span>
+<span class="px-2 py-0.5 rounded-full bg-status-high/15 text-status-high font-label-sm text-label-sm">92%</span>
+</div>
+<div class="w-full bg-surface-container h-1.5 rounded-full overflow-hidden mt-4">
+<div class="bg-status-high h-full" style="width: 92%"></div>
+</div>
+</div>
+<!-- Card 3 -->
+<div class="bg-elevated border border-border rounded-xl p-4 flex flex-col justify-between h-28">
+<div class="flex justify-between items-start">
+<span class="font-label-lg text-label-lg text-text-secondary">Compliance</span>
+<span class="px-2 py-0.5 rounded-full bg-status-amber/15 text-status-amber font-label-sm text-label-sm">78%</span>
+</div>
+<div class="w-full bg-surface-container h-1.5 rounded-full overflow-hidden mt-4">
+<div class="bg-status-amber h-full" style="width: 78%"></div>
+</div>
+</div>
+<!-- Card 4 -->
+<div class="bg-elevated border border-border rounded-xl p-4 flex flex-col justify-between h-28">
+<div class="flex justify-between items-start">
+<span class="font-label-lg text-label-lg text-text-secondary">Clarity</span>
+<span class="px-2 py-0.5 rounded-full bg-status-critical/15 text-status-critical font-label-sm text-label-sm">45%</span>
+</div>
+<div class="w-full bg-surface-container h-1.5 rounded-full overflow-hidden mt-4">
+<div class="bg-status-critical h-full" style="width: 45%"></div>
+</div>
+</div>
+</div>
+<!-- Heatmap View -->
+<div class="bg-elevated border border-border rounded-xl p-6 h-[400px] flex flex-col">
+<h3 class="font-label-lg text-label-lg text-text-muted uppercase tracking-wider mb-4 flex justify-between items-center">
+<span>Segment Heatmap</span>
+<div class="flex gap-2">
+<span class="flex items-center gap-1 font-label-sm text-label-sm"><span class="w-2 h-2 rounded-full bg-status-high"></span> Safe</span>
+<span class="flex items-center gap-1 font-label-sm text-label-sm"><span class="w-2 h-2 rounded-full bg-status-amber"></span> Flagged</span>
+<span class="flex items-center gap-1 font-label-sm text-label-sm"><span class="w-2 h-2 rounded-full bg-status-critical"></span> Critical</span>
+</div>
+</h3>
+<div class="flex-1 bg-editor-bg rounded border border-border p-4 overflow-y-auto relative">
+<!-- Simulated Document Text with Heatmap Highlights -->
+<p class="font-body-md text-body-md text-[#0A0A0A] mb-4">
+                                    1.1 This Master Services Agreement ("Agreement") is entered into by and between <span class="bg-status-amber/20 border-b-2 border-status-amber">the Client</span> and Service Provider.
+                                </p>
+<p class="font-body-md text-body-md text-[#0A0A0A] mb-4">
+                                    2.3 <span class="bg-status-high/20 border-b-2 border-status-high">The Service Provider agrees to deliver the Services described in Exhibit A in a professional and workmanlike manner.</span>
+</p>
+<p class="font-body-md text-body-md text-[#0A0A0A] mb-4">
+                                    4.2 <span class="bg-status-critical/20 border-b-2 border-status-critical">The Purchaser shall indemnify, defend, and hold harmless the Service Provider against any and all claims, damages, losses, or expenses arising from the use of the Services, regardless of fault or negligence.</span>
+</p>
+<p class="font-body-md text-body-md text-[#0A0A0A] mb-4">
+                                    5.1 Payment is due within 30 days of receipt of invoice. Late payments will incur a penalty of <span class="bg-status-amber/20 border-b-2 border-status-amber">1.5% per month</span>.
+                                </p>
+<div class="absolute inset-y-0 left-0 w-1 bg-gradient-to-b from-status-amber via-status-high to-status-critical opacity-50"></div>
+</div>
+</div>
+</div>
+</div>
+</div>
+</main>
+</div>
+</body></html>

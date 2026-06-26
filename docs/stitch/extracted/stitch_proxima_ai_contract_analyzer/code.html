@@ -1,0 +1,355 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>PROXIMA - Contract Analyzer</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=Playfair+Display:wght@700&amp;family=JetBrains+Mono:wght@400&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "on-secondary-fixed-variant": "#5a4308",
+                        "status-critical": "#991B1B",
+                        "on-surface-variant": "#d0c5b2",
+                        "tertiary": "#e2c469",
+                        "on-primary-fixed-variant": "#584400",
+                        "surface": "#111111",
+                        "text-primary": "#F0EFE9",
+                        "secondary": "#e4c27d",
+                        "surface-container-high": "#2a2a2a",
+                        "inverse-surface": "#e5e2e1",
+                        "surface-tint": "#e6c364",
+                        "on-tertiary-fixed": "#231b00",
+                        "on-primary-container": "#503d00",
+                        "inverse-primary": "#755b00",
+                        "gold-mist": "rgba(201,168,76,0.08)",
+                        "secondary-container": "#5c460b",
+                        "status-low": "#DC2626",
+                        "tertiary-container": "#c5a951",
+                        "outline-variant": "#4d4637",
+                        "on-surface": "#e5e2e1",
+                        "on-secondary-fixed": "#251a00",
+                        "inverse-on-surface": "#313030",
+                        "surface-container": "#201f1f",
+                        "background": "#131313",
+                        "editor-bg": "#FAFAF8",
+                        "secondary-fixed": "#ffdf9d",
+                        "error": "#ffb4ab",
+                        "surface-container-low": "#1c1b1b",
+                        "on-tertiary-fixed-variant": "#574500",
+                        "text-muted": "#555550",
+                        "border-strong": "#3A3A3A",
+                        "text-secondary": "#888880",
+                        "on-tertiary-container": "#4e3e00",
+                        "on-error-container": "#ffdad6",
+                        "primary-fixed-dim": "#e6c364",
+                        "surface-container-highest": "#353534",
+                        "elevated": "#1A1A1A",
+                        "surface-dim": "#131313",
+                        "status-amber": "#D97706",
+                        "on-tertiary": "#3c2f00",
+                        "on-secondary-container": "#d5b470",
+                        "on-primary": "#3d2e00",
+                        "secondary-fixed-dim": "#e4c27d",
+                        "outline": "#99907e",
+                        "on-background": "#e5e2e1",
+                        "on-error": "#690005",
+                        "on-primary-fixed": "#241a00",
+                        "status-high": "#16A34A",
+                        "surface-bright": "#3a3939",
+                        "tertiary-fixed": "#ffe084",
+                        "primary": "#e6c364",
+                        "tertiary-fixed-dim": "#e2c468",
+                        "surface-variant": "#353534",
+                        "primary-fixed": "#ffe08f",
+                        "on-secondary": "#3f2e00",
+                        "border": "#2A2A2A",
+                        "error-container": "#93000a",
+                        "primary-container": "#c9a84c",
+                        "surface-container-lowest": "#0e0e0e"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.125rem",
+                        "lg": "0.25rem",
+                        "xl": "0.5rem",
+                        "full": "0.75rem"
+                    },
+                    "spacing": {
+                        "base": "4px",
+                        "sidebar-right": "300px",
+                        "editor-gutter": "40px",
+                        "editor-max-width": "720px",
+                        "container-gap": "24px",
+                        "sidebar-left": "280px",
+                        "panel-padding": "20px"
+                    },
+                    "fontFamily": {
+                        "headline-lg": ["Inter"],
+                        "headline-xl": ["Inter"],
+                        "body-lg": ["Inter"],
+                        "body-md": ["Inter"],
+                        "label-lg": ["Inter"],
+                        "code-md": ["JetBrains Mono"],
+                        "display-lg": ["Playfair Display"],
+                        "label-sm": ["Inter"],
+                        "headline-xl-mobile": ["Inter"],
+                        "display-xl": ["Playfair Display"]
+                    },
+                    "fontSize": {
+                        "headline-lg": ["24px", {"lineHeight": "1.3", "fontWeight": "600"}],
+                        "headline-xl": ["32px", {"lineHeight": "1.25", "fontWeight": "700"}],
+                        "body-lg": ["17px", {"lineHeight": "1.65", "fontWeight": "400"}],
+                        "body-md": ["15px", {"lineHeight": "1.6", "fontWeight": "400"}],
+                        "label-lg": ["13px", {"lineHeight": "1.4", "letterSpacing": "0.04em", "fontWeight": "500"}],
+                        "code-md": ["14px", {"lineHeight": "1.6", "fontWeight": "400"}],
+                        "display-lg": ["48px", {"lineHeight": "1.15", "letterSpacing": "-0.02em", "fontWeight": "700"}],
+                        "label-sm": ["11px", {"lineHeight": "1.4", "letterSpacing": "0.08em", "fontWeight": "500"}],
+                        "headline-xl-mobile": ["28px", {"lineHeight": "1.25", "fontWeight": "700"}],
+                        "display-xl": ["72px", {"lineHeight": "1.1", "letterSpacing": "-0.02em", "fontWeight": "700"}]
+                    }
+                }
+            }
+        }
+    </script>
+<style>
+        .gold-glow { box-shadow: 0 0 0 2px rgba(201,168,76,0.15) inset; }
+        .focus-gold:focus-within { border-color: #C9A84C; box-shadow: 0 0 0 2px rgba(201,168,76,0.15) inset; }
+    </style>
+</head>
+<body class="bg-background text-text-primary min-h-screen font-body-md selection:bg-primary-container selection:text-on-primary-container flex flex-col">
+<!-- TopNavBar -->
+<nav class="fixed top-0 w-full h-[60px] z-50 bg-surface/80 backdrop-blur-xl border-b border-border flex items-center justify-between px-panel-padding">
+<div class="flex items-center gap-8">
+<div class="font-display-lg text-headline-lg text-on-surface uppercase tracking-tighter">PROXIMA</div>
+<div class="hidden md:flex items-center gap-6">
+<a class="font-body-md text-body-md text-text-secondary hover:text-text-primary transition-colors" href="#">Dashboard</a>
+<a class="font-body-md text-body-md text-text-secondary hover:text-text-primary transition-colors" href="#">Workspace</a>
+<a class="font-body-md text-body-md text-primary font-bold border-b-2 border-primary pb-1 Active: scale-95 duration-100" href="#">Contract Analyzer</a>
+<a class="font-body-md text-body-md text-text-secondary hover:text-text-primary transition-colors" href="#">Clinical Notes</a>
+<a class="font-body-md text-body-md text-text-secondary hover:text-text-primary transition-colors" href="#">Code Suite</a>
+<a class="font-body-md text-body-md text-text-secondary hover:text-text-primary transition-colors" href="#">Library</a>
+</div>
+</div>
+<div class="flex items-center gap-4">
+<div class="relative focus-gold rounded border border-border bg-surface w-64 h-8 flex items-center px-3 transition-colors">
+<span class="material-symbols-outlined text-text-muted text-[18px] mr-2" data-icon="search">search</span>
+<input class="bg-transparent border-none outline-none text-body-md text-text-primary w-full p-0 placeholder-text-muted" placeholder="Search..." type="text"/>
+</div>
+<button class="text-text-secondary hover:text-primary transition-colors h-8 w-8 flex items-center justify-center rounded hover:bg-gold-mist transition-all duration-200">
+<span class="material-symbols-outlined" data-icon="notifications">notifications</span>
+</button>
+<button class="text-text-secondary hover:text-primary transition-colors h-8 w-8 flex items-center justify-center rounded hover:bg-gold-mist transition-all duration-200">
+<span class="material-symbols-outlined" data-icon="settings">settings</span>
+</button>
+<div class="h-8 w-8 rounded-full bg-surface-container border border-border overflow-hidden ml-2 cursor-pointer border-border-strong hover:border-primary transition-colors">
+<img alt="User profile" class="w-full h-full object-cover" data-alt="A professional headshot of a person, framed closely on the face, against a dark, neutral background. The lighting is soft but precise, creating a serious, authoritative mood suitable for an enterprise software profile. The image style is realistic photography." src="https://lh3.googleusercontent.com/aida-public/AB6AXuCtuMSKqP2OKxw81VTD8RuPK4zEIrpU3_4NHmQEbVjazjPuT1tgyONY7c9rtgN13m63zLF98KSib0nt4bTQesUZbPLKeaZgW6haQXLqrqWvJtc9_mgOccv07-TkCK7OfUz6xkoJkjW6ELuh1drFdBTR6ZUD7H9P8MCQif7OAI1lY0s3H45w0jRwoiNXriyRPfLxdwhsMgRkLV6icQ4K-m7bqiGL3VkYkdtJ0ZiBRzh_utFWO_roJFByb6jmCYkqz-PX0PtZ2YANJSQ"/>
+</div>
+</div>
+</nav>
+<!-- Main Content Area -->
+<main class="flex-grow flex pt-[60px] overflow-hidden h-screen">
+<!-- Left Panel: Upload & Configuration -->
+<div class="w-1/2 h-full border-r border-border bg-surface-container flex flex-col p-container-gap overflow-y-auto custom-scrollbar">
+<div class="mb-8">
+<h1 class="font-headline-xl text-headline-xl text-text-primary mb-2">Initialize Analysis</h1>
+<p class="font-body-md text-body-md text-text-secondary">Upload a document and configure parameters for deep extraction.</p>
+</div>
+<!-- Drop Zone -->
+<div class="border border-dashed border-border-strong rounded-xl bg-surface p-8 flex flex-col items-center justify-center text-center mb-container-gap hover:border-primary hover:bg-gold-mist transition-all duration-300 cursor-pointer group">
+<div class="h-16 w-16 rounded-full bg-surface-container-high flex items-center justify-center mb-4 group-hover:bg-primary-container transition-colors duration-300">
+<span class="material-symbols-outlined text-text-secondary text-[32px] group-hover:text-on-primary-container" data-icon="upload_file">upload_file</span>
+</div>
+<h3 class="font-headline-lg text-headline-lg text-text-primary mb-2">Drag &amp; Drop Document</h3>
+<p class="font-body-md text-body-md text-text-secondary mb-6">Supports PDF, DOCX, TXT. Max file size: 50MB.</p>
+<button class="bg-surface-container border border-border-strong text-text-primary px-6 py-2 rounded font-label-lg text-label-lg hover:border-primary hover:text-primary transition-colors">
+                    Browse Files
+                </button>
+</div>
+<!-- Configuration -->
+<div class="bg-elevated border border-border rounded-xl p-6 mb-container-gap">
+<h3 class="font-label-lg text-label-lg text-text-primary uppercase tracking-wider mb-6 border-b border-border pb-2">Analysis Parameters</h3>
+<div class="grid grid-cols-2 gap-6">
+<div class="flex flex-col">
+<label class="font-label-sm text-label-sm text-text-muted uppercase mb-2">Document Type</label>
+<div class="relative focus-gold rounded border border-border bg-surface h-10 flex items-center px-3 transition-colors">
+<select class="bg-transparent border-none outline-none text-body-md text-text-primary w-full p-0 appearance-none">
+<option class="bg-surface text-text-primary">Master Service Agreement</option>
+<option class="bg-surface text-text-primary">Non-Disclosure Agreement</option>
+<option class="bg-surface text-text-primary">Employment Contract</option>
+<option class="bg-surface text-text-primary">Auto-Detect</option>
+</select>
+<span class="material-symbols-outlined text-text-muted absolute right-3 pointer-events-none" data-icon="expand_more">expand_more</span>
+</div>
+</div>
+<div class="flex flex-col">
+<label class="font-label-sm text-label-sm text-text-muted uppercase mb-2">Jurisdiction</label>
+<div class="relative focus-gold rounded border border-border bg-surface h-10 flex items-center px-3 transition-colors">
+<select class="bg-transparent border-none outline-none text-body-md text-text-primary w-full p-0 appearance-none">
+<option class="bg-surface text-text-primary">Delaware (US)</option>
+<option class="bg-surface text-text-primary">New York (US)</option>
+<option class="bg-surface text-text-primary">California (US)</option>
+<option class="bg-surface text-text-primary">United Kingdom</option>
+</select>
+<span class="material-symbols-outlined text-text-muted absolute right-3 pointer-events-none" data-icon="expand_more">expand_more</span>
+</div>
+</div>
+</div>
+<div class="mt-6 flex flex-col">
+<label class="font-label-sm text-label-sm text-text-muted uppercase mb-2">Focus Areas</label>
+<div class="flex flex-wrap gap-2">
+<span class="bg-surface-container border border-primary text-primary px-3 py-1 rounded-full font-label-sm text-label-sm cursor-pointer">Liability</span>
+<span class="bg-surface-container border border-primary text-primary px-3 py-1 rounded-full font-label-sm text-label-sm cursor-pointer">Termination</span>
+<span class="bg-surface-container border border-border-strong text-text-secondary px-3 py-1 rounded-full font-label-sm text-label-sm cursor-pointer hover:border-primary hover:text-primary transition-colors">Intellectual Property</span>
+<span class="bg-surface-container border border-border-strong text-text-secondary px-3 py-1 rounded-full font-label-sm text-label-sm cursor-pointer hover:border-primary hover:text-primary transition-colors">Data Privacy</span>
+</div>
+</div>
+</div>
+<div class="mt-auto">
+<button class="w-full bg-primary-container text-on-primary-container font-headline-lg text-headline-lg py-4 rounded hover:-translate-y-[1px] transition-transform shadow-[0_4px_14px_0_rgba(201,168,76,0.2)] flex items-center justify-center gap-2">
+<span class="material-symbols-outlined" data-icon="bolt">bolt</span>
+                    Execute Analysis
+                </button>
+</div>
+</div>
+<!-- Right Panel: Results & Breakdown -->
+<div class="w-1/2 h-full bg-surface flex flex-col overflow-hidden relative">
+<!-- Blank State for when no analysis is active. We will simulate active state for design preview -->
+<!-- Header/Export Bar -->
+<div class="h-16 border-b border-border bg-surface-container-low flex items-center justify-between px-panel-padding shrink-0">
+<div class="flex items-center gap-3">
+<span class="material-symbols-outlined text-primary" data-icon="description">description</span>
+<span class="font-label-lg text-label-lg text-text-primary">Vendor_MSA_AcmeCorp_v2.pdf</span>
+<span class="bg-status-amber/15 text-status-amber px-2 py-0.5 rounded-full font-label-sm text-label-sm border border-status-amber/30 ml-2">Medium Risk</span>
+</div>
+<div class="flex items-center gap-2">
+<button class="h-8 px-3 rounded border border-border-strong text-text-secondary font-label-lg text-label-lg hover:text-primary hover:border-primary flex items-center gap-2 transition-colors">
+<span class="material-symbols-outlined text-[16px]" data-icon="download">download</span>
+                        Export Report
+                    </button>
+</div>
+</div>
+<!-- Scrollable Content -->
+<div class="flex-grow overflow-y-auto p-container-gap custom-scrollbar">
+<!-- Risk Gauge Summary -->
+<div class="bg-elevated border border-border rounded-xl p-6 mb-container-gap border-t-2 border-t-primary">
+<div class="flex items-start justify-between">
+<div>
+<h2 class="font-headline-lg text-headline-lg text-text-primary mb-1">Contract Health Score</h2>
+<p class="font-body-md text-body-md text-text-secondary">Based on standard SaaS MSA benchmarks.</p>
+</div>
+<div class="text-right">
+<div class="font-display-lg text-display-lg text-status-amber leading-none">68<span class="text-headline-lg text-text-muted">/100</span></div>
+<div class="font-label-sm text-label-sm text-status-amber mt-1 tracking-widest uppercase">Action Required</div>
+</div>
+</div>
+<div class="mt-8 grid grid-cols-3 gap-4">
+<div class="bg-surface border border-border p-4 rounded-lg">
+<div class="font-label-sm text-label-sm text-text-muted uppercase mb-1 flex items-center gap-1">
+<span class="material-symbols-outlined text-status-low text-[14px]" data-icon="flag">flag</span> Critical Flags
+                            </div>
+<div class="font-headline-xl text-headline-xl text-text-primary">3</div>
+</div>
+<div class="bg-surface border border-border p-4 rounded-lg">
+<div class="font-label-sm text-label-sm text-text-muted uppercase mb-1 flex items-center gap-1">
+<span class="material-symbols-outlined text-status-amber text-[14px]" data-icon="warning">warning</span> Moderate Risks
+                            </div>
+<div class="font-headline-xl text-headline-xl text-text-primary">7</div>
+</div>
+<div class="bg-surface border border-border p-4 rounded-lg">
+<div class="font-label-sm text-label-sm text-text-muted uppercase mb-1 flex items-center gap-1">
+<span class="material-symbols-outlined text-primary text-[14px]" data-icon="check_circle">check_circle</span> Standard Clauses
+                            </div>
+<div class="font-headline-xl text-headline-xl text-text-primary">42</div>
+</div>
+</div>
+</div>
+<!-- Accordions -->
+<div class="space-y-4">
+<!-- Risk Flags -->
+<div class="border border-border rounded-lg bg-surface-container-low overflow-hidden">
+<button class="w-full px-6 py-4 flex items-center justify-between hover:bg-surface-container transition-colors group">
+<div class="flex items-center gap-3">
+<span class="material-symbols-outlined text-status-low" data-icon="error">error</span>
+<span class="font-headline-lg text-headline-lg text-text-primary">Risk Flags</span>
+<span class="bg-status-low/20 text-status-low font-label-sm text-label-sm px-2 py-0.5 rounded-full">3 Critical</span>
+</div>
+<span class="material-symbols-outlined text-text-muted group-hover:text-primary transition-colors" data-icon="expand_more">expand_more</span>
+</button>
+<div class="px-6 pb-6 pt-2 border-t border-border bg-surface">
+<div class="space-y-4 mt-4">
+<div class="p-4 border border-status-low/30 bg-status-low/5 rounded-lg border-l-2 border-l-status-low">
+<div class="flex justify-between items-start mb-2">
+<h4 class="font-label-lg text-label-lg text-text-primary">Uncapped Liability</h4>
+<span class="font-label-sm text-label-sm text-text-muted">Section 8.2</span>
+</div>
+<p class="font-body-md text-body-md text-text-secondary mb-3">The limitation of liability clause excludes direct damages, effectively exposing the company to uncapped risk.</p>
+<div class="bg-background p-3 rounded border border-border font-code-md text-code-md text-text-muted">
+                                        "Party A's liability shall not be limited for any breach of confidentiality or direct damages arising from..."
+                                    </div>
+</div>
+</div>
+</div>
+</div>
+<!-- Missing Clauses -->
+<div class="border border-border rounded-lg bg-surface-container-low overflow-hidden">
+<button class="w-full px-6 py-4 flex items-center justify-between hover:bg-surface-container transition-colors group">
+<div class="flex items-center gap-3">
+<span class="material-symbols-outlined text-status-amber" data-icon="find_in_page">find_in_page</span>
+<span class="font-headline-lg text-headline-lg text-text-primary">Missing Clauses</span>
+<span class="bg-surface-container border border-border text-text-secondary font-label-sm text-label-sm px-2 py-0.5 rounded-full">2 Identified</span>
+</div>
+<span class="material-symbols-outlined text-text-muted group-hover:text-primary transition-colors" data-icon="expand_more">expand_more</span>
+</button>
+</div>
+<!-- Redline Suggestions -->
+<div class="border border-border rounded-lg bg-surface-container-low overflow-hidden">
+<button class="w-full px-6 py-4 flex items-center justify-between hover:bg-surface-container transition-colors group">
+<div class="flex items-center gap-3">
+<span class="material-symbols-outlined text-primary" data-icon="edit_document">edit_document</span>
+<span class="font-headline-lg text-headline-lg text-text-primary">Redline Suggestions</span>
+</div>
+<span class="material-symbols-outlined text-text-muted group-hover:text-primary transition-colors" data-icon="expand_less">expand_less</span>
+</button>
+<div class="px-6 pb-6 pt-2 border-t border-border bg-surface">
+<div class="space-y-6 mt-4">
+<div class="border border-border rounded-lg overflow-hidden">
+<div class="bg-surface-container-high px-4 py-2 flex items-center justify-between border-b border-border">
+<span class="font-label-sm text-label-sm text-text-muted uppercase">Section 4.1: Payment Terms</span>
+<button class="text-primary font-label-sm text-label-sm hover:underline">Apply Change</button>
+</div>
+<div class="p-4 bg-editor-bg font-body-md text-body-md leading-relaxed text-[#0A0A0A]">
+                                        Invoices shall be payable within 
+                                        <span class="bg-status-low/20 text-status-critical line-through px-1 rounded mx-1">thirty (30)</span>
+<span class="bg-status-high/20 text-status-high px-1 rounded mx-1 border-b-2 border-status-high">sixty (60)</span>
+                                        days of receipt.
+                                    </div>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+</main>
+<style>
+        .custom-scrollbar::-webkit-scrollbar {
+            width: 8px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-track {
+            background: #111111; 
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+            background: #2a2a2a; 
+            border-radius: 4px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+            background: #3A3A3A; 
+        }
+    </style>
+</body></html>

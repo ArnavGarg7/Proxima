@@ -1,0 +1,374 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Template Library - PROXIMA</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=JetBrains+Mono:wght@400&amp;family=Playfair+Display:wght@700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+          darkMode: "class",
+          theme: {
+            extend: {
+              "colors": {
+                      "on-secondary-fixed-variant": "#5a4308",
+                      "status-critical": "#991B1B",
+                      "on-surface-variant": "#d0c5b2",
+                      "tertiary": "#e2c469",
+                      "on-primary-fixed-variant": "#584400",
+                      "surface": "#111111",
+                      "text-primary": "#F0EFE9",
+                      "secondary": "#e4c27d",
+                      "surface-container-high": "#2a2a2a",
+                      "inverse-surface": "#e5e2e1",
+                      "surface-tint": "#e6c364",
+                      "on-tertiary-fixed": "#231b00",
+                      "on-primary-container": "#503d00",
+                      "inverse-primary": "#755b00",
+                      "gold-mist": "rgba(201,168,76,0.08)",
+                      "secondary-container": "#5c460b",
+                      "status-low": "#DC2626",
+                      "tertiary-container": "#c5a951",
+                      "outline-variant": "#4d4637",
+                      "on-surface": "#e5e2e1",
+                      "on-secondary-fixed": "#251a00",
+                      "inverse-on-surface": "#313030",
+                      "surface-container": "#201f1f",
+                      "background": "#131313",
+                      "editor-bg": "#FAFAF8",
+                      "secondary-fixed": "#ffdf9d",
+                      "error": "#ffb4ab",
+                      "surface-container-low": "#1c1b1b",
+                      "on-tertiary-fixed-variant": "#574500",
+                      "text-muted": "#555550",
+                      "border-strong": "#3A3A3A",
+                      "text-secondary": "#888880",
+                      "on-tertiary-container": "#4e3e00",
+                      "on-error-container": "#ffdad6",
+                      "primary-fixed-dim": "#e6c364",
+                      "surface-container-highest": "#353534",
+                      "elevated": "#1A1A1A",
+                      "surface-dim": "#131313",
+                      "status-amber": "#D97706",
+                      "on-tertiary": "#3c2f00",
+                      "on-secondary-container": "#d5b470",
+                      "on-primary": "#3d2e00",
+                      "secondary-fixed-dim": "#e4c27d",
+                      "outline": "#99907e",
+                      "on-background": "#e5e2e1",
+                      "on-error": "#690005",
+                      "on-primary-fixed": "#241a00",
+                      "status-high": "#16A34A",
+                      "surface-bright": "#3a3939",
+                      "tertiary-fixed": "#ffe084",
+                      "primary": "#e6c364",
+                      "tertiary-fixed-dim": "#e2c468",
+                      "surface-variant": "#353534",
+                      "primary-fixed": "#ffe08f",
+                      "on-secondary": "#3f2e00",
+                      "border": "#2A2A2A",
+                      "error-container": "#93000a",
+                      "primary-container": "#c9a84c",
+                      "surface-container-lowest": "#0e0e0e"
+              },
+              "borderRadius": {
+                      "DEFAULT": "0.125rem",
+                      "lg": "0.25rem",
+                      "xl": "0.5rem",
+                      "full": "0.75rem"
+              },
+              "spacing": {
+                      "base": "4px",
+                      "sidebar-right": "300px",
+                      "editor-gutter": "40px",
+                      "editor-max-width": "720px",
+                      "container-gap": "24px",
+                      "sidebar-left": "280px",
+                      "panel-padding": "20px"
+              },
+              "fontFamily": {
+                      "headline-lg": ["Inter"],
+                      "headline-xl": ["Inter"],
+                      "body-lg": ["Inter"],
+                      "body-md": ["Inter"],
+                      "label-lg": ["Inter"],
+                      "code-md": ["JetBrains Mono"],
+                      "display-lg": ["Playfair Display"],
+                      "label-sm": ["Inter"],
+                      "headline-xl-mobile": ["Inter"],
+                      "display-xl": ["Playfair Display"]
+              },
+              "fontSize": {
+                      "headline-lg": ["24px", {"lineHeight": "1.3", "fontWeight": "600"}],
+                      "headline-xl": ["32px", {"lineHeight": "1.25", "fontWeight": "700"}],
+                      "body-lg": ["17px", {"lineHeight": "1.65", "fontWeight": "400"}],
+                      "body-md": ["15px", {"lineHeight": "1.6", "fontWeight": "400"}],
+                      "label-lg": ["13px", {"lineHeight": "1.4", "letterSpacing": "0.04em", "fontWeight": "500"}],
+                      "code-md": ["14px", {"lineHeight": "1.6", "fontWeight": "400"}],
+                      "display-lg": ["48px", {"lineHeight": "1.15", "letterSpacing": "-0.02em", "fontWeight": "700"}],
+                      "label-sm": ["11px", {"lineHeight": "1.4", "letterSpacing": "0.08em", "fontWeight": "500"}],
+                      "headline-xl-mobile": ["28px", {"lineHeight": "1.25", "fontWeight": "700"}],
+                      "display-xl": ["72px", {"lineHeight": "1.1", "letterSpacing": "-0.02em", "fontWeight": "700"}]
+              }
+            }
+          }
+        }
+    </script>
+<style>
+        body { background-color: #131313; color: #F0EFE9; }
+        .material-symbols-outlined { font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24; }
+        .material-symbols-outlined.fill { font-variation-settings: 'FILL' 1; }
+        
+        /* Custom Scrollbar for dark theme */
+        ::-webkit-scrollbar { width: 8px; height: 8px; }
+        ::-webkit-scrollbar-track { background: #111111; }
+        ::-webkit-scrollbar-thumb { background: #2A2A2A; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #3A3A3A; }
+    </style>
+</head>
+<body class="font-body-md text-body-md antialiased overflow-hidden flex flex-col h-screen">
+<!-- TopNavBar -->
+<nav class="bg-surface/80 backdrop-blur-xl text-primary font-body-md text-body-md fixed top-0 w-full h-[60px] z-50 border-b border-border flex items-center justify-between px-panel-padding w-full">
+<div class="flex items-center gap-8 h-full">
+<span class="font-display-lg text-headline-lg text-on-surface uppercase tracking-tighter">PROXIMA</span>
+<div class="hidden md:flex items-center h-full gap-6 ml-4">
+<a class="text-text-secondary hover:text-text-primary transition-colors hover:bg-gold-mist transition-all duration-200 px-3 py-1 rounded-DEFAULT h-full flex items-center" href="#">Dashboard</a>
+<a class="text-text-secondary hover:text-text-primary transition-colors hover:bg-gold-mist transition-all duration-200 px-3 py-1 rounded-DEFAULT h-full flex items-center" href="#">Workspace</a>
+<a class="text-text-secondary hover:text-text-primary transition-colors hover:bg-gold-mist transition-all duration-200 px-3 py-1 rounded-DEFAULT h-full flex items-center" href="#">Contract Analyzer</a>
+<a class="text-text-secondary hover:text-text-primary transition-colors hover:bg-gold-mist transition-all duration-200 px-3 py-1 rounded-DEFAULT h-full flex items-center" href="#">Clinical Notes</a>
+<a class="text-text-secondary hover:text-text-primary transition-colors hover:bg-gold-mist transition-all duration-200 px-3 py-1 rounded-DEFAULT h-full flex items-center" href="#">Code Suite</a>
+<a class="text-primary font-bold border-b-2 border-primary pb-1 h-full flex items-center px-3 hover:bg-gold-mist transition-all duration-200" href="#">Library</a>
+</div>
+</div>
+<div class="flex items-center gap-4">
+<div class="relative hidden md:block">
+<span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-text-muted text-sm">search</span>
+<input class="bg-[#111111] border-[#2A2A2A] text-text-primary text-sm rounded-DEFAULT pl-9 pr-4 py-1.5 focus:border-primary focus:ring-0 focus:shadow-[inset_0_0_8px_rgba(201,168,76,0.15)] transition-all w-64 placeholder-text-muted" placeholder="Search library..." type="text"/>
+</div>
+<button class="text-text-secondary hover:text-text-primary transition-colors p-1 rounded-DEFAULT hover:bg-surface-container">
+<span class="material-symbols-outlined" data-icon="notifications">notifications</span>
+</button>
+<button class="text-text-secondary hover:text-text-primary transition-colors p-1 rounded-DEFAULT hover:bg-surface-container">
+<span class="material-symbols-outlined" data-icon="settings">settings</span>
+</button>
+<div class="w-8 h-8 rounded-full bg-surface-container border border-border overflow-hidden ml-2 flex items-center justify-center">
+<span class="material-symbols-outlined text-text-secondary text-sm">person</span>
+</div>
+</div>
+</nav>
+<!-- Main Layout Grid -->
+<div class="flex flex-1 mt-[60px] h-[calc(100vh-60px)] overflow-hidden">
+<!-- Left Sidebar: Filters -->
+<aside class="w-sidebar-left bg-surface-container flex flex-col py-panel-padding border-r border-border flex-shrink-0 h-full overflow-y-auto">
+<div class="px-panel-padding mb-6">
+<h2 class="font-headline-lg text-headline-lg text-text-primary mb-1">Filters</h2>
+<p class="font-label-sm text-label-sm text-text-secondary">Refine template view</p>
+</div>
+<!-- Filter Categories -->
+<div class="flex flex-col gap-6 px-panel-padding">
+<!-- Domain Filter -->
+<div>
+<h3 class="font-label-lg text-label-lg text-text-primary mb-3 flex items-center gap-2">
+<span class="material-symbols-outlined text-[16px] text-text-muted">domain</span>
+                        Domain
+                    </h3>
+<div class="flex flex-col gap-2">
+<label class="flex items-center gap-3 cursor-pointer group">
+<div class="w-4 h-4 rounded-sm border border-border bg-[#111111] flex items-center justify-center group-hover:border-primary transition-colors relative">
+<span class="material-symbols-outlined text-[12px] text-[#111111] absolute">check</span>
+</div>
+<span class="font-body-md text-body-md text-text-secondary group-hover:text-text-primary transition-colors">All Domains</span>
+</label>
+<label class="flex items-center gap-3 cursor-pointer group">
+<div class="w-4 h-4 rounded-sm border border-primary bg-primary flex items-center justify-center transition-colors relative">
+<span class="material-symbols-outlined text-[12px] text-[#111111] absolute font-bold">check</span>
+</div>
+<span class="font-body-md text-body-md text-text-primary transition-colors">Legal &amp; Compliance</span>
+</label>
+<label class="flex items-center gap-3 cursor-pointer group">
+<div class="w-4 h-4 rounded-sm border border-border bg-[#111111] flex items-center justify-center group-hover:border-primary transition-colors relative">
+</div>
+<span class="font-body-md text-body-md text-text-secondary group-hover:text-text-primary transition-colors">Medical &amp; Clinical</span>
+</label>
+<label class="flex items-center gap-3 cursor-pointer group">
+<div class="w-4 h-4 rounded-sm border border-border bg-[#111111] flex items-center justify-center group-hover:border-primary transition-colors relative">
+</div>
+<span class="font-body-md text-body-md text-text-secondary group-hover:text-text-primary transition-colors">Engineering &amp; Code</span>
+</label>
+<label class="flex items-center gap-3 cursor-pointer group">
+<div class="w-4 h-4 rounded-sm border border-border bg-[#111111] flex items-center justify-center group-hover:border-primary transition-colors relative">
+</div>
+<span class="font-body-md text-body-md text-text-secondary group-hover:text-text-primary transition-colors">Financial &amp; Audit</span>
+</label>
+</div>
+</div>
+<!-- Divider -->
+<div class="h-px bg-border w-full"></div>
+<!-- Analysis Type -->
+<div>
+<h3 class="font-label-lg text-label-lg text-text-primary mb-3 flex items-center gap-2">
+<span class="material-symbols-outlined text-[16px] text-text-muted">category</span>
+                        Category
+                    </h3>
+<div class="flex flex-col gap-2">
+<label class="flex items-center gap-3 cursor-pointer group">
+<input checked="" class="w-4 h-4 bg-[#111111] border-border text-primary focus:ring-primary focus:ring-offset-[#111111]" name="category" type="radio"/>
+<span class="font-body-md text-body-md text-text-primary">Standard Audit</span>
+</label>
+<label class="flex items-center gap-3 cursor-pointer group">
+<input class="w-4 h-4 bg-[#111111] border-border text-primary focus:ring-primary focus:ring-offset-[#111111]" name="category" type="radio"/>
+<span class="font-body-md text-body-md text-text-secondary group-hover:text-text-primary">Risk Assessment</span>
+</label>
+<label class="flex items-center gap-3 cursor-pointer group">
+<input class="w-4 h-4 bg-[#111111] border-border text-primary focus:ring-primary focus:ring-offset-[#111111]" name="category" type="radio"/>
+<span class="font-body-md text-body-md text-text-secondary group-hover:text-text-primary">Compliance Checklist</span>
+</label>
+<label class="flex items-center gap-3 cursor-pointer group">
+<input class="w-4 h-4 bg-[#111111] border-border text-primary focus:ring-primary focus:ring-offset-[#111111]" name="category" type="radio"/>
+<span class="font-body-md text-body-md text-text-secondary group-hover:text-text-primary">Extraction Schema</span>
+</label>
+</div>
+</div>
+<!-- Divider -->
+<div class="h-px bg-border w-full"></div>
+<!-- Rating Filter -->
+<div>
+<h3 class="font-label-lg text-label-lg text-text-primary mb-3 flex items-center gap-2">
+<span class="material-symbols-outlined text-[16px] text-text-muted">star</span>
+                        Minimum Rating
+                    </h3>
+<div class="flex items-center justify-between bg-[#111111] border border-border rounded-lg p-1">
+<button class="px-3 py-1 font-label-sm text-label-sm text-text-secondary hover:text-text-primary rounded-DEFAULT">Any</button>
+<button class="px-3 py-1 font-label-sm text-label-sm text-text-secondary hover:text-text-primary rounded-DEFAULT">3+</button>
+<button class="px-3 py-1 font-label-sm text-label-sm bg-elevated border border-border text-primary rounded-DEFAULT shadow-sm">4+</button>
+</div>
+</div>
+</div>
+<div class="mt-auto px-panel-padding pt-6">
+<button class="w-full py-2 bg-transparent border border-border text-text-secondary font-label-lg text-label-lg rounded-DEFAULT hover:border-primary hover:text-primary transition-colors flex items-center justify-center gap-2">
+<span class="material-symbols-outlined text-[16px]">restart_alt</span>
+                    Reset Filters
+                </button>
+</div>
+</aside>
+<!-- Main Content Area: Canvas -->
+<main class="flex-1 bg-background relative overflow-y-auto">
+<!-- Page Header -->
+<div class="px-8 py-8 border-b border-border bg-[#111111]/50 backdrop-blur-sm sticky top-0 z-10 flex justify-between items-end">
+<div>
+<h1 class="font-headline-xl text-headline-xl text-text-primary mb-2">Template Library</h1>
+<p class="font-body-md text-body-md text-text-secondary max-w-2xl">Access curated, professional-grade analysis templates for standardized document extraction and auditing.</p>
+</div>
+<div class="flex items-center gap-3">
+<span class="font-label-sm text-label-sm text-text-muted">Showing 12 of 48 templates</span>
+<button class="flex items-center gap-2 bg-[#111111] border border-border text-text-primary px-3 py-1.5 rounded-DEFAULT hover:border-primary transition-colors font-label-lg text-label-lg">
+<span class="material-symbols-outlined text-[16px]">sort</span>
+                        Most Popular
+                    </button>
+</div>
+</div>
+<!-- Bento Grid Layout -->
+<div class="p-8">
+<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-container-gap">
+<!-- Template Card 1 -->
+<div class="bg-elevated border border-border rounded-[16px] p-6 flex flex-col hover:border-primary/50 transition-all group relative overflow-hidden">
+<div class="absolute top-0 left-0 w-full h-[2px] bg-primary opacity-0 group-hover:opacity-100 transition-opacity"></div>
+<div class="flex justify-between items-start mb-4">
+<div class="inline-flex items-center gap-2 bg-primary/10 border border-primary/20 rounded-full px-2 py-0.5">
+<div class="w-1.5 h-1.5 rounded-full bg-primary"></div>
+<span class="font-label-sm text-label-sm text-primary uppercase tracking-wider">Legal</span>
+</div>
+<div class="flex items-center gap-1 text-primary">
+<span class="material-symbols-outlined fill text-[14px]">star</span>
+<span class="font-label-sm text-label-sm">4.9</span>
+</div>
+</div>
+<h3 class="font-headline-lg text-headline-lg text-text-primary mb-2 group-hover:text-primary transition-colors">NDA Risk Analyzer</h3>
+<p class="font-body-md text-body-md text-text-secondary mb-6 flex-1 line-clamp-3">Comprehensive audit of non-disclosure agreements, extracting confidentiality terms, durations, and identifying non-standard liability clauses.</p>
+<div class="flex items-center justify-between mt-auto pt-4 border-t border-border/50">
+<button class="font-label-lg text-label-lg text-text-secondary hover:text-text-primary transition-colors">Preview</button>
+<button class="bg-primary text-[#111111] font-label-lg text-label-lg px-4 py-1.5 rounded-DEFAULT hover:-translate-y-px transition-transform shadow-sm flex items-center gap-2">
+                                Use Template
+                                <span class="material-symbols-outlined text-[16px]">arrow_forward</span>
+</button>
+</div>
+</div>
+<!-- Template Card 2 -->
+<div class="bg-elevated border border-border rounded-[16px] p-6 flex flex-col hover:border-primary/50 transition-all group relative overflow-hidden">
+<div class="absolute top-0 left-0 w-full h-[2px] bg-primary opacity-0 group-hover:opacity-100 transition-opacity"></div>
+<div class="flex justify-between items-start mb-4">
+<div class="inline-flex items-center gap-2 bg-[#16A34A]/10 border border-[#16A34A]/20 rounded-full px-2 py-0.5">
+<div class="w-1.5 h-1.5 rounded-full bg-[#16A34A]"></div>
+<span class="font-label-sm text-label-sm text-[#16A34A] uppercase tracking-wider">Medical</span>
+</div>
+<div class="flex items-center gap-1 text-primary">
+<span class="material-symbols-outlined fill text-[14px]">star</span>
+<span class="font-label-sm text-label-sm">4.8</span>
+</div>
+</div>
+<h3 class="font-headline-lg text-headline-lg text-text-primary mb-2 group-hover:text-primary transition-colors">Clinical Trial Protocol</h3>
+<p class="font-body-md text-body-md text-text-secondary mb-6 flex-1 line-clamp-3">Extraction schema for Phase II/III clinical trial protocols, focusing on inclusion/exclusion criteria, primary endpoints, and safety monitoring.</p>
+<div class="flex items-center justify-between mt-auto pt-4 border-t border-border/50">
+<button class="font-label-lg text-label-lg text-text-secondary hover:text-text-primary transition-colors">Preview</button>
+<button class="bg-primary text-[#111111] font-label-lg text-label-lg px-4 py-1.5 rounded-DEFAULT hover:-translate-y-px transition-transform shadow-sm flex items-center gap-2">
+                                Use Template
+                                <span class="material-symbols-outlined text-[16px]">arrow_forward</span>
+</button>
+</div>
+</div>
+<!-- Template Card 3 -->
+<div class="bg-elevated border border-border rounded-[16px] p-6 flex flex-col hover:border-primary/50 transition-all group relative overflow-hidden">
+<div class="absolute top-0 left-0 w-full h-[2px] bg-primary opacity-0 group-hover:opacity-100 transition-opacity"></div>
+<div class="flex justify-between items-start mb-4">
+<div class="inline-flex items-center gap-2 bg-primary/10 border border-primary/20 rounded-full px-2 py-0.5">
+<div class="w-1.5 h-1.5 rounded-full bg-primary"></div>
+<span class="font-label-sm text-label-sm text-primary uppercase tracking-wider">Legal</span>
+</div>
+<div class="flex items-center gap-1 text-primary">
+<span class="material-symbols-outlined fill text-[14px]">star</span>
+<span class="font-label-sm text-label-sm">4.7</span>
+</div>
+</div>
+<h3 class="font-headline-lg text-headline-lg text-text-primary mb-2 group-hover:text-primary transition-colors">Master Service Agreement</h3>
+<p class="font-body-md text-body-md text-text-secondary mb-6 flex-1 line-clamp-3">Deep-dive analysis of MSA terms, indemnification clauses, governing law, and payment schedules with predefined risk thresholds.</p>
+<div class="flex items-center justify-between mt-auto pt-4 border-t border-border/50">
+<button class="font-label-lg text-label-lg text-text-secondary hover:text-text-primary transition-colors">Preview</button>
+<button class="bg-primary text-[#111111] font-label-lg text-label-lg px-4 py-1.5 rounded-DEFAULT hover:-translate-y-px transition-transform shadow-sm flex items-center gap-2">
+                                Use Template
+                                <span class="material-symbols-outlined text-[16px]">arrow_forward</span>
+</button>
+</div>
+</div>
+<!-- Template Card 4 -->
+<div class="bg-elevated border border-border rounded-[16px] p-6 flex flex-col hover:border-primary/50 transition-all group relative overflow-hidden">
+<div class="absolute top-0 left-0 w-full h-[2px] bg-primary opacity-0 group-hover:opacity-100 transition-opacity"></div>
+<div class="flex justify-between items-start mb-4">
+<div class="inline-flex items-center gap-2 bg-[#D97706]/10 border border-[#D97706]/20 rounded-full px-2 py-0.5">
+<div class="w-1.5 h-1.5 rounded-full bg-[#D97706]"></div>
+<span class="font-label-sm text-label-sm text-[#D97706] uppercase tracking-wider">Financial</span>
+</div>
+<div class="flex items-center gap-1 text-primary">
+<span class="material-symbols-outlined fill text-[14px]">star</span>
+<span class="font-label-sm text-label-sm">4.5</span>
+</div>
+</div>
+<h3 class="font-headline-lg text-headline-lg text-text-primary mb-2 group-hover:text-primary transition-colors">Quarterly Earnings Extraction</h3>
+<p class="font-body-md text-body-md text-text-secondary mb-6 flex-1 line-clamp-3">Automated extraction of key financial metrics, forward-looking statements, and risk disclosures from 10-Q filings.</p>
+<div class="flex items-center justify-between mt-auto pt-4 border-t border-border/50">
+<button class="font-label-lg text-label-lg text-text-secondary hover:text-text-primary transition-colors">Preview</button>
+<button class="bg-primary text-[#111111] font-label-lg text-label-lg px-4 py-1.5 rounded-DEFAULT hover:-translate-y-px transition-transform shadow-sm flex items-center gap-2">
+                                Use Template
+                                <span class="material-symbols-outlined text-[16px]">arrow_forward</span>
+</button>
+</div>
+</div>
+</div>
+</div>
+</main>
+</div>
+</body></html>

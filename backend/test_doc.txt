@@ -1,0 +1,4 @@
+This is a simple text file.
+
+It has multiple paragraphs.
+   Some extra spaces here.

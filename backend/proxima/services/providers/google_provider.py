@@ -15,8 +15,8 @@ class GoogleProvider:
 
     def _get_model_id(self, requested_id: str) -> str:
         if not requested_id or "gemini" not in requested_id:
-            # Fallback for milestone 5
-            return os.getenv("DEFAULT_GEMINI_MODEL", "gemini-2.5-flash")
+            # gemini-2.0-flash-lite: 30 RPM on free tier vs 2 RPM for 2.5-flash
+            return os.getenv("DEFAULT_GEMINI_MODEL", "gemini-2.0-flash-lite")
         return requested_id
 
     def _handle_error(self, e: Exception):
@@ -26,7 +26,7 @@ class GoogleProvider:
         elif "timeout" in err_msg:
             raise HTTPException(status_code=504, detail="Provider timeout.")
         elif "unavailable" in err_msg or "503" in err_msg or "500" in err_msg:
-            raise HTTPException(status_code=502, detail="Provider unavailable.")
+            raise HTTPException(status_code=502, detail=f"Provider unavailable: {str(e)}")
         else:
             raise HTTPException(status_code=500, detail=f"Provider Error: {str(e)}")
 
@@ -35,7 +35,7 @@ class GoogleProvider:
             raise HTTPException(status_code=401, detail="Invalid API key provided. API key is missing.")
 
         model_name = self._get_model_id(model_id)
-        model = genai.GenerativeModel(model_name)
+        model = genai.GenerativeModel(model_name, system_instruction=system_prompt)
         
         try:
             # Running synchronous generate_content in a thread since genai API can be tricky, 
@@ -47,8 +47,7 @@ class GoogleProvider:
                     generation_config={
                         'temperature': temperature,
                         'max_output_tokens': max_tokens,
-                    },
-                    system_instruction=system_prompt,
+                    }
                 ),
                 timeout=30.0
             )
@@ -63,7 +62,7 @@ class GoogleProvider:
             raise HTTPException(status_code=401, detail="Invalid API key provided. API key is missing.")
 
         model_name = self._get_model_id(model_id)
-        model = genai.GenerativeModel(model_name)
+        model = genai.GenerativeModel(model_name, system_instruction=system_prompt)
         
         try:
             # We wrap the initial call in a timeout. The streaming iteration can also be timed out if needed.
@@ -74,15 +73,17 @@ class GoogleProvider:
                     generation_config={
                         'temperature': temperature,
                         'max_output_tokens': max_tokens,
-                    },
-                    system_instruction=system_prompt,
+                    }
                 ),
                 timeout=10.0
             )
             
             async for chunk in response:
-                if chunk.text:
-                    yield chunk.text
+                try:
+                    if chunk.text:
+                        yield chunk.text
+                except ValueError:
+                    pass # Safety block or empty part
         except asyncio.TimeoutError:
             raise HTTPException(status_code=504, detail="Provider timeout.")
         except Exception as e:

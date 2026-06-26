@@ -1,0 +1,434 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>PROXIMA - Domain Radar</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=JetBrains+Mono:wght@400;500&amp;family=Playfair+Display:wght@700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "on-secondary-fixed-variant": "#5a4308",
+                        "status-critical": "#991B1B",
+                        "on-surface-variant": "#d0c5b2",
+                        "tertiary": "#e2c469",
+                        "on-primary-fixed-variant": "#584400",
+                        "surface": "#111111",
+                        "text-primary": "#F0EFE9",
+                        "secondary": "#e4c27d",
+                        "surface-container-high": "#2a2a2a",
+                        "inverse-surface": "#e5e2e1",
+                        "surface-tint": "#e6c364",
+                        "on-tertiary-fixed": "#231b00",
+                        "on-primary-container": "#503d00",
+                        "inverse-primary": "#755b00",
+                        "gold-mist": "rgba(201,168,76,0.08)",
+                        "secondary-container": "#5c460b",
+                        "status-low": "#DC2626",
+                        "tertiary-container": "#c5a951",
+                        "outline-variant": "#4d4637",
+                        "on-surface": "#e5e2e1",
+                        "on-secondary-fixed": "#251a00",
+                        "inverse-on-surface": "#313030",
+                        "surface-container": "#201f1f",
+                        "background": "#131313",
+                        "editor-bg": "#FAFAF8",
+                        "secondary-fixed": "#ffdf9d",
+                        "error": "#ffb4ab",
+                        "surface-container-low": "#1c1b1b",
+                        "on-tertiary-fixed-variant": "#574500",
+                        "text-muted": "#555550",
+                        "border-strong": "#3A3A3A",
+                        "text-secondary": "#888880",
+                        "on-tertiary-container": "#4e3e00",
+                        "on-error-container": "#ffdad6",
+                        "primary-fixed-dim": "#e6c364",
+                        "surface-container-highest": "#353534",
+                        "elevated": "#1A1A1A",
+                        "surface-dim": "#131313",
+                        "status-amber": "#D97706",
+                        "on-tertiary": "#3c2f00",
+                        "on-secondary-container": "#d5b470",
+                        "on-primary": "#3d2e00",
+                        "secondary-fixed-dim": "#e4c27d",
+                        "outline": "#99907e",
+                        "on-background": "#e5e2e1",
+                        "on-error": "#690005",
+                        "on-primary-fixed": "#241a00",
+                        "status-high": "#16A34A",
+                        "surface-bright": "#3a3939",
+                        "tertiary-fixed": "#ffe084",
+                        "primary": "#e6c364",
+                        "tertiary-fixed-dim": "#e2c468",
+                        "surface-variant": "#353534",
+                        "primary-fixed": "#ffe08f",
+                        "on-secondary": "#3f2e00",
+                        "border": "#2A2A2A",
+                        "error-container": "#93000a",
+                        "primary-container": "#c9a84c",
+                        "surface-container-lowest": "#0e0e0e"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.125rem",
+                        "lg": "0.25rem",
+                        "xl": "0.5rem",
+                        "full": "0.75rem"
+                    },
+                    "spacing": {
+                        "base": "4px",
+                        "sidebar-right": "300px",
+                        "editor-gutter": "40px",
+                        "editor-max-width": "720px",
+                        "container-gap": "24px",
+                        "sidebar-left": "280px",
+                        "panel-padding": "20px"
+                    },
+                    "fontFamily": {
+                        "headline-lg": ["Inter"],
+                        "headline-xl": ["Inter"],
+                        "body-lg": ["Inter"],
+                        "body-md": ["Inter"],
+                        "label-lg": ["Inter"],
+                        "code-md": ["JetBrains Mono"],
+                        "display-lg": ["Playfair Display"],
+                        "label-sm": ["Inter"],
+                        "headline-xl-mobile": ["Inter"],
+                        "display-xl": ["Playfair Display"]
+                    },
+                    "fontSize": {
+                        "headline-lg": ["24px", { "lineHeight": "1.3", "fontWeight": "600" }],
+                        "headline-xl": ["32px", { "lineHeight": "1.25", "fontWeight": "700" }],
+                        "body-lg": ["17px", { "lineHeight": "1.65", "fontWeight": "400" }],
+                        "body-md": ["15px", { "lineHeight": "1.6", "fontWeight": "400" }],
+                        "label-lg": ["13px", { "lineHeight": "1.4", "letterSpacing": "0.04em", "fontWeight": "500" }],
+                        "code-md": ["14px", { "lineHeight": "1.6", "fontWeight": "400" }],
+                        "display-lg": ["48px", { "lineHeight": "1.15", "letterSpacing": "-0.02em", "fontWeight": "700" }],
+                        "label-sm": ["11px", { "lineHeight": "1.4", "letterSpacing": "0.08em", "fontWeight": "500" }],
+                        "headline-xl-mobile": ["28px", { "lineHeight": "1.25", "fontWeight": "700" }],
+                        "display-xl": ["72px", { "lineHeight": "1.1", "letterSpacing": "-0.02em", "fontWeight": "700" }]
+                    }
+                }
+            }
+        }
+    </script>
+<style>
+        .radar-sweep {
+            animation: sweep 4s linear infinite;
+            transform-origin: 50% 50%;
+        }
+        @keyframes sweep {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
+        .blip {
+            animation: blipFade 4s linear infinite;
+        }
+        @keyframes blipFade {
+            0% { opacity: 0; transform: scale(0.8); }
+            10% { opacity: 1; transform: scale(1.2); }
+            30% { opacity: 0.8; transform: scale(1); }
+            100% { opacity: 0; transform: scale(0.8); }
+        }
+        
+        input[type=range] {
+            -webkit-appearance: none; 
+            width: 100%; 
+            background: transparent; 
+        }
+        input[type=range]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            height: 16px;
+            width: 16px;
+            border-radius: 50%;
+            background: #e6c364;
+            cursor: pointer;
+            margin-top: -6px; 
+            border: 2px solid #111111;
+        }
+        input[type=range]::-webkit-slider-runnable-track {
+            width: 100%;
+            height: 4px;
+            cursor: pointer;
+            background: #2A2A2A;
+            border-radius: 2px;
+        }
+        input[type=range]:focus {
+            outline: none;
+        }
+        
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #2A2A2A;
+            border-radius: 3px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #3A3A3A;
+        }
+    </style>
+</head>
+<body class="bg-background text-on-surface font-body-md min-h-screen flex flex-col overflow-x-hidden selection:bg-gold-mist selection:text-primary">
+<!-- TopNavBar -->
+<nav class="fixed top-0 w-full h-[60px] z-50 bg-surface/80 backdrop-blur-xl border-b border-border flex items-center justify-between px-panel-padding">
+<div class="flex items-center gap-8">
+<div class="font-display-lg text-headline-lg text-on-surface uppercase tracking-tighter">
+                PROXIMA
+            </div>
+<div class="hidden md:flex gap-6">
+<a class="text-text-secondary hover:text-text-primary transition-colors hover:bg-gold-mist duration-200 py-1 font-body-md text-body-md" href="#">Dashboard</a>
+<a class="text-text-secondary hover:text-text-primary transition-colors hover:bg-gold-mist duration-200 py-1 font-body-md text-body-md" href="#">Workspace</a>
+<a class="text-text-secondary hover:text-text-primary transition-colors hover:bg-gold-mist duration-200 py-1 font-body-md text-body-md" href="#">Contract Analyzer</a>
+<a class="text-text-secondary hover:text-text-primary transition-colors hover:bg-gold-mist duration-200 py-1 font-body-md text-body-md" href="#">Clinical Notes</a>
+<a class="text-text-secondary hover:text-text-primary transition-colors hover:bg-gold-mist duration-200 py-1 font-body-md text-body-md" href="#">Code Suite</a>
+<a class="text-text-secondary hover:text-text-primary transition-colors hover:bg-gold-mist duration-200 py-1 font-body-md text-body-md" href="#">Library</a>
+</div>
+</div>
+<div class="flex items-center gap-4">
+<div class="relative hidden sm:block">
+<span class="material-symbols-outlined absolute right-3 top-1/2 -translate-y-1/2 text-text-muted text-sm">search</span>
+<input class="bg-surface border border-border rounded-DEFAULT py-1.5 pl-3 pr-8 font-label-sm text-label-sm text-text-primary focus:border-primary focus:ring-1 focus:ring-primary/20 transition-all w-48 placeholder:text-text-muted" placeholder="Search..." type="text"/>
+</div>
+<button class="text-text-secondary hover:text-primary transition-colors p-1 flex items-center justify-center">
+<span class="material-symbols-outlined" data-icon="notifications">notifications</span>
+</button>
+<button class="text-text-secondary hover:text-primary transition-colors p-1 flex items-center justify-center">
+<span class="material-symbols-outlined" data-icon="settings">settings</span>
+</button>
+<div class="w-8 h-8 rounded-full bg-surface-container border border-border overflow-hidden">
+<!-- User Profile Image Placeholder -->
+<div class="w-full h-full bg-gradient-to-br from-surface-container-high to-surface-container flex items-center justify-center">
+<span class="material-symbols-outlined text-text-muted text-sm" data-icon="person">person</span>
+</div>
+</div>
+</div>
+</nav>
+<div class="flex flex-1 mt-[60px] relative">
+<!-- Left SideNavBar (Intelligence Panel) -->
+<aside class="hidden lg:flex fixed left-0 top-[60px] w-sidebar-left h-[calc(100vh-60px)] bg-surface-container border-r border-border flex-col py-panel-padding z-40">
+<div class="px-5 mb-8 flex items-center gap-4">
+<div class="w-10 h-10 rounded-DEFAULT bg-surface flex items-center justify-center border border-border shadow-[0_0_10px_rgba(201,168,76,0.1)]">
+<span class="material-symbols-outlined text-primary" data-icon="memory">memory</span>
+</div>
+<div>
+<h2 class="font-headline-lg text-headline-lg text-primary text-sm leading-tight">Intelligence Panel</h2>
+<p class="font-label-sm text-label-sm text-text-muted">V4.0 Active Analysis</p>
+</div>
+</div>
+<div class="px-4 mb-6">
+<button class="w-full bg-primary text-on-primary font-label-lg text-label-lg py-2.5 rounded-DEFAULT hover:-translate-y-[1px] transition-transform duration-200 shadow-sm flex items-center justify-center gap-2">
+<span class="material-symbols-outlined text-[18px]">add</span>
+                    New Analysis
+                </button>
+</div>
+<nav class="flex-1 flex flex-col gap-1 px-3">
+<a class="flex items-center gap-3 px-3 py-2.5 rounded-DEFAULT text-text-secondary hover:bg-surface-container-high hover:text-on-surface transition-colors font-label-lg text-label-lg group" href="#">
+<span class="material-symbols-outlined text-[20px] group-hover:text-primary transition-colors" data-icon="psychology">psychology</span>
+                    Intelligence
+                </a>
+<a class="flex items-center gap-3 px-3 py-2.5 rounded-DEFAULT text-text-secondary hover:bg-surface-container-high hover:text-on-surface transition-colors font-label-lg text-label-lg group" href="#">
+<span class="material-symbols-outlined text-[20px] group-hover:text-primary transition-colors" data-icon="description">description</span>
+                    Documents
+                </a>
+<a class="flex items-center gap-3 px-3 py-2.5 rounded-DEFAULT text-text-secondary hover:bg-surface-container-high hover:text-on-surface transition-colors font-label-lg text-label-lg group" href="#">
+<span class="material-symbols-outlined text-[20px] group-hover:text-primary transition-colors" data-icon="history">history</span>
+                    History
+                </a>
+<a class="flex items-center gap-3 px-3 py-2.5 rounded-DEFAULT text-text-secondary hover:bg-surface-container-high hover:text-on-surface transition-colors font-label-lg text-label-lg group" href="#">
+<span class="material-symbols-outlined text-[20px] group-hover:text-primary transition-colors" data-icon="verified_user">verified_user</span>
+                    Confidence Audit
+                </a>
+<a class="flex items-center gap-3 px-3 py-2.5 rounded-DEFAULT bg-gold-mist text-primary border-l-2 border-primary translate-x-1 duration-200 font-label-lg text-label-lg" href="#">
+<span class="material-symbols-outlined text-[20px]" data-icon="radar">radar</span>
+                    Domain Radar
+                </a>
+<a class="flex items-center gap-3 px-3 py-2.5 rounded-DEFAULT text-text-secondary hover:bg-surface-container-high hover:text-on-surface transition-colors font-label-lg text-label-lg group" href="#">
+<span class="material-symbols-outlined text-[20px] group-hover:text-primary transition-colors" data-icon="folder_copy">folder_copy</span>
+                    Templates
+                </a>
+</nav>
+<div class="mt-auto px-3 border-t border-border pt-4">
+<a class="flex items-center gap-3 px-3 py-2 rounded-DEFAULT text-text-secondary hover:bg-surface-container-high hover:text-on-surface transition-colors font-label-sm text-label-sm" href="#">
+<span class="material-symbols-outlined text-[16px]" data-icon="help">help</span>
+                    Support
+                </a>
+<a class="flex items-center gap-3 px-3 py-2 rounded-DEFAULT text-text-secondary hover:bg-surface-container-high hover:text-on-surface transition-colors font-label-sm text-label-sm" href="#">
+<span class="material-symbols-outlined text-[16px]" data-icon="archive">archive</span>
+                    Archive
+                </a>
+</div>
+</aside>
+<!-- Main Content Area -->
+<main class="flex-1 lg:ml-sidebar-left flex flex-col items-center py-12 px-4 sm:px-8 lg:px-12 w-full max-w-[1200px] mx-auto min-h-[calc(100vh-60px)]">
+<!-- Header section -->
+<div class="w-full text-center mb-12">
+<h1 class="font-headline-xl text-headline-xl text-on-surface mb-2 tracking-tight">Domain Radar Analysis</h1>
+<p class="font-body-lg text-body-lg text-text-secondary max-w-2xl mx-auto">Real-time multispectral scan of document context, identifying cross-domain dependencies and risk concentrations.</p>
+</div>
+<div class="w-full grid grid-cols-1 xl:grid-cols-12 gap-container-gap">
+<!-- Center Radar Visualization -->
+<div class="xl:col-span-6 xl:col-start-4 flex flex-col items-center justify-center p-8 bg-elevated border border-border rounded-xl relative overflow-hidden group">
+<!-- Corner accents -->
+<div class="absolute top-0 left-0 w-8 h-8 border-t border-l border-border group-hover:border-primary/50 transition-colors m-4"></div>
+<div class="absolute top-0 right-0 w-8 h-8 border-t border-r border-border group-hover:border-primary/50 transition-colors m-4"></div>
+<div class="absolute bottom-0 left-0 w-8 h-8 border-b border-l border-border group-hover:border-primary/50 transition-colors m-4"></div>
+<div class="absolute bottom-0 right-0 w-8 h-8 border-b border-r border-border group-hover:border-primary/50 transition-colors m-4"></div>
+<div class="font-label-sm text-label-sm text-text-muted absolute top-6 left-1/2 -translate-x-1/2 tracking-widest uppercase">Live Scan Active</div>
+<div class="relative w-[340px] h-[340px] mt-4 flex items-center justify-center">
+<!-- Background Grid -->
+<svg class="absolute inset-0 w-full h-full opacity-20" viewbox="0 0 400 400">
+<!-- Concentric circles -->
+<circle cx="200" cy="200" fill="none" r="160" stroke="#F0EFE9" stroke-dasharray="2 4" stroke-width="1"></circle>
+<circle cx="200" cy="200" fill="none" r="120" stroke="#F0EFE9" stroke-dasharray="2 4" stroke-width="1"></circle>
+<circle cx="200" cy="200" fill="none" r="80" stroke="#F0EFE9" stroke-dasharray="2 4" stroke-width="1"></circle>
+<circle cx="200" cy="200" fill="none" r="40" stroke="#F0EFE9" stroke-dasharray="2 4" stroke-width="1"></circle>
+<!-- Axes -->
+<line opacity="0.5" stroke="#F0EFE9" stroke-width="1" x1="200" x2="200" y1="40" y2="360"></line>
+<line opacity="0.5" stroke="#F0EFE9" stroke-width="1" x1="40" x2="360" y1="200" y2="200"></line>
+<line opacity="0.5" stroke="#F0EFE9" stroke-width="1" x1="86" x2="314" y1="86" y2="314"></line>
+<line opacity="0.5" stroke="#F0EFE9" stroke-width="1" x1="86" x2="314" y1="314" y2="86"></line>
+</svg>
+<!-- Data Polygon -->
+<svg class="absolute inset-0 w-full h-full" viewbox="0 0 400 400">
+<polygon fill="rgba(201,168,76,0.15)" points="200,60 280,120 320,200 250,300 200,260 140,280 90,200 130,110" stroke="#e6c364" stroke-width="2"></polygon>
+<!-- Data points -->
+<circle cx="200" cy="60" fill="#e6c364" r="4"></circle>
+<circle cx="280" cy="120" fill="#e6c364" r="4"></circle>
+<circle cx="320" cy="200" fill="#e6c364" r="4"></circle>
+<circle cx="250" cy="300" fill="#e6c364" r="4"></circle>
+<circle cx="200" cy="260" fill="#e6c364" r="4"></circle>
+<circle cx="140" cy="280" fill="#e6c364" r="4"></circle>
+<circle cx="90" cy="200" fill="#e6c364" r="4"></circle>
+<circle cx="130" cy="110" fill="#e6c364" r="4"></circle>
+</svg>
+<!-- Sweep Animation -->
+<div class="absolute inset-0 rounded-full w-full h-full overflow-hidden" style="clip-path: circle(40% at 50% 50%);">
+<div class="radar-sweep absolute top-1/2 left-1/2 w-1/2 h-1/2 origin-top-left bg-gradient-to-br from-primary/40 to-transparent"></div>
+<div class="radar-sweep absolute top-1/2 left-1/2 w-[160px] h-[1px] origin-left bg-primary shadow-[0_0_10px_#e6c364]"></div>
+</div>
+<!-- Blips -->
+<div class="absolute w-2 h-2 rounded-full bg-status-critical blip" style="top: 25%; left: 65%; animation-delay: 0.5s;"></div>
+<div class="absolute w-2 h-2 rounded-full bg-primary blip" style="top: 60%; left: 30%; animation-delay: 1.2s;"></div>
+<div class="absolute w-2 h-2 rounded-full bg-[#3b82f6] blip" style="top: 40%; left: 75%; animation-delay: 2.8s;"></div>
+<!-- Axis Labels -->
+<div class="absolute -top-6 left-1/2 -translate-x-1/2 font-code-md text-label-sm text-text-muted">LEGAL</div>
+<div class="absolute -bottom-6 left-1/2 -translate-x-1/2 font-code-md text-label-sm text-text-muted">ETHICS</div>
+<div class="absolute top-1/2 -left-12 -translate-y-1/2 font-code-md text-label-sm text-text-muted">MEDICAL</div>
+<div class="absolute top-1/2 -right-8 -translate-y-1/2 font-code-md text-label-sm text-text-muted">CODE</div>
+</div>
+</div>
+</div>
+<!-- Bottom Section: Domain Controls & Outputs -->
+<div class="w-full mt-12 grid grid-cols-1 lg:grid-cols-12 gap-container-gap">
+<!-- Manual Blend Sliders -->
+<div class="lg:col-span-3 bg-surface border border-border p-5 rounded-lg flex flex-col gap-6">
+<div>
+<h3 class="font-label-lg text-label-lg text-on-surface mb-1">Blend Vectors</h3>
+<p class="font-label-sm text-label-sm text-text-muted mb-4">Adjust domain weighting for output generation.</p>
+</div>
+<div class="flex flex-col gap-5">
+<!-- Slider Item -->
+<div class="flex flex-col gap-2">
+<div class="flex justify-between items-center">
+<span class="font-code-md text-label-sm text-text-secondary">LEGAL_WEIGHT</span>
+<span class="font-code-md text-label-sm text-primary">0.85</span>
+</div>
+<input class="w-full" max="100" min="0" type="range" value="85"/>
+</div>
+<!-- Slider Item -->
+<div class="flex flex-col gap-2">
+<div class="flex justify-between items-center">
+<span class="font-code-md text-label-sm text-text-secondary">MED_WEIGHT</span>
+<span class="font-code-md text-label-sm text-primary">0.42</span>
+</div>
+<input class="w-full" max="100" min="0" type="range" value="42"/>
+</div>
+<!-- Slider Item -->
+<div class="flex flex-col gap-2">
+<div class="flex justify-between items-center">
+<span class="font-code-md text-label-sm text-text-secondary">CODE_WEIGHT</span>
+<span class="font-code-md text-label-sm text-primary">0.68</span>
+</div>
+<input class="w-full" max="100" min="0" type="range" value="68"/>
+</div>
+</div>
+<div class="mt-auto pt-4 border-t border-border">
+<button class="w-full py-2 bg-transparent border border-border text-text-primary font-label-lg rounded-DEFAULT hover:border-border-strong hover:text-on-surface transition-colors flex justify-center items-center gap-2">
+<span class="material-symbols-outlined text-sm">sync</span> Recalculate
+                        </button>
+</div>
+</div>
+<!-- Parallel Output Panels -->
+<div class="lg:col-span-9 grid grid-cols-1 md:grid-cols-3 gap-4">
+<!-- Legal Output -->
+<div class="bg-surface-container border border-border rounded-lg flex flex-col h-[320px] relative overflow-hidden">
+<div class="h-1 w-full bg-[#10b981] absolute top-0 left-0"></div> <!-- Domain Color Accent -->
+<div class="p-4 border-b border-border bg-surface-container-low flex justify-between items-center">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-text-secondary text-sm">gavel</span>
+<span class="font-label-lg text-label-sm text-on-surface">Legal Interpretation</span>
+</div>
+<div class="px-2 py-0.5 rounded-full bg-[#10b981]/15 text-[#10b981] font-code-md text-[10px] border border-[#10b981]/30">HIGH CONF</div>
+</div>
+<div class="p-4 flex-1 overflow-y-auto font-body-md text-body-md text-text-secondary leading-relaxed">
+<p class="mb-3">The liability clause in section 4.2 indicates a significant <span class="text-on-surface bg-primary/10 border-b border-primary/30 px-1">indemnification risk</span> regarding third-party data processing.</p>
+<p>Compliance with GDPR Article 28 is conditionally met, but requires addendum B for full ratification.</p>
+</div>
+</div>
+<!-- Medical Output -->
+<div class="bg-surface-container border border-border rounded-lg flex flex-col h-[320px] relative overflow-hidden">
+<div class="h-1 w-full bg-[#ef4444] absolute top-0 left-0"></div> <!-- Domain Color Accent -->
+<div class="p-4 border-b border-border bg-surface-container-low flex justify-between items-center">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-text-secondary text-sm">local_hospital</span>
+<span class="font-label-lg text-label-sm text-on-surface">Clinical Implications</span>
+</div>
+<div class="px-2 py-0.5 rounded-full bg-status-amber/15 text-status-amber font-code-md text-[10px] border border-status-amber/30">MED CONF</div>
+</div>
+<div class="p-4 flex-1 overflow-y-auto font-body-md text-body-md text-text-secondary leading-relaxed">
+<p class="mb-3">Protocol adjustments noted in paragraph 2 contradict standard contraindication guidelines for <span class="text-error bg-error/10 px-1">Compound A</span> interaction.</p>
+<p>Recommend review by the ethics board regarding patient cohort selection criteria.</p>
+</div>
+</div>
+<!-- Code Output -->
+<div class="bg-surface-container border border-border rounded-lg flex flex-col h-[320px] relative overflow-hidden">
+<div class="h-1 w-full bg-[#3b82f6] absolute top-0 left-0"></div> <!-- Domain Color Accent -->
+<div class="p-4 border-b border-border bg-surface-container-low flex justify-between items-center">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-text-secondary text-sm">terminal</span>
+<span class="font-label-lg text-label-sm text-on-surface">Technical Implementation</span>
+</div>
+<div class="px-2 py-0.5 rounded-full bg-[#3b82f6]/15 text-[#3b82f6] font-code-md text-[10px] border border-[#3b82f6]/30">ACTIVE EXTR</div>
+</div>
+<div class="p-4 flex-1 overflow-y-auto font-code-md text-code-md text-text-muted leading-relaxed text-sm">
+<pre class="text-[11px] leading-tight"><span class="text-[#3b82f6]">const</span> analyzeRisk = (data) =&gt; {
+  <span class="text-status-amber">// High latency noted here</span>
+  <span class="text-[#10b981]">return</span> data.filter(node =&gt; 
+    node.threshold &gt; <span class="text-primary">0.85</span>
+  ).map(node =&gt; {
+    <span class="text-[#10b981]">return</span> formatAudit(node);
+  });
+};
+</pre>
+<div class="mt-4 pt-4 border-t border-border/50 font-body-md text-label-sm text-text-secondary">
+                                Detected 3 potential API contract violations based on the current schema version.
+                            </div>
+</div>
+</div>
+</div>
+</div>
+</main>
+</div>
+</body></html>

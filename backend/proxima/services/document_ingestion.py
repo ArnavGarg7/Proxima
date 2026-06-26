@@ -40,17 +40,21 @@ class DocumentIngestionService:
             document.status = "processing"
             await self.db.commit()
 
-            # Extract text
+            # Extract text using unified parsers
             ext = os.path.splitext(file_path_or_uri)[1].lower()
-            text = ""
-            if ext == ".pdf":
-                with fitz.open(file_path_or_uri) as doc:
-                    for page in doc:
-                        text += page.get_text() + "\n"
-            elif ext in [".txt", ".md", ".markdown"]:
-                with open(file_path_or_uri, "r", encoding="utf-8", errors="replace") as f:
-                    text = f.read()
-            else:
+            
+            from proxima.services.parsers import ParserFactory, UnsupportedFormatError
+            
+            try:
+                parser = ParserFactory.get_parser(ext)
+                text = parser.extract_text(file_path_or_uri)
+            except UnsupportedFormatError:
+                document.status = "failed"
+                await self.db.commit()
+                return False
+            except Exception as e:
+                import traceback
+                traceback.print_exc()
                 document.status = "failed"
                 await self.db.commit()
                 return False
@@ -59,7 +63,7 @@ class DocumentIngestionService:
             text = self._extract_text_fallback(text, file_path_or_uri)
 
             if not text.strip():
-                document.status = "failed"
+                document.status = "no_extractable_text"
                 await self.db.commit()
                 return False
 

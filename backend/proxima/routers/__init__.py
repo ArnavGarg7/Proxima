@@ -8,3 +8,4 @@ from .exports_router import router as exports_router
 from .sessions_router import router as sessions_router
 from .jobs_router import router as jobs_router
 from .admin_router import router as admin_router
+from .dashboard_router import router as dashboard_router

@@ -14,8 +14,49 @@ security_service = UploadSecurityService()
 storage_service = StorageService()
 
 @router.get("/")
-async def list_documents():
-    return {"status": "stub"}
+async def list_documents(
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    from sqlalchemy import select, desc
+    
+    docs_query = select(Document).where(Document.user_id == current_user.user_id).order_by(desc(Document.created_at))
+    docs_result = await db.execute(docs_query)
+    docs = docs_result.scalars().all()
+    
+    return [
+        {
+            "id": str(doc.document_id),
+            "title": doc.title,
+            "status": doc.status,
+            "domain": doc.domain,
+            "created_at": doc.created_at.isoformat() if doc.created_at else None
+        }
+        for doc in docs
+    ]
+
+@router.get("/{document_id}")
+async def get_document(
+    document_id: str,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    try:
+        doc_uuid = uuid.UUID(document_id)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid document ID format")
+        
+    doc = await db.get(Document, doc_uuid)
+    if not doc or doc.user_id != current_user.user_id:
+        raise HTTPException(status_code=404, detail="Document not found")
+        
+    return {
+        "document_id": str(doc.document_id),
+        "title": doc.title,
+        "status": doc.status,
+        "domain": doc.domain,
+        "created_at": doc.created_at.isoformat()
+    }
 
 @router.post("/upload")
 async def upload_document(

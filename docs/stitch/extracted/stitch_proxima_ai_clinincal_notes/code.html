@@ -1,0 +1,370 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>PROXIMA - Clinical Notes</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=Playfair+Display:wght@700&amp;family=JetBrains+Mono:wght@400&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "on-secondary-fixed-variant": "#5a4308",
+                        "status-critical": "#991B1B",
+                        "on-surface-variant": "#d0c5b2",
+                        "tertiary": "#e2c469",
+                        "on-primary-fixed-variant": "#584400",
+                        "surface": "#111111",
+                        "text-primary": "#F0EFE9",
+                        "secondary": "#e4c27d",
+                        "surface-container-high": "#2a2a2a",
+                        "inverse-surface": "#e5e2e1",
+                        "surface-tint": "#e6c364",
+                        "on-tertiary-fixed": "#231b00",
+                        "on-primary-container": "#503d00",
+                        "inverse-primary": "#755b00",
+                        "gold-mist": "rgba(201,168,76,0.08)",
+                        "secondary-container": "#5c460b",
+                        "status-low": "#DC2626",
+                        "tertiary-container": "#c5a951",
+                        "outline-variant": "#4d4637",
+                        "on-surface": "#e5e2e1",
+                        "on-secondary-fixed": "#251a00",
+                        "inverse-on-surface": "#313030",
+                        "surface-container": "#201f1f",
+                        "background": "#131313",
+                        "editor-bg": "#FAFAF8",
+                        "secondary-fixed": "#ffdf9d",
+                        "error": "#ffb4ab",
+                        "surface-container-low": "#1c1b1b",
+                        "on-tertiary-fixed-variant": "#574500",
+                        "text-muted": "#555550",
+                        "border-strong": "#3A3A3A",
+                        "text-secondary": "#888880",
+                        "on-tertiary-container": "#4e3e00",
+                        "on-error-container": "#ffdad6",
+                        "primary-fixed-dim": "#e6c364",
+                        "surface-container-highest": "#353534",
+                        "elevated": "#1A1A1A",
+                        "surface-dim": "#131313",
+                        "status-amber": "#D97706",
+                        "on-tertiary": "#3c2f00",
+                        "on-secondary-container": "#d5b470",
+                        "on-primary": "#3d2e00",
+                        "secondary-fixed-dim": "#e4c27d",
+                        "outline": "#99907e",
+                        "on-background": "#e5e2e1",
+                        "on-error": "#690005",
+                        "on-primary-fixed": "#241a00",
+                        "status-high": "#16A34A",
+                        "surface-bright": "#3a3939",
+                        "tertiary-fixed": "#ffe084",
+                        "primary": "#e6c364",
+                        "tertiary-fixed-dim": "#e2c468",
+                        "surface-variant": "#353534",
+                        "primary-fixed": "#ffe08f",
+                        "on-secondary": "#3f2e00",
+                        "border": "#2A2A2A",
+                        "error-container": "#93000a",
+                        "primary-container": "#c9a84c",
+                        "surface-container-lowest": "#0e0e0e"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.125rem",
+                        "lg": "0.25rem",
+                        "xl": "0.5rem",
+                        "full": "0.75rem"
+                    },
+                    "spacing": {
+                        "base": "4px",
+                        "sidebar-right": "300px",
+                        "editor-gutter": "40px",
+                        "editor-max-width": "720px",
+                        "container-gap": "24px",
+                        "sidebar-left": "280px",
+                        "panel-padding": "20px"
+                    },
+                    "fontFamily": {
+                        "headline-lg": ["Inter"],
+                        "headline-xl": ["Inter"],
+                        "body-lg": ["Inter"],
+                        "body-md": ["Inter"],
+                        "label-lg": ["Inter"],
+                        "code-md": ["JetBrains Mono"],
+                        "display-lg": ["Playfair Display"],
+                        "label-sm": ["Inter"],
+                        "headline-xl-mobile": ["Inter"],
+                        "display-xl": ["Playfair Display"]
+                    },
+                    "fontSize": {
+                        "headline-lg": ["24px", { "lineHeight": "1.3", "fontWeight": "600" }],
+                        "headline-xl": ["32px", { "lineHeight": "1.25", "fontWeight": "700" }],
+                        "body-lg": ["17px", { "lineHeight": "1.65", "fontWeight": "400" }],
+                        "body-md": ["15px", { "lineHeight": "1.6", "fontWeight": "400" }],
+                        "label-lg": ["13px", { "lineHeight": "1.4", "letterSpacing": "0.04em", "fontWeight": "500" }],
+                        "code-md": ["14px", { "lineHeight": "1.6", "fontWeight": "400" }],
+                        "display-lg": ["48px", { "lineHeight": "1.15", "letterSpacing": "-0.02em", "fontWeight": "700" }],
+                        "label-sm": ["11px", { "lineHeight": "1.4", "letterSpacing": "0.08em", "fontWeight": "500" }],
+                        "headline-xl-mobile": ["28px", { "lineHeight": "1.25", "fontWeight": "700" }],
+                        "display-xl": ["72px", { "lineHeight": "1.1", "letterSpacing": "-0.02em", "fontWeight": "700" }]
+                    }
+                }
+            }
+        }
+    </script>
+<style>
+        body { background-color: theme('colors.background'); color: theme('colors.text-primary'); }
+        .gold-glow { box-shadow: inset 0 0 0 1px theme('colors.primary'), 0 0 12px rgba(201, 168, 76, 0.15); }
+        .glass-panel { background: rgba(17, 17, 17, 0.8); backdrop-filter: blur(12px); }
+        
+        /* Custom Scrollbar for dark theme */
+        ::-webkit-scrollbar { width: 8px; height: 8px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: theme('colors.surface-bright'); border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: theme('colors.outline'); }
+    </style>
+</head>
+<body class="font-body-md text-body-md min-h-screen flex flex-col antialiased selection:bg-primary-container selection:text-on-primary-container">
+<!-- TopNavBar -->
+<nav class="fixed top-0 w-full h-[60px] z-50 bg-surface/80 backdrop-blur-xl border-b border-border flex items-center justify-between px-panel-padding transition-all">
+<div class="flex items-center gap-8 h-full">
+<span class="font-display-lg text-headline-lg text-on-surface uppercase tracking-tighter">PROXIMA</span>
+<!-- Desktop Navigation -->
+<div class="hidden md:flex h-full items-center gap-6">
+<a class="h-full flex items-center text-text-secondary hover:text-text-primary transition-colors hover:bg-gold-mist duration-200 px-2" href="#">Dashboard</a>
+<a class="h-full flex items-center text-text-secondary hover:text-text-primary transition-colors hover:bg-gold-mist duration-200 px-2" href="#">Workspace</a>
+<a class="h-full flex items-center text-text-secondary hover:text-text-primary transition-colors hover:bg-gold-mist duration-200 px-2" href="#">Contract Analyzer</a>
+<a class="h-full flex items-center text-primary font-bold border-b-2 border-primary pb-1 px-2" href="#">Clinical Notes</a>
+<a class="h-full flex items-center text-text-secondary hover:text-text-primary transition-colors hover:bg-gold-mist duration-200 px-2" href="#">Code Suite</a>
+<a class="h-full flex items-center text-text-secondary hover:text-text-primary transition-colors hover:bg-gold-mist duration-200 px-2" href="#">Library</a>
+</div>
+</div>
+<div class="flex items-center gap-4">
+<!-- Search Bar -->
+<div class="relative hidden sm:block">
+<span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-text-muted text-[18px]">search</span>
+<input class="bg-surface-container border border-border rounded-full py-1.5 pl-9 pr-4 text-sm focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary/20 transition-all w-64 placeholder-text-muted" placeholder="Search knowledge base..." type="text"/>
+</div>
+<button class="p-2 text-text-secondary hover:text-primary transition-colors rounded-full hover:bg-surface-container">
+<span class="material-symbols-outlined text-[20px]">notifications</span>
+</button>
+<button class="p-2 text-text-secondary hover:text-primary transition-colors rounded-full hover:bg-surface-container">
+<span class="material-symbols-outlined text-[20px]">settings</span>
+</button>
+<img alt="User profile" class="w-8 h-8 rounded-full border border-border ml-2" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCUXvHeOXeopJjxvLr_fhK6TJCnkYAzhzNsx4bI5FWzpRW8EQE0n1q5aT-oR7Lr4DsDtjAFAS9qE3hfgeNGKHkszo70F9Ozcbc9BTN-PL3foBo29_itnmNCcQjE9pYJD1oUBPPlDsTHtD9B_02opN2KAuxLM5nm6gZF79grW8t_T7IBrIQq1a-Nj-jDXPnezucXFxpmadZIVf4zzTt_1TScPz70ZGLRzjWdVPE6Zghb3vSxYtEGpLBYwoItXG8xaV9hwhPUho0H4fw"/>
+</div>
+</nav>
+<!-- Main Layout Grid -->
+<main class="flex-1 mt-[60px] flex h-[calc(100vh-60px)] overflow-hidden">
+<!-- Left Panel: Context & Input (Dynamic Content Area, not the SideNavBar shell) -->
+<div class="w-1/2 lg:w-[600px] border-r border-border bg-surface-container-lowest flex flex-col h-full overflow-y-auto">
+<!-- Note Type Tabs -->
+<div class="px-6 pt-6 pb-2 border-b border-border bg-surface sticky top-0 z-10">
+<h1 class="font-headline-lg text-headline-lg mb-4 text-text-primary">Clinical Generation</h1>
+<div class="flex gap-1 bg-surface-container p-1 rounded-lg border border-border w-fit">
+<button class="px-4 py-1.5 rounded-md bg-surface border border-border text-primary font-label-lg text-label-lg shadow-sm">SOAP</button>
+<button class="px-4 py-1.5 rounded-md text-text-secondary hover:text-text-primary font-label-lg text-label-lg transition-colors">H&amp;P</button>
+<button class="px-4 py-1.5 rounded-md text-text-secondary hover:text-text-primary font-label-lg text-label-lg transition-colors">Consult</button>
+<button class="px-4 py-1.5 rounded-md text-text-secondary hover:text-text-primary font-label-lg text-label-lg transition-colors">Discharge</button>
+</div>
+</div>
+<div class="p-6 flex flex-col gap-6 flex-1">
+<!-- Patient Context Section -->
+<section class="space-y-4">
+<div class="flex items-center justify-between">
+<h2 class="font-label-sm text-label-sm text-text-muted uppercase tracking-wider">Patient Context</h2>
+<button class="text-primary hover:text-primary-fixed-dim font-label-sm text-label-sm flex items-center gap-1 transition-colors">
+<span class="material-symbols-outlined text-[14px]">refresh</span>
+                            Sync EMR
+                        </button>
+</div>
+<div class="grid grid-cols-2 gap-4">
+<div class="space-y-1">
+<label class="font-label-sm text-label-sm text-text-muted">Patient ID / Name</label>
+<div class="relative">
+<span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-text-muted text-[16px]">person</span>
+<input class="w-full bg-surface border border-border rounded-lg py-2 pl-9 pr-3 text-text-primary focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary/20 transition-all text-sm font-code-md" type="text" value="Doe, John (DOB: 04/12/1980)"/>
+</div>
+</div>
+<div class="space-y-1">
+<label class="font-label-sm text-label-sm text-text-muted">Encounter Type</label>
+<select class="w-full bg-surface border border-border rounded-lg py-2 px-3 text-text-primary focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary/20 transition-all text-sm appearance-none">
+<option>Follow-up Visit</option>
+<option>New Patient</option>
+<option>Telehealth</option>
+</select>
+</div>
+</div>
+<div class="flex gap-2 flex-wrap">
+<span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-status-low/10 border border-status-low/20 text-status-low font-label-sm text-label-sm">
+<span class="w-1.5 h-1.5 rounded-full bg-status-low"></span>
+                            Hypertension
+                        </span>
+<span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-status-amber/10 border border-status-amber/20 text-status-amber font-label-sm text-label-sm">
+<span class="w-1.5 h-1.5 rounded-full bg-status-amber"></span>
+                            Type 2 Diabetes
+                        </span>
+</div>
+</section>
+<hr class="border-border"/>
+<!-- Observation Input Section -->
+<section class="flex flex-col flex-1 space-y-4">
+<div class="flex items-center justify-between">
+<h2 class="font-label-sm text-label-sm text-text-muted uppercase tracking-wider">Raw Observations &amp; Transcript</h2>
+<div class="flex items-center gap-2">
+<button class="w-8 h-8 rounded-full bg-surface border border-border flex items-center justify-center text-text-secondary hover:text-status-low transition-colors group relative" title="Start Recording">
+<span class="material-symbols-outlined text-[16px] group-hover:hidden">mic</span>
+<span class="material-symbols-outlined text-[16px] hidden group-hover:block" style="font-variation-settings: 'FILL' 1;">mic</span>
+</button>
+<button class="w-8 h-8 rounded-full bg-surface border border-border flex items-center justify-center text-text-secondary hover:text-primary transition-colors" title="Upload Audio">
+<span class="material-symbols-outlined text-[16px]">upload_file</span>
+</button>
+</div>
+</div>
+<div class="relative flex-1 min-h-[300px]">
+<textarea class="w-full h-full bg-surface border border-border rounded-lg p-4 text-text-primary focus:outline-none focus:border-primary focus:ring-0 gold-glow transition-all resize-none font-body-md text-body-md leading-relaxed placeholder-text-muted/50" placeholder="Enter rough notes, paste transcript, or use dictation...
+
+Patient reports feeling 'more tired than usual' over the last 2 weeks. BP today 145/90. Complains of occasional dizzy spells when standing up too fast. Denies chest pain.
+
+Current meds: Metformin 500mg BID, Lisinopril 10mg daily.
+Needs refill on Lisinopril.">Patient reports feeling 'more tired than usual' over the last 2 weeks. BP today 145/90. Complains of occasional dizzy spells when standing up too fast. Denies chest pain. 
+
+Current meds: Metformin 500mg BID, Lisinopril 10mg daily. 
+Needs refill on Lisinopril.
+
+Exam: Heart RRR, no murmurs. Lungs CTA bilaterally. No peripheral edema.</textarea>
+</div>
+<button class="w-full bg-primary text-on-primary font-label-lg text-label-lg py-3 rounded-lg hover:-translate-y-[1px] hover:shadow-[0_4px_12px_rgba(201,168,76,0.2)] transition-all flex items-center justify-center gap-2 mt-4 font-semibold">
+<span class="material-symbols-outlined text-[18px]">magic_button</span>
+                        Synthesize Structured Note
+                    </button>
+</section>
+</div>
+</div>
+<!-- Right Panel: Structured Output -->
+<div class="flex-1 bg-surface flex flex-col h-full overflow-hidden relative">
+<!-- Output Header -->
+<div class="px-8 py-6 border-b border-border bg-surface/95 backdrop-blur-sm sticky top-0 z-10 flex items-center justify-between">
+<div>
+<h2 class="font-headline-lg text-headline-lg text-text-primary flex items-center gap-3">
+                        Generated Note
+                        <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-mono bg-status-high/10 text-status-high border border-status-high/20">
+<span class="material-symbols-outlined text-[12px]">check_circle</span> Ready
+                        </span>
+</h2>
+<p class="font-label-sm text-label-sm text-text-muted mt-1">SOAP Format • Model V4-Med</p>
+</div>
+<div class="flex items-center gap-3">
+<button class="px-3 py-1.5 rounded-md border border-border text-text-secondary hover:text-text-primary hover:bg-surface-container transition-colors font-label-lg text-label-lg flex items-center gap-2">
+<span class="material-symbols-outlined text-[16px]">history</span> Versions
+                    </button>
+<button class="px-3 py-1.5 rounded-md bg-elevated border border-border text-primary hover:bg-surface-container-high transition-colors font-label-lg text-label-lg flex items-center gap-2">
+<span class="material-symbols-outlined text-[16px]">edit_note</span> Edit
+                    </button>
+</div>
+</div>
+<!-- Structured Note Canvas -->
+<div class="flex-1 overflow-y-auto p-8 custom-scrollbar">
+<div class="max-w-editor-max-width mx-auto bg-editor-bg rounded-xl shadow-sm border border-border overflow-hidden text-[#0A0A0A]">
+<!-- Note Header -->
+<div class="p-6 border-b border-border bg-[#F5F5F3] flex justify-between items-start">
+<div>
+<h3 class="font-headline-lg text-headline-lg font-bold text-[#0A0A0A]">Follow-up Visit Note</h3>
+<p class="font-code-md text-code-md text-[#555] mt-1">Date: Oct 24, 2023 | Author: Dr. S. Admin</p>
+</div>
+<div class="text-right font-code-md text-code-md text-[#555]">
+<p>Pt: Doe, John</p>
+<p>DOB: 04/12/1980</p>
+</div>
+</div>
+<!-- Note Body Sections -->
+<div class="p-8 space-y-8 font-body-lg text-body-lg leading-relaxed">
+<!-- Subjective -->
+<div class="relative group">
+<!-- Left Gutter controls -->
+<div class="absolute -left-12 top-0 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col gap-1">
+<button class="p-1 rounded text-text-muted hover:text-primary hover:bg-surface"><span class="material-symbols-outlined text-[16px]">autorenew</span></button>
+</div>
+<div class="flex items-center gap-3 mb-2">
+<h4 class="font-bold text-[#0A0A0A] uppercase tracking-wider text-sm">Subjective</h4>
+<span class="inline-flex items-center px-2 py-0.5 rounded-full bg-status-high/15 text-status-high text-[10px] font-bold border border-status-high/30" title="High Confidence Extraction">98%</span>
+</div>
+<p class="text-[#222]">
+                                Patient is a 43-year-old male presenting for a follow-up visit. He reports feeling <span class="bg-primary/20 border-b-2 border-primary/50 cursor-pointer" title="Extracted from: 'more tired than usual'">fatigued</span> over the past two weeks. He also notes occasional <span class="bg-status-amber/20 border-b-2 border-status-amber/50 cursor-pointer" title="Extracted from: 'dizzy spells when standing'">orthostatic dizziness</span>. Denies any chest pain, shortness of breath, or palpitations.
+                            </p>
+</div>
+<!-- Objective -->
+<div class="relative group">
+<div class="absolute -left-12 top-0 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col gap-1">
+<button class="p-1 rounded text-text-muted hover:text-primary hover:bg-surface"><span class="material-symbols-outlined text-[16px]">autorenew</span></button>
+</div>
+<div class="flex items-center gap-3 mb-2">
+<h4 class="font-bold text-[#0A0A0A] uppercase tracking-wider text-sm">Objective</h4>
+<span class="inline-flex items-center px-2 py-0.5 rounded-full bg-status-high/15 text-status-high text-[10px] font-bold border border-status-high/30">99%</span>
+</div>
+<ul class="list-disc pl-5 text-[#222] space-y-1">
+<li><strong>Vitals:</strong> BP <span class="font-mono bg-status-low/10 text-status-low px-1 rounded">145/90</span></li>
+<li><strong>CV:</strong> Regular rate and rhythm, no murmurs, rubs, or gallops.</li>
+<li><strong>Resp:</strong> Clear to auscultation bilaterally.</li>
+<li><strong>Ext:</strong> No peripheral edema.</li>
+</ul>
+</div>
+<!-- Assessment -->
+<div class="relative group">
+<div class="absolute -left-12 top-0 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col gap-1">
+<button class="p-1 rounded text-text-muted hover:text-primary hover:bg-surface"><span class="material-symbols-outlined text-[16px]">autorenew</span></button>
+</div>
+<div class="flex items-center gap-3 mb-2">
+<h4 class="font-bold text-[#0A0A0A] uppercase tracking-wider text-sm">Assessment</h4>
+<span class="inline-flex items-center px-2 py-0.5 rounded-full bg-status-amber/15 text-status-amber text-[10px] font-bold border border-status-amber/30" title="Review suggested based on implicit data">85%</span>
+</div>
+<ol class="list-decimal pl-5 text-[#222] space-y-2">
+<li><strong>Essential Hypertension:</strong> Suboptimally controlled today (145/90). Symptoms of orthostatic dizziness may be related to medication or dehydration.</li>
+<li><strong>Type 2 Diabetes Mellitus:</strong> Stable on current regimen.</li>
+<li><strong>Fatigue:</strong> Unspecified etiology, possibly related to poor sleep, lifestyle, or underlying conditions requiring further workup if persistent.</li>
+</ol>
+</div>
+<!-- Plan -->
+<div class="relative group">
+<div class="absolute -left-12 top-0 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col gap-1">
+<button class="p-1 rounded text-text-muted hover:text-primary hover:bg-surface"><span class="material-symbols-outlined text-[16px]">autorenew</span></button>
+</div>
+<div class="flex items-center gap-3 mb-2">
+<h4 class="font-bold text-[#0A0A0A] uppercase tracking-wider text-sm">Plan</h4>
+<span class="inline-flex items-center px-2 py-0.5 rounded-full bg-status-high/15 text-status-high text-[10px] font-bold border border-status-high/30">95%</span>
+</div>
+<ul class="list-disc pl-5 text-[#222] space-y-2">
+<li>Refill Lisinopril 10mg daily. Sent to pharmacy.</li>
+<li>Continue Metformin 500mg BID.</li>
+<li>Patient advised to monitor home blood pressures and stay hydrated to mitigate dizziness.</li>
+<li>Schedule follow-up in 4 weeks. If fatigue worsens or dizziness becomes severe, patient advised to return sooner.</li>
+</ul>
+</div>
+</div>
+</div>
+<!-- Bottom padding for scroll -->
+<div class="h-24"></div>
+</div>
+<!-- Export Action Row -->
+<div class="absolute bottom-0 w-full bg-surface/90 backdrop-blur-md border-t border-border p-4 flex items-center justify-between z-20">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-status-high text-[20px]">verified_user</span>
+<span class="font-label-sm text-label-sm text-text-secondary">PHI Scrubbed &amp; Verified</span>
+</div>
+<div class="flex items-center gap-3">
+<button class="px-4 py-2 rounded-lg border border-border bg-surface text-text-primary hover:bg-surface-container transition-colors font-label-lg text-label-lg flex items-center gap-2">
+<span class="material-symbols-outlined text-[18px]">content_copy</span> Copy to Clipboard
+                    </button>
+<button class="px-4 py-2 rounded-lg bg-surface-container-highest border border-border text-primary hover:border-primary transition-colors font-label-lg text-label-lg flex items-center gap-2">
+<span class="material-symbols-outlined text-[18px]">send</span> Push to EHR
+                    </button>
+</div>
+</div>
+</div>
+</main>
+</body></html>

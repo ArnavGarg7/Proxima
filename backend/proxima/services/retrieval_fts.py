@@ -21,7 +21,7 @@ class FTSRetrievalService:
         """
         self.db_session = db_session
 
-    async def search(self, query: str, document_id: Optional[str] = None, limit: int = 5) -> List[Dict[str, Any]]:
+    async def search(self, query: str, document_id: str, limit: int = 5) -> List[Dict[str, Any]]:
         """
         Searches DocumentChunks using PostgreSQL tsvector and plainto_tsquery.
         """
@@ -34,15 +34,12 @@ class FTSRetrievalService:
             SELECT chunk_id, document_id, chunk_index, content,
                    ts_rank(to_tsvector('english', content), plainto_tsquery('english', :query)) AS rank
             FROM document_chunks
-            WHERE to_tsvector('english', content) @@ plainto_tsquery('english', :query)
+            WHERE document_id = :doc_id
+              AND to_tsvector('english', content) @@ plainto_tsquery('english', :query)
         """
         
-        params = {"query": query, "limit": limit}
+        params = {"query": query, "doc_id": document_id, "limit": limit}
         
-        if document_id:
-            sql += " AND document_id = :doc_id"
-            params["doc_id"] = document_id
-            
         sql += " ORDER BY rank DESC LIMIT :limit"
         
         result = await self.db_session.execute(text(sql), params)

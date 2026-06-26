@@ -1,0 +1,109 @@
+SERVICE AGREEMENT CONTRACT
+
+This Agreement is entered into as of a date to be confirmed between the parties involved, by and between:
+
+SERVICE PROVIDER: NovaTech Solutions Pvt. Ltd., a company incorporated under applicable laws, having its registered office at an address on record ("Provider")
+
+CLIENT: Meridian Retail Group, having its principal place of business at a location as communicated ("Client")
+
+Collectively referred to as "the Parties."
+
+---
+
+1. SCOPE OF SERVICES
+
+The Provider agrees to deliver certain technology services to the Client as may be discussed and mutually agreed upon from time to time. The exact nature, deliverables, and timelines of these services shall be determined at the Provider's discretion unless otherwise communicated in writing.
+
+Additional services may be added to this Agreement at any point, and the Client shall be liable to pay for such services at rates determined solely by the Provider at the time of rendering.
+
+---
+
+2. TERM AND TERMINATION
+
+This Agreement shall commence on the date of signing and shall continue for an indefinite period unless terminated. Either party may terminate this Agreement by providing notice, however the notice period has not been specified herein and shall be mutually agreed at the time of termination.
+
+The Provider reserves the right to terminate this Agreement immediately and without prior notice for reasons it deems sufficient, including but not limited to non-payment, breach, or any other cause at its sole discretion.
+
+Upon termination, the Client shall not be entitled to refunds of any fees paid, regardless of the circumstances of termination.
+
+---
+
+3. PAYMENT TERMS
+
+The Client agrees to pay the Provider for services rendered. Fees shall be as per invoices raised by the Provider from time to time, which may be revised without advance notice to the Client.
+
+Payment shall be due within a reasonable time of receiving the invoice. Late payment penalties may apply at rates to be determined by the Provider.
+
+All payments shall be made in the currency preferred by the Provider. The Client shall bear all transaction charges, taxes, and levies applicable.
+
+The Provider may suspend services in the event of delayed payment without liability to the Client for any losses or damages arising from such suspension.
+
+---
+
+4. INTELLECTUAL PROPERTY
+
+All work product, deliverables, and intellectual property created by the Provider in connection with this Agreement shall remain the exclusive property of the Provider unless explicitly stated otherwise in a separate written instrument signed by both parties.
+
+The Client is granted a non-exclusive, non-transferable, revocable license to use the deliverables solely for internal business purposes. The scope and duration of this license shall be at the Provider's discretion.
+
+The Client shall not reverse-engineer, copy, distribute, sublicense, or modify any deliverables without prior written consent of the Provider.
+
+---
+
+5. CONFIDENTIALITY
+
+Each party acknowledges that it may receive confidential information from the other. The receiving party agrees to maintain confidentiality of such information, however no specific duration of this obligation has been outlined in this Agreement.
+
+Exceptions to confidentiality obligations are not defined herein and shall be interpreted broadly in favor of the disclosing party.
+
+The Provider may reference the Client's name and engagement in its marketing materials without requiring separate consent.
+
+---
+
+6. LIABILITY AND INDEMNIFICATION
+
+The Provider's total liability under this Agreement, for any reason, shall not exceed the amount paid by the Client in the one month immediately preceding the event giving rise to the claim.
+
+The Client agrees to indemnify, defend, and hold harmless the Provider, its directors, employees, and affiliates from and against any and all claims, damages, losses, costs, and expenses, including legal fees, arising out of or related to the Client's use of the services.
+
+The Provider shall not be liable for any indirect, incidental, consequential, special, or punitive damages, including loss of profits or data, even if advised of the possibility of such damages.
+
+---
+
+7. DISPUTE RESOLUTION
+
+Any disputes arising out of or in connection with this Agreement shall first be attempted to be resolved amicably. If no resolution is reached, disputes shall be referred to arbitration, however the seat, rules, and governing body of arbitration are not specified herein.
+
+The governing law applicable to this Agreement has not been stated and shall be determined at the time a dispute arises.
+
+---
+
+8. FORCE MAJEURE
+
+The Provider shall not be liable for delays or failures in performance resulting from circumstances beyond its control, including but not limited to acts of God, government actions, pandemics, or internet outages. The duration for which Force Majeure may suspend obligations is not capped.
+
+---
+
+9. GENERAL PROVISIONS
+
+9.1 This Agreement may be amended at any time by the Provider, and continued use of services shall constitute acceptance of such amendments.
+
+9.2 If any provision of this Agreement is found to be unenforceable, the remaining provisions shall continue in full force.
+
+9.3 This Agreement constitutes the entire agreement between the parties, however several commercial terms including SLAs, data protection obligations, and pricing schedules are not included and are intended to be added at a later date.
+
+9.4 Notices under this Agreement may be delivered via email to addresses on file, however no provision for acknowledgment or confirmation of receipt is included.
+
+9.5 The Client waives its right to participate in any class action or consolidated claim against the Provider.
+
+---
+
+SIGNATURES
+
+Provider Authorized Signatory: ______________________ Date: __________
+Name & Designation: (to be filled)
+
+Client Authorized Signatory: ______________________ Date: __________
+Name & Designation: (to be filled)
+
+Note: This document has not been reviewed by legal counsel and is presented as a draft for discussion purposes only.

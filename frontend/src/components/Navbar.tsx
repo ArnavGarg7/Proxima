@@ -9,10 +9,16 @@ export default function Navbar() {
       <div className="flex items-center space-x-6">
         <Link to="/workspace" className="font-display text-gold-primary text-xl font-semibold">Proxima</Link>
         <nav className="flex items-center space-x-4">
+          <Link to="/dashboard" className="text-text-secondary hover:text-text-primary text-sm transition-colors">Dashboard</Link>
           <Link to="/workspace" className="text-text-secondary hover:text-text-primary text-sm transition-colors">Workspace</Link>
+          <Link to="/templates" className="text-text-secondary hover:text-text-primary text-sm transition-colors">Templates</Link>
           <Link to="/analyze" className="text-text-secondary hover:text-text-primary text-sm transition-colors">Analyze</Link>
+          <Link to="/legal" className="text-text-secondary hover:text-text-primary text-sm transition-colors">Legal</Link>
           <Link to="/clinical" className="text-text-secondary hover:text-text-primary text-sm transition-colors">Clinical</Link>
           <Link to="/compare" className="text-text-secondary hover:text-text-primary text-sm transition-colors">Compare</Link>
+          <Link to="/audit" className="text-text-secondary hover:text-text-primary text-sm transition-colors">Audit</Link>
+          <Link to="/code" className="text-text-secondary hover:text-text-primary text-sm transition-colors">Code Suite</Link>
+          <Link to="/radar" className="text-text-secondary hover:text-text-primary text-sm transition-colors">Domain Radar</Link>
         </nav>
       </div>
       <div className="flex items-center space-x-4">

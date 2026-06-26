@@ -1,0 +1,469 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Workspace - Editorial Precision</title>
+<!-- Fonts & Icons -->
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=JetBrains+Mono:wght@400&amp;family=Playfair+Display:wght@700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<!-- Tailwind CSS -->
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<!-- Tailwind Configuration -->
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            "colors": {
+                    "on-secondary-fixed-variant": "#5a4308",
+                    "status-critical": "#991B1B",
+                    "on-surface-variant": "#d0c5b2",
+                    "tertiary": "#e2c469",
+                    "on-primary-fixed-variant": "#584400",
+                    "surface": "#111111",
+                    "text-primary": "#F0EFE9",
+                    "secondary": "#e4c27d",
+                    "surface-container-high": "#2a2a2a",
+                    "inverse-surface": "#e5e2e1",
+                    "surface-tint": "#e6c364",
+                    "on-tertiary-fixed": "#231b00",
+                    "on-primary-container": "#503d00",
+                    "inverse-primary": "#755b00",
+                    "gold-mist": "rgba(201,168,76,0.08)",
+                    "secondary-container": "#5c460b",
+                    "status-low": "#DC2626",
+                    "tertiary-container": "#c5a951",
+                    "outline-variant": "#4d4637",
+                    "on-surface": "#e5e2e1",
+                    "on-secondary-fixed": "#251a00",
+                    "inverse-on-surface": "#313030",
+                    "surface-container": "#201f1f",
+                    "background": "#131313",
+                    "editor-bg": "#FAFAF8",
+                    "secondary-fixed": "#ffdf9d",
+                    "error": "#ffb4ab",
+                    "surface-container-low": "#1c1b1b",
+                    "on-tertiary-fixed-variant": "#574500",
+                    "text-muted": "#555550",
+                    "border-strong": "#3A3A3A",
+                    "text-secondary": "#888880",
+                    "on-tertiary-container": "#4e3e00",
+                    "on-error-container": "#ffdad6",
+                    "primary-fixed-dim": "#e6c364",
+                    "surface-container-highest": "#353534",
+                    "elevated": "#1A1A1A",
+                    "surface-dim": "#131313",
+                    "status-amber": "#D97706",
+                    "on-tertiary": "#3c2f00",
+                    "on-secondary-container": "#d5b470",
+                    "on-primary": "#3d2e00",
+                    "secondary-fixed-dim": "#e4c27d",
+                    "outline": "#99907e",
+                    "on-background": "#e5e2e1",
+                    "on-error": "#690005",
+                    "on-primary-fixed": "#241a00",
+                    "status-high": "#16A34A",
+                    "surface-bright": "#3a3939",
+                    "tertiary-fixed": "#ffe084",
+                    "primary": "#e6c364",
+                    "tertiary-fixed-dim": "#e2c468",
+                    "surface-variant": "#353534",
+                    "primary-fixed": "#ffe08f",
+                    "on-secondary": "#3f2e00",
+                    "border": "#2A2A2A",
+                    "error-container": "#93000a",
+                    "primary-container": "#c9a84c",
+                    "surface-container-lowest": "#0e0e0e"
+            },
+            "borderRadius": {
+                    "DEFAULT": "0.125rem",
+                    "lg": "0.25rem",
+                    "xl": "0.5rem",
+                    "full": "0.75rem"
+            },
+            "spacing": {
+                    "base": "4px",
+                    "sidebar-right": "300px",
+                    "editor-gutter": "40px",
+                    "editor-max-width": "720px",
+                    "container-gap": "24px",
+                    "sidebar-left": "280px",
+                    "panel-padding": "20px"
+            },
+            "fontFamily": {
+                    "headline-lg": ["Inter"],
+                    "headline-xl": ["Inter"],
+                    "body-lg": ["Inter"],
+                    "body-md": ["Inter"],
+                    "label-lg": ["Inter"],
+                    "code-md": ["JetBrains Mono"],
+                    "display-lg": ["Playfair Display"],
+                    "label-sm": ["Inter"],
+                    "headline-xl-mobile": ["Inter"],
+                    "display-xl": ["Playfair Display"]
+            },
+            "fontSize": {
+                    "headline-lg": ["24px", {"lineHeight": "1.3", "fontWeight": "600"}],
+                    "headline-xl": ["32px", {"lineHeight": "1.25", "fontWeight": "700"}],
+                    "body-lg": ["17px", {"lineHeight": "1.65", "fontWeight": "400"}],
+                    "body-md": ["15px", {"lineHeight": "1.6", "fontWeight": "400"}],
+                    "label-lg": ["13px", {"lineHeight": "1.4", "letterSpacing": "0.04em", "fontWeight": "500"}],
+                    "code-md": ["14px", {"lineHeight": "1.6", "fontWeight": "400"}],
+                    "display-lg": ["48px", {"lineHeight": "1.15", "letterSpacing": "-0.02em", "fontWeight": "700"}],
+                    "label-sm": ["11px", {"lineHeight": "1.4", "letterSpacing": "0.08em", "fontWeight": "500"}],
+                    "headline-xl-mobile": ["28px", {"lineHeight": "1.25", "fontWeight": "700"}],
+                    "display-xl": ["72px", {"lineHeight": "1.1", "letterSpacing": "-0.02em", "fontWeight": "700"}]
+            }
+          }
+        }
+      }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 300, 'GRAD' 0, 'opsz' 24;
+        }
+        .material-symbols-outlined.fill {
+            font-variation-settings: 'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        
+        /* Editor Scoped Styles */
+        .editor-content p { margin-bottom: 1.5em; }
+        .heatmap-high { background-color: rgba(22, 163, 74, 0.2); border-bottom: 2px solid #16A34A; }
+        .heatmap-amber { background-color: rgba(217, 119, 6, 0.2); border-bottom: 2px solid #D97706; }
+        .heatmap-critical { background-color: rgba(153, 27, 27, 0.2); border-bottom: 2px solid #991B1B; }
+        
+        /* Blinking Cursor */
+        .gold-cursor {
+            display: inline-block;
+            width: 2px;
+            height: 1em;
+            background-color: #e6c364; /* primary */
+            animation: blink 1s step-end infinite;
+            vertical-align: middle;
+            margin-left: 2px;
+        }
+        @keyframes blink { 50% { opacity: 0; } }
+
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar { width: 8px; height: 8px; }
+        ::-webkit-scrollbar-track { background: #131313; }
+        ::-webkit-scrollbar-thumb { background: #2A2A2A; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #3A3A3A; }
+    </style>
+</head>
+<body class="bg-background text-on-background min-h-screen pt-[60px] flex font-body-md selection:bg-primary/30">
+<!-- TopNavBar -->
+<nav class="fixed top-0 w-full h-[60px] z-50 bg-surface/80 backdrop-blur-xl border-b border-border flex items-center justify-between px-panel-padding">
+<div class="flex items-center gap-8">
+<span class="font-display-lg text-headline-lg text-on-surface uppercase tracking-tighter">PROXIMA</span>
+<div class="hidden md:flex gap-6 items-center pt-1">
+<a class="font-body-md text-body-md text-text-secondary hover:text-text-primary transition-colors hover:bg-gold-mist px-2 py-1 rounded" href="#">Dashboard</a>
+<a class="font-body-md text-body-md text-primary font-bold border-b-2 border-primary pb-1 px-2 py-1" href="#">Workspace</a>
+<a class="font-body-md text-body-md text-text-secondary hover:text-text-primary transition-colors hover:bg-gold-mist px-2 py-1 rounded" href="#">Contract Analyzer</a>
+<a class="font-body-md text-body-md text-text-secondary hover:text-text-primary transition-colors hover:bg-gold-mist px-2 py-1 rounded" href="#">Clinical Notes</a>
+<a class="font-body-md text-body-md text-text-secondary hover:text-text-primary transition-colors hover:bg-gold-mist px-2 py-1 rounded" href="#">Code Suite</a>
+<a class="font-body-md text-body-md text-text-secondary hover:text-text-primary transition-colors hover:bg-gold-mist px-2 py-1 rounded" href="#">Library</a>
+</div>
+</div>
+<div class="flex items-center gap-4">
+<div class="relative hidden lg:block">
+<span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-text-muted text-[18px]">search</span>
+<input class="bg-surface-container-high border border-border rounded-full py-1.5 pl-10 pr-4 text-body-md text-text-primary focus:border-primary focus:ring-1 focus:ring-primary/50 outline-none w-64 transition-all placeholder:text-text-muted" placeholder="Search across documents..." type="text"/>
+</div>
+<button class="text-text-secondary hover:text-primary transition-colors">
+<span class="material-symbols-outlined">notifications</span>
+</button>
+<button class="text-text-secondary hover:text-primary transition-colors">
+<span class="material-symbols-outlined">settings</span>
+</button>
+<div class="w-8 h-8 rounded-full bg-surface-container-high border border-border flex items-center justify-center overflow-hidden ml-2">
+<span class="material-symbols-outlined text-text-secondary">person</span>
+</div>
+</div>
+</nav>
+<!-- Left SideNavBar: Intelligence Panel -->
+<aside class="fixed left-0 top-[60px] w-sidebar-left h-[calc(100vh-60px)] bg-surface-container border-r border-border flex flex-col z-40 overflow-y-auto">
+<!-- Header -->
+<div class="p-panel-padding border-b border-border flex items-center gap-3">
+<div class="w-10 h-10 rounded bg-elevated border border-border flex items-center justify-center text-primary">
+<span class="material-symbols-outlined fill">psychology</span>
+</div>
+<div>
+<h2 class="font-headline-lg text-body-lg text-primary leading-tight">Intelligence Panel</h2>
+<p class="font-label-sm text-label-sm text-text-secondary">V4.0 Active Analysis</p>
+</div>
+</div>
+<!-- Action -->
+<div class="p-4">
+<button class="w-full bg-primary text-on-primary font-label-lg text-label-lg py-2 rounded shadow-[0_1px_2px_rgba(0,0,0,0.5)] hover:-translate-y-[1px] transition-transform flex items-center justify-center gap-2">
+<span class="material-symbols-outlined text-[18px]">add</span>
+                New Analysis
+            </button>
+</div>
+<!-- Navigation -->
+<nav class="flex-1 overflow-y-auto px-2 py-2 flex flex-col gap-1">
+<a class="flex items-center gap-3 px-3 py-2 bg-gold-mist text-primary border-l-2 border-primary font-label-lg text-label-lg rounded-r" href="#">
+<span class="material-symbols-outlined text-[20px]">psychology</span>
+                Intelligence
+            </a>
+<a class="flex items-center gap-3 px-3 py-2 text-text-secondary hover:bg-surface-container-high hover:text-on-surface font-label-lg text-label-lg rounded border-l-2 border-transparent transition-colors" href="#">
+<span class="material-symbols-outlined text-[20px]">description</span>
+                Documents
+            </a>
+<a class="flex items-center gap-3 px-3 py-2 text-text-secondary hover:bg-surface-container-high hover:text-on-surface font-label-lg text-label-lg rounded border-l-2 border-transparent transition-colors" href="#">
+<span class="material-symbols-outlined text-[20px]">history</span>
+                History
+            </a>
+<a class="flex items-center gap-3 px-3 py-2 text-text-secondary hover:bg-surface-container-high hover:text-on-surface font-label-lg text-label-lg rounded border-l-2 border-transparent transition-colors" href="#">
+<span class="material-symbols-outlined text-[20px]">verified_user</span>
+                Confidence Audit
+            </a>
+<a class="flex items-center gap-3 px-3 py-2 text-text-secondary hover:bg-surface-container-high hover:text-on-surface font-label-lg text-label-lg rounded border-l-2 border-transparent transition-colors" href="#">
+<span class="material-symbols-outlined text-[20px]">radar</span>
+                Domain Radar
+            </a>
+<a class="flex items-center gap-3 px-3 py-2 text-text-secondary hover:bg-surface-container-high hover:text-on-surface font-label-lg text-label-lg rounded border-l-2 border-transparent transition-colors" href="#">
+<span class="material-symbols-outlined text-[20px]">folder_copy</span>
+                Templates
+            </a>
+<!-- Divider -->
+<div class="h-px bg-border my-4 mx-2"></div>
+<!-- Custom Content Requested in Prompt for Left Panel -->
+<div class="px-3 pb-6 flex flex-col gap-6">
+<!-- Upload Zone -->
+<div class="border border-dashed border-border-strong rounded-lg p-4 flex flex-col items-center justify-center text-center bg-surface-container-low hover:border-primary/50 transition-colors cursor-pointer group">
+<span class="material-symbols-outlined text-text-muted group-hover:text-primary transition-colors text-3xl mb-2">cloud_upload</span>
+<span class="font-label-sm text-label-sm text-text-primary block mb-1">Drag &amp; Drop Files</span>
+<span class="font-label-sm text-[10px] text-text-muted">PDF, DOCX, TXT up to 50MB</span>
+</div>
+<!-- Domain Radar Visual -->
+<div>
+<h3 class="font-label-sm text-label-sm text-text-muted uppercase tracking-wider mb-3">Domain Focus</h3>
+<div class="relative w-full aspect-square flex items-center justify-center bg-surface rounded-lg border border-border">
+<!-- Simplified CSS Radar representation for brevity and robustness -->
+<div class="absolute inset-4 rounded-full border border-border-strong flex items-center justify-center">
+<div class="absolute inset-4 rounded-full border border-border-strong flex items-center justify-center">
+<div class="absolute inset-4 rounded-full border border-border-strong"></div>
+</div>
+</div>
+<!-- Radar Sweep Arm -->
+<div class="absolute inset-0 origin-center animate-[spin_4s_linear_infinite]" style="clip-path: polygon(50% 50%, 100% 0, 100% 50%); background: conic-gradient(from 0deg at 50% 50%, transparent 0deg, rgba(230,195,100,0.2) 60deg, rgba(230,195,100,0.8) 90deg, transparent 90deg);"></div>
+<!-- Crosshairs -->
+<div class="absolute w-full h-px bg-border-strong"></div>
+<div class="absolute h-full w-px bg-border-strong"></div>
+<!-- Points -->
+<div class="absolute w-2 h-2 bg-primary rounded-full" style="top: 20%; left: 30%;"></div>
+<div class="absolute w-2 h-2 bg-status-amber rounded-full" style="top: 70%; left: 60%;"></div>
+<div class="absolute w-2 h-2 bg-status-high rounded-full" style="top: 40%; left: 80%;"></div>
+</div>
+</div>
+<!-- Settings Sliders -->
+<div>
+<h3 class="font-label-sm text-label-sm text-text-muted uppercase tracking-wider mb-3">Analysis Parameters</h3>
+<div class="space-y-4">
+<div>
+<div class="flex justify-between font-label-sm text-label-sm text-text-primary mb-1">
+<span>Strictness</span>
+<span class="text-primary">85%</span>
+</div>
+<input class="w-full h-1 bg-surface-container-high rounded-lg appearance-none cursor-pointer accent-primary" max="100" min="0" type="range" value="85"/>
+</div>
+<div>
+<div class="flex justify-between font-label-sm text-label-sm text-text-primary mb-1">
+<span>Context Window</span>
+<span class="text-text-muted">Max</span>
+</div>
+<input class="w-full h-1 bg-surface-container-high rounded-lg appearance-none cursor-pointer accent-primary" max="100" min="0" type="range" value="100"/>
+</div>
+</div>
+</div>
+</div>
+</nav>
+<!-- Footer -->
+<div class="p-2 border-t border-border mt-auto">
+<a class="flex items-center gap-3 px-3 py-2 text-text-secondary hover:bg-surface-container-highest transition-colors font-label-sm text-label-sm rounded" href="#">
+<span class="material-symbols-outlined text-[18px]">help</span>
+                Support
+            </a>
+<a class="flex items-center gap-3 px-3 py-2 text-text-secondary hover:bg-surface-container-highest transition-colors font-label-sm text-label-sm rounded" href="#">
+<span class="material-symbols-outlined text-[18px]">archive</span>
+                Archive
+            </a>
+</div>
+</aside>
+<!-- Center Document Canvas -->
+<main class="flex-1 ml-sidebar-left mr-sidebar-right bg-background p-container-gap flex justify-center h-[calc(100vh-60px)] overflow-y-auto relative">
+<!-- Editor Container -->
+<article class="w-full max-w-editor-max-width bg-editor-bg rounded-lg shadow-2xl flex flex-col border border-border-strong relative overflow-hidden min-h-[800px] mb-20">
+<!-- Document Header -->
+<header class="bg-white border-b border-[#E5E5E5] px-8 py-4 flex justify-between items-center sticky top-0 z-10 text-surface-container-lowest">
+<div>
+<h1 class="font-headline-lg text-headline-lg">Master Services Agreement v4</h1>
+<p class="font-label-sm text-label-sm text-[#666666] mt-1">Last edited 2 hours ago by Proxima AI</p>
+</div>
+<div class="flex gap-2">
+<span class="px-2 py-1 bg-[#16A34A]/10 text-[#16A34A] rounded-full font-label-sm text-[10px] border border-[#16A34A]/20 flex items-center gap-1">
+<span class="w-1.5 h-1.5 rounded-full bg-[#16A34A]"></span> Analyzed
+                    </span>
+<span class="px-2 py-1 bg-[#2563EB]/10 text-[#2563EB] rounded-full font-label-sm text-[10px] border border-[#2563EB]/20">
+                        Legal Domain
+                    </span>
+</div>
+</header>
+<div class="flex flex-1">
+<!-- Line Numbers / Gutter -->
+<aside class="w-editor-gutter border-r border-[#E5E5E5] bg-[#F5F5F3] flex flex-col items-center py-6 font-code-md text-code-md text-[#A3A3A3] select-none">
+<span>1</span>
+<span>2</span>
+<span>3</span>
+<span class="text-status-amber font-bold relative group cursor-pointer">
+                        4
+                        <div class="absolute left-full ml-2 top-1/2 -translate-y-1/2 w-2 h-2 rounded-full bg-status-amber hidden group-hover:block"></div>
+</span>
+<span>5</span>
+<span>6</span>
+<span>7</span>
+<span class="text-status-high font-bold">8</span>
+<span>9</span>
+<span>10</span>
+</aside>
+<!-- Document Content -->
+<section class="flex-1 p-8 pr-12 font-body-lg text-body-lg text-surface-container-lowest editor-content leading-relaxed">
+<p>This Master Services Agreement ("Agreement") is entered into as of the Effective Date by and between the parties listed below. The purpose of this Agreement is to establish the terms and conditions under which the Provider will deliver professional services to the Client.</p>
+<p>Subject to the terms and conditions set forth herein, the Provider agrees to perform the services described in the attached Statements of Work (each, a "SOW"). <span class="heatmap-high cursor-help" title="Standard provision verified. Confidence: 98%">The Client agrees to pay the fees set forth in each SOW in accordance with the payment terms specified therein.</span></p>
+<p>Either party may terminate this Agreement for cause upon thirty (30) days prior written notice of a material breach by the other party, if such breach remains uncured at the expiration of such period. <span class="heatmap-amber relative" title="Risk identified: Ambiguous jurisdiction clause.">However, in the event of termination, the Client shall remain liable for all fees incurred up to the date of termination, <span class="gold-cursor"></span>including any non-refundable deposits or commitments made by the Provider in anticipation of delivering the services.</span></p>
+<p>All intellectual property rights arising out of or related to the services performed under this Agreement shall belong exclusively to the Client, provided that the Provider retains all rights in its pre-existing intellectual property used to perform the services.</p>
+</section>
+</div>
+</article>
+<!-- Floating Action Bar (Center Bottom) -->
+<div class="fixed bottom-8 left-1/2 -translate-x-1/2 z-50 flex items-center gap-1 bg-elevated/90 backdrop-blur-md border border-border p-1.5 rounded-full shadow-lg">
+<button class="w-10 h-10 rounded-full flex items-center justify-center text-text-secondary hover:text-primary hover:bg-surface-container-high transition-colors" title="Add Comment">
+<span class="material-symbols-outlined text-[20px]">add_comment</span>
+</button>
+<button class="w-10 h-10 rounded-full flex items-center justify-center text-text-secondary hover:text-primary hover:bg-surface-container-high transition-colors" title="Suggest Edit">
+<span class="material-symbols-outlined text-[20px]">edit_note</span>
+</button>
+<div class="w-px h-6 bg-border mx-1"></div>
+<button class="px-4 py-2 bg-primary text-on-primary rounded-full font-label-lg text-label-lg flex items-center gap-2 shadow-sm hover:shadow-md transition-shadow">
+<span class="material-symbols-outlined text-[18px]">auto_awesome</span>
+                Run Audit
+            </button>
+</div>
+</main>
+<!-- Right SideNavBar: Analysis Panel -->
+<aside class="fixed right-0 top-[60px] w-sidebar-right h-[calc(100vh-60px)] bg-surface-container-low border-l border-border flex flex-col z-40 overflow-y-auto">
+<!-- Header -->
+<div class="p-panel-padding border-b border-border">
+<div class="flex items-center gap-3 mb-2">
+<div class="w-8 h-8 rounded-full bg-surface-container border border-border flex items-center justify-center text-primary">
+<span class="material-symbols-outlined text-[16px]">analytics</span>
+</div>
+<h2 class="font-headline-sm text-headline-lg text-primary">Analysis Panel</h2>
+</div>
+<p class="font-label-sm text-label-sm text-text-muted">Real-time extraction</p>
+</div>
+<!-- Navigation Tabs (Horizontal for Right Panel to save vertical space based on prompt needs, deviating slightly from vertical list to fit bento style) -->
+<nav class="flex border-b border-border bg-surface-container">
+<a class="flex-1 py-3 text-center text-text-muted hover:text-text-primary transition-opacity font-label-sm text-label-sm border-b-2 border-transparent" href="#">Context</a>
+<a class="flex-1 py-3 text-center text-text-muted hover:text-text-primary transition-opacity font-label-sm text-label-sm border-b-2 border-transparent" href="#">Risk</a>
+<a class="flex-1 py-3 text-center text-primary font-semibold border-b-2 border-primary bg-surface-container-low" href="#">Metrics</a>
+<a class="flex-1 py-3 text-center text-text-muted hover:text-text-primary transition-opacity font-label-sm text-label-sm border-b-2 border-transparent" href="#">Meta</a>
+</nav>
+<!-- Tab Content (Metrics) -->
+<div class="flex-1 p-panel-padding flex flex-col gap-6 overflow-y-auto">
+<!-- Confidence Gauge -->
+<div class="bg-surface rounded-lg border border-border p-5 flex flex-col items-center relative overflow-hidden border-t-2 border-t-primary">
+<h3 class="font-label-sm text-label-sm text-text-secondary uppercase tracking-widest w-full text-left mb-4">Overall Confidence</h3>
+<div class="relative w-32 h-32 flex items-center justify-center">
+<!-- SVG Circular Progress -->
+<svg class="w-full h-full transform -rotate-90" viewbox="0 0 100 100">
+<circle cx="50" cy="50" fill="transparent" r="40" stroke="#2A2A2A" stroke-width="8"></circle>
+<circle class="transition-all duration-1000 ease-out" cx="50" cy="50" fill="transparent" r="40" stroke="#16A34A" stroke-dasharray="251.2" stroke-dashoffset="30.14" stroke-width="8"></circle> <!-- 88% -->
+</svg>
+<div class="absolute flex flex-col items-center">
+<span class="font-display-lg text-[32px] text-text-primary font-bold">88<span class="text-body-md text-text-secondary">%</span></span>
+<span class="font-label-sm text-[10px] text-status-high flex items-center gap-1 mt-1">
+<span class="material-symbols-outlined text-[12px]">trending_up</span> High
+                        </span>
+</div>
+</div>
+</div>
+<!-- Dimension Score Bars -->
+<div class="bg-surface rounded-lg border border-border p-4">
+<h3 class="font-label-sm text-label-sm text-text-secondary uppercase tracking-widest mb-4">Scoring Dimensions</h3>
+<div class="space-y-4">
+<!-- Dimension 1 -->
+<div>
+<div class="flex justify-between font-label-sm text-[12px] text-text-primary mb-1.5">
+<span>Clarity</span>
+<span>92%</span>
+</div>
+<div class="h-1.5 w-full bg-surface-container-high rounded-full overflow-hidden">
+<div class="h-full bg-status-high rounded-full" style="width: 92%;"></div>
+</div>
+</div>
+<!-- Dimension 2 -->
+<div>
+<div class="flex justify-between font-label-sm text-[12px] text-text-primary mb-1.5">
+<span>Completeness</span>
+<span>78%</span>
+</div>
+<div class="h-1.5 w-full bg-surface-container-high rounded-full overflow-hidden">
+<div class="h-full bg-primary rounded-full" style="width: 78%;"></div>
+</div>
+</div>
+<!-- Dimension 3 -->
+<div>
+<div class="flex justify-between font-label-sm text-[12px] text-text-primary mb-1.5">
+<span>Compliance Risk</span>
+<span class="text-status-amber">45%</span>
+</div>
+<div class="h-1.5 w-full bg-surface-container-high rounded-full overflow-hidden">
+<div class="h-full bg-status-amber rounded-full" style="width: 45%;"></div>
+</div>
+</div>
+</div>
+</div>
+<!-- Segment Table (Extracted Entities) -->
+<div class="bg-surface rounded-lg border border-border overflow-hidden flex flex-col">
+<div class="p-3 border-b border-border bg-surface-container-low flex justify-between items-center">
+<h3 class="font-label-sm text-label-sm text-text-secondary uppercase tracking-widest">Key Segments</h3>
+<button class="text-text-muted hover:text-primary transition-colors">
+<span class="material-symbols-outlined text-[16px]">filter_list</span>
+</button>
+</div>
+<div class="flex flex-col">
+<!-- Row 1 -->
+<div class="p-3 border-b border-border flex flex-col gap-1 hover:bg-surface-container-highest cursor-pointer transition-colors group">
+<div class="flex justify-between items-start">
+<span class="font-label-lg text-label-sm text-text-primary">Payment Terms</span>
+<span class="px-1.5 py-0.5 bg-status-high/10 text-status-high text-[9px] rounded uppercase font-bold border border-status-high/20">Verified</span>
+</div>
+<span class="font-body-md text-[12px] text-text-muted line-clamp-1 group-hover:text-text-secondary">Net 30 days upon invoice receipt.</span>
+</div>
+<!-- Row 2 -->
+<div class="p-3 border-b border-border flex flex-col gap-1 hover:bg-surface-container-highest cursor-pointer transition-colors group bg-gold-mist/30">
+<div class="flex justify-between items-start">
+<span class="font-label-lg text-label-sm text-text-primary">Termination</span>
+<span class="px-1.5 py-0.5 bg-status-amber/10 text-status-amber text-[9px] rounded uppercase font-bold border border-status-amber/20">Review</span>
+</div>
+<span class="font-body-md text-[12px] text-text-muted line-clamp-1 group-hover:text-text-secondary">30 days notice; client liability clause unclear.</span>
+</div>
+<!-- Row 3 -->
+<div class="p-3 flex flex-col gap-1 hover:bg-surface-container-highest cursor-pointer transition-colors group">
+<div class="flex justify-between items-start">
+<span class="font-label-lg text-label-sm text-text-primary">Jurisdiction</span>
+<span class="px-1.5 py-0.5 bg-surface-container-high text-text-secondary text-[9px] rounded uppercase font-bold border border-border">Standard</span>
+</div>
+<span class="font-body-md text-[12px] text-text-muted line-clamp-1 group-hover:text-text-secondary">State of Delaware.</span>
+</div>
+</div>
+</div>
+</div>
+</aside>
+</body></html>

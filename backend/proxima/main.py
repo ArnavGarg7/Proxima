@@ -55,7 +55,8 @@ from proxima.routers import (
     sessions_router,
     jobs_router,
     admin_router,
-    intelligence_router
+    intelligence_router,
+    dashboard_router
 )
 
 # Register routers
@@ -69,3 +70,4 @@ app.include_router(sessions_router)
 app.include_router(jobs_router)
 app.include_router(admin_router)
 app.include_router(intelligence_router)
+app.include_router(dashboard_router)
