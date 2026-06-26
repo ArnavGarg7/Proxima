@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { ActionItem } from '@/types/analyze';
 
 interface ActionItemCardProps {

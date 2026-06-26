@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { Topic } from '@/types/analyze';
 
 interface TopicCardProps {

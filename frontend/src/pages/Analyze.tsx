@@ -143,7 +143,7 @@ export default function Analyze() {
     );
   }
 
-  if (error && !result && loading === false) {
+  if (error && !result && !loading) {
     return (
       <div className="flex-1 flex flex-col items-center justify-center bg-void min-h-[calc(100vh-60px)]">
         <span className="material-symbols-outlined text-conf-critical text-6xl mb-4">error</span>
@@ -151,6 +151,10 @@ export default function Analyze() {
         <p className="text-text-secondary">{error}</p>
       </div>
     );
+  }
+
+  if (!result) {
+    return null;
   }
 
   return (

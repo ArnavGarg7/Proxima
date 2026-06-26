@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { Takeaway } from '@/types/analyze';
 
 interface TakeawayCardProps {

@@ -1,4 +1,3 @@
-import React from 'react';
 import { RecentRun } from '@/types/dashboard';
 
 interface RecentRunCardProps {

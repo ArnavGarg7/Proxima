@@ -1,4 +1,3 @@
-import React from 'react';
 import { NamedEntity } from '@/types/analyze';
 
 interface EntityCardProps {

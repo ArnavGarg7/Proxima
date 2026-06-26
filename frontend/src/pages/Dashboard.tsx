@@ -15,7 +15,7 @@ export default function Dashboard() {
   const [userName, setUserName] = useState<string>('');
 
   useEffect(() => {
-    const intervalId: NodeJS.Timeout;
+    let intervalId: NodeJS.Timeout;
 
     const fetchDashboard = async (silent = false) => {
       try {
@@ -64,7 +64,7 @@ export default function Dashboard() {
     );
   }
 
-  const handleResume = (id: string, analyzer: string) => {
+  const handleResume = (_id: string, analyzer: string) => {
     if (analyzer === 'clinical') navigate('/clinical');
     else if (analyzer === 'legal') navigate('/legal');
     else if (analyzer === 'compare') navigate('/compare');
