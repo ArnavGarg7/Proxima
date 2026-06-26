@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { api } from '@/lib/axios';
 import { GeneralAnalysisResult } from '@/types/analyze';
@@ -12,6 +12,7 @@ export default function Analyze() {
   const documentId = searchParams.get('document_id');
   const templateOrigin = searchParams.get('template');
   
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [documents, setDocuments] = useState<any[]>([]);
   const [selectedDocId, setSelectedDocId] = useState<string>('');
   const [loadingDocs, setLoadingDocs] = useState(true);
@@ -44,7 +45,7 @@ export default function Analyze() {
     }
   }, [documentId]);
 
-  const runAnalysis = async () => {
+  const runAnalysis = useCallback(async () => {
     if (!selectedDocId) {
       setError("No document specified.");
       return;
@@ -55,19 +56,20 @@ export default function Analyze() {
     setResult(null);
 
     try {
-      const payload: any = { document_id: selectedDocId };
+      const payload: Record<string, string> = { document_id: selectedDocId };
       if (templateOrigin) {
         payload.template_origin = templateOrigin;
       }
 
       const res = await api.post('/api/intelligence/analyze', payload);
       setResult(res.data);
-    } catch (err: any) {
-      setError(err.response?.data?.detail || err.message || "Analysis failed.");
+    } catch (err: unknown) {
+      const e = err as { response?: { data?: { detail?: string } }; message?: string };
+      setError(e.response?.data?.detail || e.message || "Analysis failed.");
     } finally {
       setLoading(false);
     }
-  };
+  }, [selectedDocId, templateOrigin]);
 
   useEffect(() => {
     if (documentId) {
@@ -75,7 +77,7 @@ export default function Analyze() {
     } else {
       setLoading(false);
     }
-  }, [documentId]);
+  }, [documentId, runAnalysis]);
 
   if (loading) {
     return (

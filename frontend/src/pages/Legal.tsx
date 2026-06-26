@@ -198,7 +198,7 @@ export default function Legal() {
       data.document_domain_hint = data.document_domain_hint ?? { is_legal_like: false, confidence: 0, reason: '' };
       setResult(data);
 
-    } catch (err: any) {
+    } catch (err: any /* eslint-disable-line @typescript-eslint/no-explicit-any */) {
       setError(err.response?.data?.detail || err.message || 'Analysis failed');
     } finally {
       setIsAnalyzing(false);

@@ -40,7 +40,7 @@ const STORAGE_KEY = 'proxima_template_launch_context';
 export function saveTemplateLaunchContext(ctx: TemplateLaunchContext): void {
   try {
     sessionStorage.setItem(STORAGE_KEY, JSON.stringify(ctx));
-  } catch {}
+  } catch { /* empty */ }
 }
 
 export function loadTemplateLaunchContext(): TemplateLaunchContext | null {
@@ -55,5 +55,5 @@ export function loadTemplateLaunchContext(): TemplateLaunchContext | null {
 export function clearTemplateLaunchContext(): void {
   try {
     sessionStorage.removeItem(STORAGE_KEY);
-  } catch {}
+  } catch { /* empty */ }
 }

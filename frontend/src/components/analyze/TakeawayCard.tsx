@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Takeaway, Evidence } from '@/types/analyze';
+import { Takeaway } from '@/types/analyze';
 
 interface TakeawayCardProps {
   takeaway: Takeaway;

@@ -37,7 +37,7 @@ interface DomainRadarResult {
     surface: string;
     reason: string;
   }[];
-  diagnostics: Record<string, any>;
+  diagnostics: Record<string, unknown>;
 }
 
 export default function DomainRadar() {
@@ -77,8 +77,9 @@ export default function DomainRadar() {
         document_id: selectedDocId
       });
       setResult(res.data);
-    } catch (err: any) {
-      setError(err.response?.data?.detail || err.message || 'Analysis failed');
+    } catch (err: unknown) {
+      const e = err as { response?: { data?: { detail?: string } }; message?: string };
+      setError(e.response?.data?.detail || e.message || 'Analysis failed');
     } finally {
       setIsAnalyzing(false);
     }

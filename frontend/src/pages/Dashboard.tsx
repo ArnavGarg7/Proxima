@@ -15,7 +15,7 @@ export default function Dashboard() {
   const [userName, setUserName] = useState<string>('');
 
   useEffect(() => {
-    let intervalId: NodeJS.Timeout;
+    const intervalId: NodeJS.Timeout;
 
     const fetchDashboard = async (silent = false) => {
       try {
@@ -28,8 +28,11 @@ export default function Dashboard() {
             setUserName(authResponse.data.name.split(' ')[0]);
           }
         }
-      } catch (err: any) {
-        if (!silent) setError(err.message || 'Failed to load dashboard data');
+      } catch (err: unknown) {
+        if (!silent) {
+          const e = err as { message?: string };
+          setError(e.message || 'Failed to load dashboard data');
+        }
       } finally {
         if (!silent) setLoading(false);
       }

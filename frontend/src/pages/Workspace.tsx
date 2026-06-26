@@ -27,12 +27,13 @@ export default function Workspace() {
         try {
           const res = await api.get(`/api/documents/${docId}`);
           handleNewDocument(docId, res.data.filename || res.data.title || `Document ${docId}`);
-        } catch (err: any) {
+        } catch (err: unknown) {
           setError(`Failed to load document: ${docId}. It may not exist or you don't have access.`);
         }
       };
       fetchDocument();
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams]);
 
   // Hydrate template launch context
@@ -46,6 +47,7 @@ export default function Workspace() {
         setActiveFilename(ctx.document_name || ctx.document_id);
       }
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [location.state]);
 
   const handleNewDocument = (docId: string, filename: string) => {
@@ -69,11 +71,12 @@ export default function Workspace() {
         headers: { 'Content-Type': 'multipart/form-data' }
       });
       handleNewDocument(response.data.document_id, file.name);
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Upload failed:', err);
-      if (err.response?.status === 401 || err.response?.status === 403) {
+      const e = err as { response?: { status?: number } };
+      if (e.response?.status === 401 || e.response?.status === 403) {
         setError('Unauthorized: Please log in again.');
-      } else if (err.response?.status === 422) {
+      } else if (e.response?.status === 422) {
         setError('Validation Error: Invalid file format or size.');
       } else {
         setError('Failed to upload document. Internal Server Error.');

@@ -5,12 +5,12 @@ interface WorkspaceState {
   content: string;
   isStreaming: boolean;
   domain: string | null;
-  qheMetrics: any | null;
+  qheMetrics: unknown | null;
   setCurrentDocumentId: (id: string | null) => void;
   setContent: (content: string) => void;
   setStreaming: (isStreaming: boolean) => void;
   setDomain: (domain: string | null) => void;
-  setQheMetrics: (metrics: any | null) => void;
+  setQheMetrics: (metrics: unknown | null) => void;
   aiResponse: string;
   setAiResponse: (response: string) => void;
 }

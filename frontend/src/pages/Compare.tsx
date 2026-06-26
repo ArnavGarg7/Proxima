@@ -128,7 +128,7 @@ export default function Compare() {
       data.deterministic_signals = data.deterministic_signals || [];
       
       setResult(data);
-    } catch (err: any) {
+    } catch (err: any /* eslint-disable-line @typescript-eslint/no-explicit-any */) {
       if (err.response) {
         setError(err.response.data.detail || `Error ${err.response.status}`);
       } else {

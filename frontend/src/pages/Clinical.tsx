@@ -110,7 +110,7 @@ export default function Clinical() {
         document_id: selectedDocId
       });
       setResult(res.data);
-    } catch (err: any) {
+    } catch (err: any /* eslint-disable-line @typescript-eslint/no-explicit-any */) {
       setError(err.response?.data?.detail || err.message || 'Analysis failed');
     } finally {
       setIsAnalyzing(false);

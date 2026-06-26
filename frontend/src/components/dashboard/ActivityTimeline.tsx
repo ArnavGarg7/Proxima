@@ -41,16 +41,16 @@ export function ActivityTimeline({ runs }: ActivityTimelineProps) {
     if (!acc[category]) acc[category] = [];
     acc[category].push({ ...run, agoText: ago });
     return acc;
-  }, {} as Record<string, any[]>);
+  }, {} as Record<string, any[]> /* eslint-disable-line @typescript-eslint/no-explicit-any */);
 
-  const renderGroup = (title: string, groupRuns: any[]) => {
+  const renderGroup = (title: string, groupRuns: any[] /* eslint-disable-line @typescript-eslint/no-explicit-any */) => {
     if (!groupRuns || groupRuns.length === 0) return null;
     return (
       <div key={title} className="mb-6 last:mb-0">
         <h4 className="font-sans text-xs font-bold text-text-muted uppercase tracking-wider mb-3">{title}</h4>
         <div className="flex flex-col gap-4 relative">
           <div className="absolute left-[7px] top-2 bottom-0 w-[2px] bg-border z-0"></div>
-          {groupRuns.map((run, i) => (
+          {groupRuns.map((run) => (
             <div key={run.id} className="flex items-start gap-4 relative z-10">
               <div className="w-4 h-4 rounded-full bg-surface border-2 border-primary mt-1 shrink-0 z-10" />
               <div className="flex-1 bg-surface border border-border p-3 rounded-lg shadow-sm">

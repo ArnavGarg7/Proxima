@@ -30,7 +30,7 @@ interface AuditResult {
     dimension: string;
     excerpt: string;
   }[];
-  diagnostics: Record<string, any>;
+  diagnostics: Record<string, unknown>;
 }
 
 export default function Audit() {
@@ -70,7 +70,7 @@ export default function Audit() {
         document_id: selectedDocId
       });
       setAuditResult(res.data);
-    } catch (err: any) {
+    } catch (err: any /* eslint-disable-line @typescript-eslint/no-explicit-any */) {
       if (err.response) {
         setError(err.response.data.detail || `Error ${err.response.status}`);
       } else {

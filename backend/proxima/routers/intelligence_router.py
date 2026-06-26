@@ -23,6 +23,8 @@ from proxima.services.prompt_assembler import PromptAssemblerService
 from proxima.services.model_registry import model_registry
 from proxima.services.qhe import QualityHeuristicEngine
 from proxima.services.compare_analyzer import CompareAnalyzer
+from proxima.services.code_suite_service import CodeSuiteService
+from proxima.services.general_document_analyzer import GeneralDocumentAnalyzer
 
 router = APIRouter(prefix="/api/intelligence", tags=["intelligence"])
 

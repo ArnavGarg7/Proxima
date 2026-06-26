@@ -15,7 +15,7 @@ interface LegacyCodeResult {
   language_detected: string;
   summary: string;
   result_markdown: string;
-  snippet_profile: any;
+  snippet_profile: any /* eslint-disable-line @typescript-eslint/no-explicit-any */;
 }
 
 export default function CodeSuite() {
@@ -54,7 +54,7 @@ export default function CodeSuite() {
         language: language || null
       });
       setResult(res.data);
-    } catch (err: any) {
+    } catch (err: any /* eslint-disable-line @typescript-eslint/no-explicit-any */) {
       setError(err.response?.data?.detail || err.message || 'Analysis failed');
     } finally {
       setIsAnalyzing(false);
@@ -262,7 +262,7 @@ export default function CodeSuite() {
             {['review', 'explain', 'docs', 'optimize', 'security'].map((m) => (
               <button 
                 key={m}
-                onClick={() => { setMode(m as any); runAnalysis(m as any); }}
+                onClick={() => { setMode(m as 'review'); runAnalysis(m as 'review'); }}
                 className={`flex-1 py-2 px-3 text-xs font-bold rounded capitalize transition-colors text-left flex items-center gap-2 ${mode === m ? 'bg-elevated text-primary shadow-sm border border-border' : 'text-text-secondary hover:text-text-primary hover:bg-elevated/50 border border-transparent'}`}
               >
                 <span className="material-symbols-outlined text-[16px]">

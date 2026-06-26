@@ -79,7 +79,7 @@ export default function TemplateLaunchModal({ template, onClose }: TemplateLaunc
       const route = ROUTE_MAP[template.target_workbench] ?? '/workspace';
       navigate(route, { state: { templateContext: ctx } });
       onClose();
-    } catch (err: any) {
+    } catch (err: any /* eslint-disable-line @typescript-eslint/no-explicit-any */) {
       setError(err.response?.data?.detail || err.message || 'Launch failed');
     } finally {
       setIsLaunching(false);
