@@ -1,90 +1,249 @@
 /**
- * Motion system — timing and easing definitions for Proxima.
+ * Motion system — Proxima's unified animation tokens.
  *
- * STAGE 4.1: This file defines constants only.
- * Framer Motion AnimatePresence page transitions and stagger animations
- * are scheduled for Stage 4.4. Do not implement motion here yet.
+ * Single source of truth for:
+ *   - Duration values (ms)
+ *   - Easing curves (CSS strings + Framer Motion arrays)
+ *   - Scale / lift / opacity values
+ *   - Framer Motion variant blueprints
+ *   - Stagger timing
  *
- * These constants are the single source of truth that CSS transitions,
- * Tailwind classes, and future Framer Motion variants should all derive from.
+ * Philosophy: Fast. Precise. Confident.
+ * Reference: Linear, Vercel, Cursor, Arc Browser.
+ *
+ * Performance rules — only animate opacity + transform.
+ * Never animate: width, height, left, top, box-shadow.
  */
 
-/** Duration in milliseconds */
+import type { Variants, Transition } from 'framer-motion';
+
+// ─── Durations (milliseconds) ─────────────────────────────────────────────────
+
 export const duration = {
-  /** Micro-interactions: icon hover, checkbox tick */
-  fast:  100,
-  /** Standard interactions: button hover, input focus, card hover */
-  base:  150,
-  /** Emphasis transitions: panel open, badge change */
-  slow:  250,
-  /** Page-level transitions (future Framer Motion use) */
-  page:  300,
-  /** Complex reveals: staggered card grids */
-  enter: 400,
+  /** Micro-interaction: icon swap, state toggle */
+  instant: 50,
+  /** Standard hover, color swap */
+  fast:    100,
+  /** Button, input focus, most transitions */
+  base:    150,
+  /** Panel open, badge change, drawer */
+  slow:    250,
+  /** Page-level transitions */
+  page:    300,
+  /** Complex reveals, staggered grids */
+  enter:   400,
 } as const;
 
-/** CSS easing curves */
+// ─── Easings — CSS cubic-bezier strings ───────────────────────────────────────
+
 export const ease = {
-  /** General purpose — accelerate then decelerate */
-  default: 'cubic-bezier(0.4, 0, 0.2, 1)',
-  /** Enter — decelerating (element arriving) */
-  out:     'cubic-bezier(0, 0, 0.2, 1)',
-  /** Exit — accelerating (element leaving) */
-  in:      'cubic-bezier(0.4, 0, 1, 1)',
-  /** Playful spring — for emphasis, not default */
-  spring:  'cubic-bezier(0.34, 1.56, 0.64, 1)',
+  /** Decelerate: element arriving — most common */
+  out:      'cubic-bezier(0, 0, 0.2, 1)',
+  /** Symmetric: shared-axis, reversible transitions */
+  inOut:    'cubic-bezier(0.4, 0, 0.2, 1)',
+  /** Accelerate: element leaving */
+  in:       'cubic-bezier(0.4, 0, 1, 1)',
+  /** Constant speed: spinners, marquees */
+  linear:   'linear',
+  /** Calm deceleration: hero + modal entry */
+  emphasized: 'cubic-bezier(0.2, 0, 0, 1)',
+  /** Playful spring — use sparingly, never as default */
+  spring:   'cubic-bezier(0.34, 1.56, 0.64, 1)',
 } as const;
 
-/** Tailwind transition class shortcuts — use in className props */
-export const transition = {
-  /** Colors, borders, text-color, opacity */
-  colors: 'transition-colors duration-150',
-  /** All properties — use sparingly */
-  all:    'transition-all duration-150',
-  /** Transform only — hover lift and scale */
-  transform: 'transition-transform duration-150',
+// ─── Easings — Framer Motion arrays ───────────────────────────────────────────
+// Framer Motion expects [x1, y1, x2, y2] tuples, not CSS strings.
+
+export const easeArr = {
+  out:        [0, 0, 0.2, 1]     as [number, number, number, number],
+  inOut:      [0.4, 0, 0.2, 1]   as [number, number, number, number],
+  in:         [0.4, 0, 1, 1]     as [number, number, number, number],
+  emphasized: [0.2, 0, 0, 1]     as [number, number, number, number],
 } as const;
 
-/** Scale factors for interactive state (applied via Tailwind `scale-*`) */
+// ─── Scale ────────────────────────────────────────────────────────────────────
+
 export const scale = {
-  /** Hover scale for cards and large interactive surfaces */
-  cardHover:   1.01,
-  /** Icon scale on parent hover */
-  iconHover:   1.1,
-  /** Button press feedback */
+  /** Button press — immediate tactile feedback */
+  press:      0.98,
+  /** Card active press */
+  cardPress:  0.99,
+  /** Modal / dialog entry starting scale */
+  dialogIn:   0.97,
+  /** Hover scale for cards — cards LIFT, not scale */
+  cardHover:  1.0,
+  /** Icon hover scale on parent hover */
+  iconHover:  1.1,
+  /** @deprecated Use press */
   buttonPress: 0.98,
 } as const;
 
-/** Translate values for lift effects */
-export const lift = {
-  /** btn-primary hover lift */
-  button: '-1px',
-  /** Card hover lift (future, Stage 4.4) */
-  card:   '-2px',
+// ─── Opacity ──────────────────────────────────────────────────────────────────
+
+export const opacity = {
+  hidden:   0,
+  visible:  1,
+  /** Backdrop / overlay */
+  overlay:  0.6,
+  /** Disabled elements */
+  disabled: 0.4,
+  /** Muted / secondary content */
+  muted:    0.6,
 } as const;
 
-/**
- * Framer Motion variant blueprints — to be wired up in Stage 4.4.
- * Defined here now so all future animation work references a single spec.
- */
+// ─── Lift — translateY for hover effects ──────────────────────────────────────
+
+export const lift = {
+  /** Primary button hover lift (px, as number for Framer) */
+  button: -1,
+  /** Card hover lift */
+  card:   -2,
+  /** Small element lift */
+  small:  -1,
+} as const;
+
+// ─── Tailwind transition shorthand strings ────────────────────────────────────
+
+export const transition = {
+  colors:    'transition-colors duration-150',
+  all:       'transition-all duration-150',
+  transform: 'transition-transform duration-150',
+  opacity:   'transition-opacity duration-150',
+} as const;
+
+// ─── Framer Motion transition presets ─────────────────────────────────────────
+
+export const motionTransition: Record<string, Transition> = {
+  instant: { duration: duration.instant / 1000, ease: easeArr.out  },
+  fast:    { duration: duration.fast    / 1000, ease: easeArr.out  },
+  base:    { duration: duration.base    / 1000, ease: easeArr.out  },
+  slow:    { duration: duration.slow    / 1000, ease: easeArr.out  },
+  page:    { duration: duration.page    / 1000, ease: easeArr.out  },
+  enter:   { duration: duration.enter   / 1000, ease: easeArr.out  },
+  exit:    { duration: duration.fast    / 1000, ease: easeArr.in   },
+  overlay: { duration: duration.base    / 1000, ease: easeArr.inOut },
+  dialog:  { duration: duration.slow    / 1000, ease: easeArr.emphasized },
+};
+
+// ─── Framer Motion variants ───────────────────────────────────────────────────
+// All respect reduced motion — components must check useReducedMotion().
+
+export const motionVariants: Record<string, Variants> = {
+  /** Opacity fade only — toasts, tooltips, overlays */
+  fadeIn: {
+    hidden:  { opacity: 0 },
+    visible: { opacity: 1, transition: motionTransition.base },
+    exit:    { opacity: 0, transition: motionTransition.exit },
+  },
+
+  /** Fade + subtle upward lift — cards, panels, inspector sections */
+  fadeUp: {
+    hidden:  { opacity: 0, y: 8 },
+    visible: { opacity: 1, y: 0, transition: motionTransition.slow },
+    exit:    { opacity: 0, y: -4, transition: motionTransition.exit },
+  },
+
+  /** Scale from 97% with fade — dialogs, popovers */
+  scaleIn: {
+    hidden:  { opacity: 0, scale: scale.dialogIn },
+    visible: { opacity: 1, scale: 1, transition: motionTransition.slow },
+    exit:    { opacity: 0, scale: scale.dialogIn, transition: motionTransition.exit },
+  },
+
+  /** Slide in from left — drawers */
+  slideInLeft: {
+    hidden:  { opacity: 0, x: -16 },
+    visible: { opacity: 1, x: 0, transition: motionTransition.slow },
+    exit:    { opacity: 0, x: -16, transition: motionTransition.exit },
+  },
+
+  /** Slide in from right */
+  slideInRight: {
+    hidden:  { opacity: 0, x: 16 },
+    visible: { opacity: 1, x: 0, transition: motionTransition.slow },
+    exit:    { opacity: 0, x: 16, transition: motionTransition.exit },
+  },
+
+  /** Backdrop fade — modal / drawer overlay */
+  overlay: {
+    hidden:  { opacity: 0 },
+    visible: { opacity: 1, transition: motionTransition.overlay },
+    exit:    { opacity: 0, transition: motionTransition.exit },
+  },
+
+  /** Dialog — scale + fade */
+  dialog: {
+    hidden:  { opacity: 0, scale: scale.dialogIn },
+    visible: { opacity: 1, scale: 1, transition: motionTransition.dialog },
+    exit:    { opacity: 0, scale: scale.dialogIn, transition: motionTransition.exit },
+  },
+
+  /** Page-level fade+lift */
+  page: {
+    initial:  { opacity: 0, y: 6 },
+    animate:  { opacity: 1, y: 0, transition: motionTransition.page },
+    exit:     { opacity: 0, y: -4, transition: motionTransition.exit },
+  },
+
+  /** Toast entry — fade + upward */
+  toast: {
+    hidden:  { opacity: 0, y: 8, scale: 0.98 },
+    visible: { opacity: 1, y: 0, scale: 1, transition: motionTransition.base },
+    exit:    { opacity: 0, y: 4, transition: motionTransition.exit },
+  },
+};
+
+// ─── Stagger timing ───────────────────────────────────────────────────────────
+
+export const stagger = {
+  /** Dense grids, tight lists */
+  fast: 0.04,
+  /** Standard card grids */
+  base: 0.07,
+  /** Sparse layouts, hero content */
+  slow: 0.10,
+} as const;
+
+/** Framer Motion container variant that staggers children */
+export const staggerContainer: Variants = {
+  hidden:  {},
+  visible: { transition: { staggerChildren: stagger.base } },
+};
+
+/** Item inside staggerContainer */
+export const staggerItem: Variants = {
+  hidden:  { opacity: 0, y: 12 },
+  visible: { opacity: 1, y: 0, transition: motionTransition.slow },
+};
+
+// ─── Hover hierarchy — animation intensity by component importance ─────────────
+// ★★★★★  Primary CTA: lift + press scale
+// ★★★★☆  Card: translateY(-2px)
+// ★★★☆☆  Nav Item: color only
+// ★★☆☆☆  Chip: border + opacity
+// ★☆☆☆☆  Badge: no animation
+
+export const hoverHierarchy = {
+  primaryCta: { lift: lift.button, press: scale.press },
+  card:       { lift: lift.card,   press: scale.cardPress },
+  navItem:    { lift: 0,           press: 1 },
+  chip:       { lift: 0,           press: 1 },
+  badge:      { lift: 0,           press: 1 },
+} as const;
+
+// ─── Legacy compat — used by existing landing components ──────────────────────
+
+/** @deprecated Use motionVariants.page instead */
 export const motionSpec = {
   pageEnter: {
-    initial:  { opacity: 0, y: 8 },
-    animate:  { opacity: 1, y: 0 },
-    exit:     { opacity: 0, y: -4 },
+    initial:   { opacity: 0, y: 8 },
+    animate:   { opacity: 1, y: 0 },
+    exit:      { opacity: 0, y: -4 },
     transition: { duration: duration.page / 1000, ease: ease.out },
   },
   cardStagger: {
-    container: { transition: { staggerChildren: 0.05 } },
-    item: {
-      initial:  { opacity: 0, y: 12 },
-      animate:  { opacity: 1, y: 0 },
-      transition: { duration: duration.slow / 1000, ease: ease.out },
-    },
+    container: staggerContainer,
+    item:      staggerItem,
   },
-  fadeIn: {
-    initial:  { opacity: 0 },
-    animate:  { opacity: 1 },
-    transition: { duration: duration.base / 1000 },
-  },
+  fadeIn: motionVariants.fadeIn,
 } as const;

@@ -488,6 +488,7 @@ async def intelligence_domain_radar(
 
 class ClinicalRequest(BaseModel):
     document_id: str
+    template_origin: Optional[str] = None
 
 @router.post("/clinical")
 async def intelligence_clinical(
@@ -528,6 +529,7 @@ async def intelligence_clinical(
 
 class LegalAnalyzerRequest(BaseModel):
     document_id: str
+    template_origin: Optional[str] = None
 
 @router.post("/legal")
 async def intelligence_legal(
@@ -565,7 +567,7 @@ async def intelligence_legal(
 
     try:
         analysis_result = await ContractAnalyzer.analyze(db, full_text, metadata)
-        await complete_analysis_session(db, session, status="completed", start_time=start_time, confidence=analysis_result.get("executive_summary", {}).get("risk_score", 0))
+        await complete_analysis_session(db, session, status="completed", start_time=start_time, confidence=analysis_result.get("extraction_confidence", 0))
         return analysis_result
     except Exception as e:
         await complete_analysis_session(db, session, status="failed", start_time=start_time)

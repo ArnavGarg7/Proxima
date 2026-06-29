@@ -29,11 +29,11 @@ describe('Auth Store & Components', () => {
 
     render(
       <BrowserRouter>
-        <Navbar />
+        <Navbar onMenuClick={() => undefined} isDrawerOpen={false} />
       </BrowserRouter>
     );
 
-    expect(screen.getByText('Admin Dashboard')).toBeInTheDocument();
+    expect(screen.getByText('Admin')).toBeInTheDocument();
     expect(screen.getByText('admin@proxima.test')).toBeInTheDocument();
   });
 });

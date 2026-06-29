@@ -40,8 +40,8 @@ export function Panel({
       {...rest}
     >
       {hasHeader && (
-        <div className="flex items-center justify-between px-5 py-3 border-b border-border bg-elevated/50">
-          <div className="flex flex-col gap-0.5">
+        <div className="flex items-center justify-between px-4 py-3 border-b border-border bg-elevated/50 sm:px-5">
+          <div className="flex flex-col gap-0.5 min-w-0">
             {title && (
               <span className="text-xs font-medium uppercase tracking-widest text-text-muted font-sans">
                 {title}
@@ -51,11 +51,11 @@ export function Panel({
               <span className="text-xs text-text-muted font-sans">{subtitle}</span>
             )}
           </div>
-          {headerAction && <div className="shrink-0">{headerAction}</div>}
+          {headerAction && <div className="shrink-0 ml-2">{headerAction}</div>}
         </div>
       )}
 
-      <div className={cn(!noPadding && 'p-5')}>
+      <div className={cn(!noPadding && 'p-4 sm:p-5')}>
         {children}
       </div>
     </div>

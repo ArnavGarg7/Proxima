@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { api } from '@/lib/axios';
 import { GeneralAnalysisResult } from '@/types/analyze';
@@ -6,12 +6,43 @@ import { TakeawayCard } from '@/components/analyze/TakeawayCard';
 import { TopicCard } from '@/components/analyze/TopicCard';
 import { EntityCard } from '@/components/analyze/EntityCard';
 import { ActionItemCard } from '@/components/analyze/ActionItemCard';
+import {
+  AnalysisLayout,
+  AnalysisHeader,
+  AnalysisSidebar,
+  AnalysisInspector,
+  InspectorStat,
+  AnalysisEmptyState,
+  AnalysisLoading,
+  ConfidenceRing,
+  type OutlineItem,
+} from '@/components/analysis';
+import { Panel } from '@/components/ui/Panel';
+import { Card } from '@/components/ui/Card';
+import { Badge } from '@/components/ui/Badge';
+import { Button } from '@/components/ui/Button';
+import { Chip } from '@/components/ui/Chip';
+import { confidenceLabel } from '@/lib/confidence';
+
+/* Risk level → presentation tokens */
+const RISK_STYLES: Record<string, { icon: string; tone: string }> = {
+  High:   { icon: 'error',   tone: 'text-conf-critical' },
+  Medium: { icon: 'warning', tone: 'text-conf-amber' },
+  Low:    { icon: 'info',    tone: 'text-conf-high' },
+};
+
+/* Small muted placeholder shown inside a section Panel with no results */
+function SectionEmpty({ message }: { message: string }) {
+  return (
+    <p className="py-2 text-center font-sans text-sm text-text-muted">{message}</p>
+  );
+}
 
 export default function Analyze() {
   const [searchParams] = useSearchParams();
   const documentId = searchParams.get('document_id');
   const templateOrigin = searchParams.get('template');
-  
+
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [documents, setDocuments] = useState<any[]>([]);
   const [selectedDocId, setSelectedDocId] = useState<string>('');
@@ -79,292 +110,351 @@ export default function Analyze() {
     }
   }, [documentId, runAnalysis]);
 
+  /* ── Derived (hooks must precede early returns) ────────────────────────── */
+
+  const selectedDoc = documents.find((d) => d.id === selectedDocId);
+
+  const outlineItems = useMemo<OutlineItem[]>(() => {
+    if (!result) return [];
+    return [
+      { id: 'sec-summary',   label: 'Executive Summary', icon: 'summarize' },
+      { id: 'sec-takeaways', label: 'Key Takeaways',     icon: 'lightbulb', count: result.takeaways.length },
+      { id: 'sec-topics',    label: 'Topics',            icon: 'category',  count: result.topics.length },
+      { id: 'sec-entities',  label: 'Named Entities',    icon: 'group',     count: result.entities.length },
+      { id: 'sec-actions',   label: 'Action Items',      icon: 'checklist', count: result.actions.length },
+      { id: 'sec-numbers',   label: 'Numerical Insights',icon: 'bar_chart', count: result.numbers.length },
+      { id: 'sec-risks',     label: 'Risks',             icon: 'warning',   count: result.risks.length },
+    ];
+  }, [result]);
+
+  /* Client-side export — serializes the existing result, no API change */
+  const handleExport = () => {
+    if (!result) return;
+    const blob = new Blob([JSON.stringify(result, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${selectedDoc?.title ?? 'document'}-analysis.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const handleCopySummary = () => {
+    if (result?.executive_summary) {
+      navigator.clipboard?.writeText(result.executive_summary).catch(() => { /* ignore */ });
+    }
+  };
+
+  /* ── Loading ───────────────────────────────────────────────────────────── */
+
   if (loading) {
     return (
-      <div className="flex-1 flex flex-col items-center justify-center bg-void min-h-[calc(100vh-60px)]">
-        <div className="w-12 h-12 border-4 border-gold-primary border-t-transparent rounded-full animate-spin mb-4" />
-        <h2 className="font-display text-xl text-text-primary mb-2">Analyzing Document...</h2>
-        <p className="text-text-secondary">Extracting intelligence across general domains</p>
-      </div>
+      <AnalysisLoading
+        title="Analyzing Document…"
+        message="Extracting intelligence across general domains"
+      />
     );
   }
 
-  if (!result && !loading) {
-    return (
-      <div className="flex-1 p-8 bg-void min-h-[calc(100vh-60px)] flex flex-col items-center justify-center">
-        <div className="w-full max-w-[600px] text-center space-y-6">
-          <div className="w-16 h-16 rounded-2xl bg-surface border border-border mx-auto flex items-center justify-center shadow-sm">
-            <span className="material-symbols-outlined text-3xl text-indigo-500">hub</span>
-          </div>
-          <div>
-            <h1 className="font-display text-4xl text-text-primary mb-3">General Intelligence</h1>
-            <p className="font-sans text-base text-text-secondary max-w-md mx-auto">
-              Select a document to extract executive summaries, themes, named entities, and action items.
-            </p>
-          </div>
-
-          {error && (
-            <div className="bg-conf-critical/10 border border-conf-critical/20 p-4 rounded-lg text-conf-critical flex items-center justify-center gap-2">
-              <span className="material-symbols-outlined text-sm">error</span>
-              <span className="text-sm">{error}</span>
-            </div>
-          )}
-
-          <div className="bg-surface border border-border rounded-xl p-6 flex flex-col items-center gap-4 max-w-md mx-auto">
-            <label className="font-sans text-sm font-medium text-text-primary">Select Document to Analyze</label>
-            {loadingDocs ? (
-              <div className="text-text-muted text-sm">Loading documents...</div>
-            ) : documents.length === 0 ? (
-              <div className="text-text-muted text-sm">No documents available. Upload one in Workspace first.</div>
-            ) : (
-              <div className="flex flex-col gap-4 w-full">
-                <select 
-                  value={selectedDocId} 
-                  onChange={(e) => setSelectedDocId(e.target.value)}
-                  className="bg-surface border border-border text-text-primary rounded-lg px-4 py-2 w-full focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 text-sm font-sans"
-                >
-                  {documents.map(doc => (
-                    <option key={doc.id} value={doc.id}>{doc.title} ({new Date(doc.created_at).toLocaleDateString()})</option>
-                  ))}
-                </select>
-                <button 
-                  onClick={runAnalysis}
-                  disabled={!selectedDocId}
-                  className="bg-gold-primary text-void px-6 py-2.5 rounded-lg font-sans text-sm font-bold hover:bg-gold-primary/90 disabled:opacity-50 transition-colors flex justify-center items-center gap-2"
-                >
-                  <span className="material-symbols-outlined text-[20px]">bolt</span>
-                  Analyze Document
-                </button>
-              </div>
-            )}
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  if (error && !result && !loading) {
-    return (
-      <div className="flex-1 flex flex-col items-center justify-center bg-void min-h-[calc(100vh-60px)]">
-        <span className="material-symbols-outlined text-conf-critical text-6xl mb-4">error</span>
-        <h2 className="font-display text-2xl text-text-primary mb-2">Analysis Failed</h2>
-        <p className="text-text-secondary">{error}</p>
-      </div>
-    );
-  }
+  /* ── Empty / onboarding (also surfaces run errors) ─────────────────────── */
 
   if (!result) {
-    return null;
+    return (
+      <AnalysisEmptyState
+        icon="hub"
+        title="General Intelligence"
+        description="Select a document to extract executive summaries, themes, named entities, and action items."
+        expectedOutput={[
+          'Executive summary',
+          'Key takeaways',
+          'Topics & entities',
+          'Action items',
+          'Numerical insights',
+          'Risk signals',
+        ]}
+        supportedTypes={['PDF', 'DOCX', 'TXT']}
+        error={error}
+      >
+        <label htmlFor="analyze-doc" className="font-sans text-sm font-medium text-text-primary">
+          Select a document to analyze
+        </label>
+        {loadingDocs ? (
+          <p className="font-sans text-sm text-text-muted">Loading documents…</p>
+        ) : documents.length === 0 ? (
+          <p className="font-sans text-sm text-text-muted">
+            No documents available. Upload one in Workspace first.
+          </p>
+        ) : (
+          <>
+            <select
+              id="analyze-doc"
+              value={selectedDocId}
+              onChange={(e) => setSelectedDocId(e.target.value)}
+              className="w-full rounded-md border border-border bg-surface px-3.5 py-2.5 font-sans text-sm text-text-primary
+                focus:border-gold-primary focus:outline-none focus:ring-2 focus:ring-gold-primary/15"
+            >
+              {documents.map((doc) => (
+                <option key={doc.id} value={doc.id}>
+                  {doc.title} ({new Date(doc.created_at).toLocaleDateString()})
+                </option>
+              ))}
+            </select>
+            <Button
+              variant="primary"
+              onClick={runAnalysis}
+              disabled={!selectedDocId}
+              leftIcon={<span className="material-symbols-outlined text-[18px]" aria-hidden="true">bolt</span>}
+              className="w-full"
+            >
+              Analyze Document
+            </Button>
+          </>
+        )}
+      </AnalysisEmptyState>
+    );
   }
 
+  /* ── Result — three-panel workspace ────────────────────────────────────── */
+
+  const header = (
+    <AnalysisHeader
+      icon="hub"
+      title="General Intelligence"
+      documentName={selectedDoc?.title}
+      status={<Badge variant="success" size="sm">Complete</Badge>}
+      confidence={result.confidence}
+      actions={
+        <>
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={runAnalysis}
+            leftIcon={<span className="material-symbols-outlined text-[16px]" aria-hidden="true">refresh</span>}
+          >
+            Re-run
+          </Button>
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={handleExport}
+            leftIcon={<span className="material-symbols-outlined text-[16px]" aria-hidden="true">download</span>}
+          >
+            Export
+          </Button>
+        </>
+      }
+    />
+  );
+
+  const sidebar = <AnalysisSidebar items={outlineItems} />;
+
+  const inspector = (
+    <AnalysisInspector>
+      {/* Overall confidence */}
+      <Panel title="Overall Confidence">
+        <div className="flex flex-col items-center gap-3 py-1">
+          <ConfidenceRing value={result.confidence} size="lg" />
+          <span className="font-sans text-sm font-medium text-text-secondary">
+            {confidenceLabel(result.confidence)}
+          </span>
+        </div>
+      </Panel>
+
+      {/* Document statistics */}
+      <Panel title="Document Statistics">
+        <div className="flex flex-col gap-3">
+          <InspectorStat icon="schedule"    label="Reading time" value={`${result.metadata.reading_time_minutes} min`} />
+          <InspectorStat icon="format_size" label="Word count"   value={result.metadata.word_count.toLocaleString()} />
+          <InspectorStat icon="language"    label="Language"     value={result.metadata.language.toUpperCase()} />
+        </div>
+      </Panel>
+
+      {/* Signals used */}
+      <Panel title="Signals Used">
+        {result.signals.length > 0 ? (
+          <div className="flex flex-wrap gap-1.5">
+            {result.signals.map((sig, idx) => (
+              <Chip key={idx} variant="default">{sig}</Chip>
+            ))}
+          </div>
+        ) : (
+          <p className="font-sans text-sm text-text-muted">No signals detected.</p>
+        )}
+      </Panel>
+
+      {/* Engine / export */}
+      <Panel title="Engine">
+        <div className="flex flex-col gap-3">
+          <InspectorStat icon="bolt" label="Analyzer" value="General" />
+          <p className="font-sans text-xs leading-relaxed text-text-muted">
+            Multi-domain extraction with evidence-backed citations.
+          </p>
+          <div className="flex flex-col gap-2 pt-1">
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={handleExport}
+              leftIcon={<span className="material-symbols-outlined text-[15px]" aria-hidden="true">download</span>}
+              className="w-full"
+            >
+              Download JSON
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={handleCopySummary}
+              leftIcon={<span className="material-symbols-outlined text-[15px]" aria-hidden="true">content_copy</span>}
+              className="w-full"
+            >
+              Copy summary
+            </Button>
+          </div>
+        </div>
+      </Panel>
+    </AnalysisInspector>
+  );
+
   return (
-    <div className="flex-1 flex gap-6 p-6 bg-void min-h-[calc(100vh-60px)]">
-      {/* LEFT SIDEBAR: Metadata & Signals */}
-      <div className="w-80 flex flex-col gap-6 flex-shrink-0">
-        <div className="bg-surface border border-border rounded-xl shadow-sm overflow-hidden flex flex-col">
-          <div className="p-4 border-b border-border bg-elevated">
-            <h3 className="font-display text-lg text-text-primary">General Intelligence</h3>
-          </div>
-          <div className="p-4 flex flex-col gap-4">
-            
-            <div className="flex flex-col items-center py-4 border-b border-border">
-              <span className="text-[10px] uppercase tracking-widest font-bold text-text-muted mb-2">Confidence</span>
-              <div className="relative w-24 h-24 flex items-center justify-center">
-                <svg className="w-full h-full transform -rotate-90" viewBox="0 0 100 100">
-                  <circle cx="50" cy="50" r="40" stroke="currentColor" strokeWidth="8" fill="transparent" className="text-elevated" />
-                  <circle 
-                    cx="50" cy="50" r="40" stroke="currentColor" strokeWidth="8" fill="transparent" 
-                    strokeDasharray={`${(result.confidence / 100) * 251.2} 251.2`} 
-                    className="text-gold-primary transition-all duration-1000" 
-                  />
-                </svg>
-                <div className="absolute inset-0 flex items-center justify-center flex-col">
-                  <span className="text-2xl font-mono font-bold text-text-primary">{result.confidence}</span>
-                </div>
-              </div>
-            </div>
+    <AnalysisLayout header={header} sidebar={sidebar} inspector={inspector} mobileContents={outlineItems}>
+      <div className="flex flex-col gap-6">
 
-            <div className="flex flex-col gap-3">
-              <h4 className="text-[10px] uppercase tracking-widest font-bold text-text-muted">Document Metrics</h4>
-              <div className="flex justify-between items-center text-sm">
-                <span className="text-text-secondary flex items-center gap-2">
-                  <span className="material-symbols-outlined text-[16px]">schedule</span> Reading Time
-                </span>
-                <span className="font-mono text-text-primary">{result.metadata.reading_time_minutes} min</span>
-              </div>
-              <div className="flex justify-between items-center text-sm">
-                <span className="text-text-secondary flex items-center gap-2">
-                  <span className="material-symbols-outlined text-[16px]">format_size</span> Word Count
-                </span>
-                <span className="font-mono text-text-primary">{result.metadata.word_count.toLocaleString()}</span>
-              </div>
-              <div className="flex justify-between items-center text-sm">
-                <span className="text-text-secondary flex items-center gap-2">
-                  <span className="material-symbols-outlined text-[16px]">language</span> Language
-                </span>
-                <span className="font-mono uppercase text-text-primary">{result.metadata.language}</span>
-              </div>
-            </div>
-
-            <div className="flex flex-col gap-3 mt-2">
-              <h4 className="text-[10px] uppercase tracking-widest font-bold text-text-muted">Signals Used</h4>
-              <div className="flex flex-wrap gap-2">
-                {result.signals.length > 0 ? result.signals.map((sig, idx) => (
-                  <span key={idx} className="bg-elevated border border-border px-2 py-1 rounded text-[11px] text-text-secondary uppercase font-semibold">
-                    {sig}
-                  </span>
-                )) : (
-                  <span className="text-xs text-text-muted">No signals detected</span>
-                )}
-              </div>
-            </div>
-
-          </div>
-        </div>
-      </div>
-
-      {/* MAIN WORKBENCH */}
-      <div className="flex-1 flex flex-col gap-6 overflow-y-auto pr-2">
-        {/* Hero: Executive Summary */}
-        <div className="bg-surface border border-border rounded-xl p-6 shadow-sm">
-          <h2 className="font-display text-2xl text-text-primary mb-4 flex items-center gap-2">
-            <span className="material-symbols-outlined text-gold-primary text-[28px]">summarize</span>
-            Executive Summary
-          </h2>
-          <div className="text-sm text-text-secondary leading-relaxed whitespace-pre-wrap">
+        {/* Executive Summary */}
+        <Panel id="sec-summary" title="Executive Summary" className="scroll-mt-6">
+          <p className="whitespace-pre-wrap font-sans text-sm leading-relaxed text-text-secondary">
             {result.executive_summary}
-          </div>
-        </div>
+          </p>
+        </Panel>
 
-        <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
-          {/* Key Takeaways */}
-          <div className="flex flex-col gap-4">
-            <h3 className="font-display text-lg text-text-primary flex items-center gap-2">
-              <span className="material-symbols-outlined text-gold-primary text-[20px]">lightbulb</span>
-              Key Takeaways
-            </h3>
-            {result.takeaways.length > 0 ? (
-              <div className="flex flex-col gap-3">
-                {result.takeaways.map((takeaway, idx) => (
-                  <TakeawayCard key={idx} takeaway={takeaway} />
-                ))}
-              </div>
-            ) : (
-              <div className="p-4 border border-border rounded-lg bg-surface text-sm text-text-muted text-center">No key takeaways identified.</div>
-            )}
-          </div>
+        {/* Key Takeaways */}
+        <Panel
+          id="sec-takeaways"
+          title="Key Takeaways"
+          className="scroll-mt-6"
+          headerAction={<Badge variant="default" size="sm" uppercase={false}>{result.takeaways.length}</Badge>}
+        >
+          {result.takeaways.length > 0 ? (
+            <div className="flex flex-col gap-3">
+              {result.takeaways.map((takeaway, idx) => (
+                <TakeawayCard key={idx} takeaway={takeaway} />
+              ))}
+            </div>
+          ) : (
+            <SectionEmpty message="No key takeaways identified." />
+          )}
+        </Panel>
 
-          {/* Topics */}
-          <div className="flex flex-col gap-4">
-            <h3 className="font-display text-lg text-text-primary flex items-center gap-2">
-              <span className="material-symbols-outlined text-gold-primary text-[20px]">category</span>
-              Topics
-            </h3>
-            {result.topics.length > 0 ? (
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                {result.topics.map((topic, idx) => (
-                  <TopicCard key={idx} topic={topic} />
-                ))}
-              </div>
-            ) : (
-              <div className="p-4 border border-border rounded-lg bg-surface text-sm text-text-muted text-center">No distinct topics extracted.</div>
-            )}
-          </div>
-        </div>
+        {/* Topics */}
+        <Panel
+          id="sec-topics"
+          title="Topics"
+          className="scroll-mt-6"
+          headerAction={<Badge variant="default" size="sm" uppercase={false}>{result.topics.length}</Badge>}
+        >
+          {result.topics.length > 0 ? (
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              {result.topics.map((topic, idx) => (
+                <TopicCard key={idx} topic={topic} />
+              ))}
+            </div>
+          ) : (
+            <SectionEmpty message="No distinct topics extracted." />
+          )}
+        </Panel>
 
-        {/* Entities and Action Items */}
-        <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
-          <div className="flex flex-col gap-4">
-            <h3 className="font-display text-lg text-text-primary flex items-center gap-2">
-              <span className="material-symbols-outlined text-gold-primary text-[20px]">group</span>
-              Named Entities
-            </h3>
-            {result.entities.length > 0 ? (
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                {result.entities.map((ent, idx) => (
-                  <EntityCard key={idx} entity={ent} />
-                ))}
-              </div>
-            ) : (
-              <div className="p-4 border border-border rounded-lg bg-surface text-sm text-text-muted text-center">No significant entities found.</div>
-            )}
-          </div>
+        {/* Named Entities */}
+        <Panel
+          id="sec-entities"
+          title="Named Entities"
+          className="scroll-mt-6"
+          headerAction={<Badge variant="default" size="sm" uppercase={false}>{result.entities.length}</Badge>}
+        >
+          {result.entities.length > 0 ? (
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              {result.entities.map((ent, idx) => (
+                <EntityCard key={idx} entity={ent} />
+              ))}
+            </div>
+          ) : (
+            <SectionEmpty message="No significant entities found." />
+          )}
+        </Panel>
 
-          <div className="flex flex-col gap-4">
-            <h3 className="font-display text-lg text-text-primary flex items-center gap-2">
-              <span className="material-symbols-outlined text-gold-primary text-[20px]">checklist</span>
-              Action Items
-            </h3>
-            {result.actions.length > 0 ? (
-              <div className="flex flex-col gap-3">
-                {result.actions.map((act, idx) => (
-                  <ActionItemCard key={idx} action={act} />
-                ))}
-              </div>
-            ) : (
-              <div className="p-4 border border-border rounded-lg bg-surface text-sm text-text-muted text-center">No action items found.</div>
-            )}
-          </div>
-        </div>
+        {/* Action Items */}
+        <Panel
+          id="sec-actions"
+          title="Action Items"
+          className="scroll-mt-6"
+          headerAction={<Badge variant="default" size="sm" uppercase={false}>{result.actions.length}</Badge>}
+        >
+          {result.actions.length > 0 ? (
+            <div className="flex flex-col gap-3">
+              {result.actions.map((act, idx) => (
+                <ActionItemCard key={idx} action={act} />
+              ))}
+            </div>
+          ) : (
+            <SectionEmpty message="No action items found." />
+          )}
+        </Panel>
 
-        {/* Numbers & Risks (Full Width / Grid) */}
-        <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
-          <div className="flex flex-col gap-4">
-            <h3 className="font-display text-lg text-text-primary flex items-center gap-2">
-              <span className="material-symbols-outlined text-gold-primary text-[20px]">bar_chart</span>
-              Numerical Insights
-            </h3>
-            {result.numbers.length > 0 ? (
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                {result.numbers.map((num, idx) => (
-                  <div key={idx} className="bg-surface border border-border rounded-lg p-4 shadow-sm flex flex-col gap-2">
-                    <div className="flex justify-between items-center">
-                      <span className="text-xs font-semibold uppercase tracking-wider text-text-muted">{num.metric}</span>
-                      <span className="font-mono text-lg font-bold text-gold-primary">{num.value}</span>
-                    </div>
-                    <p className="text-xs text-text-secondary">{num.context}</p>
+        {/* Numerical Insights */}
+        <Panel
+          id="sec-numbers"
+          title="Numerical Insights"
+          className="scroll-mt-6"
+          headerAction={<Badge variant="default" size="sm" uppercase={false}>{result.numbers.length}</Badge>}
+        >
+          {result.numbers.length > 0 ? (
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              {result.numbers.map((num, idx) => (
+                <Card key={idx} noPadding className="flex flex-col gap-2 p-4">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="font-sans text-xs font-semibold uppercase tracking-wider text-text-muted">
+                      {num.metric}
+                    </span>
+                    <span className="font-mono text-lg font-bold text-gold-primary">{num.value}</span>
                   </div>
-                ))}
-              </div>
-            ) : (
-              <div className="p-4 border border-border rounded-lg bg-surface text-sm text-text-muted text-center">No significant numerical metrics found.</div>
-            )}
-          </div>
+                  <p className="font-sans text-xs text-text-secondary">{num.context}</p>
+                </Card>
+              ))}
+            </div>
+          ) : (
+            <SectionEmpty message="No significant numerical metrics found." />
+          )}
+        </Panel>
 
-          <div className="flex flex-col gap-4">
-            <h3 className="font-display text-lg text-text-primary flex items-center gap-2">
-              <span className="material-symbols-outlined text-gold-primary text-[20px]">warning</span>
-              Risks
-            </h3>
-            {result.risks.length > 0 ? (
-              <div className="flex flex-col gap-3">
-                {result.risks.map((risk, idx) => (
-                  <div key={idx} className="bg-surface border border-border rounded-lg p-4 shadow-sm flex items-start gap-3">
-                    <span className={`material-symbols-outlined text-[20px] mt-0.5 ${
-                      risk.level === 'High' ? 'text-conf-critical' :
-                      risk.level === 'Medium' ? 'text-conf-amber' :
-                      'text-conf-high'
-                    }`}>
-                      {risk.level === 'High' ? 'error' : risk.level === 'Medium' ? 'warning' : 'info'}
+        {/* Risks */}
+        <Panel
+          id="sec-risks"
+          title="Risks"
+          className="scroll-mt-6"
+          headerAction={<Badge variant="default" size="sm" uppercase={false}>{result.risks.length}</Badge>}
+        >
+          {result.risks.length > 0 ? (
+            <div className="flex flex-col gap-3">
+              {result.risks.map((risk, idx) => {
+                const style = RISK_STYLES[risk.level] ?? RISK_STYLES.Low;
+                return (
+                  <Card key={idx} noPadding className="flex items-start gap-3 p-4">
+                    <span className={`material-symbols-outlined text-[20px] mt-0.5 ${style.tone}`} aria-hidden="true">
+                      {style.icon}
                     </span>
                     <div className="flex flex-col gap-1">
-                      <span className={`text-[10px] font-bold uppercase tracking-wider ${
-                        risk.level === 'High' ? 'text-conf-critical' :
-                        risk.level === 'Medium' ? 'text-conf-amber' :
-                        'text-conf-high'
-                      }`}>{risk.level} Risk</span>
-                      <p className="text-sm text-text-primary leading-relaxed">{risk.description}</p>
+                      <span className={`text-[10px] font-bold uppercase tracking-wider ${style.tone}`}>
+                        {risk.level} Risk
+                      </span>
+                      <p className="font-sans text-sm leading-relaxed text-text-primary">{risk.description}</p>
                     </div>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <div className="p-4 border border-border rounded-lg bg-surface text-sm text-text-muted text-center">No significant risks identified.</div>
-            )}
-          </div>
-        </div>
+                  </Card>
+                );
+              })}
+            </div>
+          ) : (
+            <SectionEmpty message="No significant risks identified." />
+          )}
+        </Panel>
 
       </div>
-    </div>
+    </AnalysisLayout>
   );
 }

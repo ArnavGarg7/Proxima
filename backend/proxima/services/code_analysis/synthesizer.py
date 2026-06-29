@@ -46,7 +46,8 @@ async def run_llm_synthesis(code: str, language: str, metrics: dict, security: l
         
         system_prompt = f"""You are a senior {language} code reviewer.
 Analyze the provided code and deterministic metrics.
-You MUST output strictly in JSON format matching the schema.
+You MUST output strictly in JSON format matching this schema:
+{CodeLLMSynthesis.schema_json(indent=2)}
 
 Deterministic Context:
 Language: {language}

@@ -28,20 +28,27 @@ export const space = {
   24: '96px',
 } as const;
 
-/** Component-level spacing conventions */
+/**
+ * Component-level spacing conventions — all values are mobile-first Tailwind
+ * class strings. Apply the whole string via `cn(layout.pagePx)` in JSX.
+ */
 export const layout = {
-  /** Standard card padding */
-  cardPadding:    'p-6',
-  /** Compact card padding */
-  cardPaddingSm:  'p-4',
-  /** Page outer padding */
-  pagePadding:    'p-8',
-  /** Section gap between cards */
-  sectionGap:     'gap-6',
+  /** Responsive horizontal page gutter: 16px → 24px → 32px */
+  pagePx:        'px-4 sm:px-6 lg:px-8',
+  /** Responsive vertical page padding: 24px → 32px */
+  pagePy:        'py-6 sm:py-8',
+  /** Responsive card body padding: 16px → 24px */
+  cardPadding:   'p-4 sm:p-6',
+  /** Compact card / panel padding: 16px → 20px */
+  cardPaddingSm: 'p-4 sm:p-5',
+  /** Section gap between cards: 16px → 24px */
+  sectionGap:    'gap-4 sm:gap-6',
   /** Gap between inline items */
-  inlineGap:      'gap-3',
-  /** Max content width */
-  maxWidth:       'max-w-[1400px]',
-  /** Navbar height */
-  navbarHeight:   '60px',
+  inlineGap:     'gap-3',
+  /** Standard max content width */
+  maxWidth:      'max-w-[1400px]',
+  /** Analysis workspace max width (allows ultra-wide without extreme stretching) */
+  maxWidthWide:  'max-w-[1600px]',
+  /** Navbar height — also set in globals.css as --nav-height */
+  navbarHeight:  '60px',
 } as const;

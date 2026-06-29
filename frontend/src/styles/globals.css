@@ -77,7 +77,15 @@
 }
 
 @layer base {
-  html { background: #0A0A0A; color: #F0EFE9; }
+  /* Prevent horizontal overflow at the document root — all pages inherit this */
+  html {
+    background: #0A0A0A;
+    color: #F0EFE9;
+    overflow-x: hidden;
+    /* Navbar height token — consumed by min-h calculations throughout the app */
+    --nav-height: 60px;
+  }
+  body { min-width: 0; }
   * { box-sizing: border-box; }
   ::-webkit-scrollbar { width: 6px; height: 6px; }
   ::-webkit-scrollbar-track { background: #111111; }
@@ -89,14 +97,45 @@
 @layer components {
   /* Legacy utility classes — kept for backward compatibility with existing pages.
      New pages should use the <Button>, <Card>, <Input> components instead. */
-  .btn-primary   { @apply bg-gold-primary text-void font-medium text-sm px-5 py-2.5 rounded hover:bg-gold-bright hover:-translate-y-px active:translate-y-0 transition-all duration-150 cursor-pointer select-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold-primary/50; }
-  .btn-secondary { @apply bg-transparent text-text-primary border border-border-strong text-sm px-5 py-2.5 rounded hover:bg-elevated transition-all duration-150 cursor-pointer select-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold-primary/50; }
-  .btn-ghost     { @apply bg-transparent text-text-secondary text-sm px-4 py-2 rounded hover:text-text-primary hover:bg-white/5 transition-all duration-150 cursor-pointer select-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold-primary/50; }
-  .btn-danger    { @apply bg-red-900/20 text-red-300 border border-red-800 text-sm px-5 py-2.5 rounded hover:bg-red-900/40 transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500/50; }
-  .input-base    { @apply bg-surface border border-border rounded px-3.5 py-2.5 text-sm text-text-primary placeholder:text-text-muted w-full focus:outline-none focus:border-gold-primary focus:ring-2 focus:ring-gold-primary/15 transition-colors duration-150; }
-  .card          { @apply bg-surface border border-border rounded-lg p-6 hover:border-border-strong hover:bg-elevated transition-all duration-150; }
+  .btn-primary   { @apply bg-gold-primary text-void font-medium text-sm px-5 py-2.5 rounded hover:bg-gold-bright motion-safe:hover:-translate-y-px motion-safe:active:translate-y-0 motion-safe:active:scale-[0.98] transition-all duration-150 cursor-pointer select-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold-primary/50 motion-safe:will-change-transform; }
+  .btn-secondary { @apply bg-transparent text-text-primary border border-border-strong text-sm px-5 py-2.5 rounded hover:bg-elevated motion-safe:active:scale-[0.98] transition-all duration-150 cursor-pointer select-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold-primary/50 motion-safe:will-change-transform; }
+  .btn-ghost     { @apply bg-transparent text-text-secondary text-sm px-4 py-2 rounded hover:text-text-primary hover:bg-white/5 motion-safe:active:scale-[0.98] transition-all duration-150 cursor-pointer select-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold-primary/50 motion-safe:will-change-transform; }
+  .btn-danger    { @apply bg-red-900/20 text-red-300 border border-red-800 text-sm px-5 py-2.5 rounded hover:bg-red-900/40 motion-safe:active:scale-[0.98] transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500/50 motion-safe:will-change-transform; }
+  .input-base    { @apply bg-surface border border-border rounded px-3.5 py-2.5 text-sm text-text-primary placeholder:text-text-muted w-full hover:border-border-strong focus:outline-none focus:border-gold-primary focus:ring-2 focus:ring-gold-primary/15 transition-colors duration-150; }
+  .card          { @apply bg-surface border border-border rounded-lg p-6 hover:border-border-strong hover:bg-elevated motion-safe:hover:-translate-y-0.5 transition-all duration-150 motion-safe:will-change-transform; }
   .metric-card   { @apply bg-surface border border-border rounded-lg p-6 border-t-2 border-t-gold-primary; }
   .panel-header  { @apply text-text-muted text-xs font-medium uppercase tracking-widest px-5 py-3 border-b border-border; }
+}
+
+/* ─── Responsive utility classes ────────────────────────────────────────────
+   Use these instead of arbitrary px-/py-/gap- values so every page compresses
+   identically on small viewports. All values mirror src/theme/spacing.ts.
+   ─────────────────────────────────────────────────────────────────────────── */
+@layer utilities {
+  /* Responsive horizontal page gutters (mirrors layout.pagePx) */
+  .page-px  { @apply px-4 sm:px-6 lg:px-8; }
+  /* Responsive vertical page padding (mirrors layout.pagePy) */
+  .page-py  { @apply py-6 sm:py-8; }
+  /* Combined responsive page padding */
+  .page-p   { @apply p-4  sm:p-6  lg:p-8; }
+
+  /* Responsive section gaps */
+  .section-gap   { @apply gap-4 sm:gap-6; }
+  .section-gap-y { @apply space-y-4 sm:space-y-6; }
+
+  /* Standard adaptive card grids */
+  .grid-1-2   { @apply grid grid-cols-1 gap-4 sm:gap-6 md:grid-cols-2; }
+  .grid-1-2-3 { @apply grid grid-cols-1 gap-4 sm:gap-6 md:grid-cols-2 xl:grid-cols-3; }
+  .grid-1-3   { @apply grid grid-cols-1 gap-4 sm:gap-6 sm:grid-cols-3; }
+
+  /* Overflow protection — apply to any container that should never bleed */
+  .overflow-safe { @apply min-w-0 overflow-hidden; }
+  /* Safe text truncation with ellipsis */
+  .text-clip     { @apply min-w-0 overflow-hidden text-ellipsis whitespace-nowrap; }
+  /* Horizontally scrollable code/pre blocks */
+  .code-scroll   { @apply overflow-x-auto; }
+  /* Long filenames / document titles */
+  .filename      { @apply min-w-0 max-w-full overflow-hidden text-ellipsis whitespace-nowrap; }
 }
 
 /* ─── Confidence heatmap ─────────────────────────────────────────────────── */

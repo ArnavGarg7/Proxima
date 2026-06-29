@@ -17,7 +17,7 @@ interface ChipProps {
 
 const baseStyles =
   'inline-flex items-center gap-1.5 text-xs font-sans font-medium rounded-full px-2.5 py-1 ' +
-  'transition-all duration-150 select-none';
+  'transition-all duration-150 select-none motion-safe:will-change-transform';
 
 const variantStyles: Record<ChipVariant, string> = {
   default: 'bg-elevated text-text-secondary border border-border hover:border-border-strong',
@@ -61,7 +61,7 @@ export function Chip({ variant = 'default', onDismiss, onClick, selected, childr
         baseStyles,
         variantStyles[variant],
         selected && selectedStyles[variant],
-        isInteractive && 'cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold-primary/50',
+        isInteractive && 'cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold-primary/50 motion-safe:active:scale-[0.95]',
         className,
       )}
     >

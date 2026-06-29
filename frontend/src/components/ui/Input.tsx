@@ -56,9 +56,10 @@ const inputBase =
   'bg-surface border border-border rounded px-3.5 py-2.5 text-sm font-sans text-text-primary ' +
   'placeholder:text-text-muted w-full ' +
   'transition-colors duration-150 ' +
+  'hover:border-border-strong ' +
   'focus:outline-none focus:border-gold-primary focus:ring-2 focus:ring-gold-primary/15 ' +
-  'disabled:opacity-40 disabled:cursor-not-allowed ' +
-  'read-only:bg-elevated read-only:cursor-default';
+  'disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:border-border ' +
+  'read-only:bg-elevated read-only:cursor-default read-only:hover:border-border';
 
 const inputError = 'border-conf-critical focus:border-conf-critical focus:ring-conf-critical/15';
 

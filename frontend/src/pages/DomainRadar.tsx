@@ -1,5 +1,23 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { api } from '@/lib/axios';
+import {
+  AnalysisLayout,
+  AnalysisHeader,
+  AnalysisSidebar,
+  AnalysisInspector,
+  InspectorStat,
+  AnalysisEmptyState,
+  AnalysisLoading,
+  ConfidenceRing,
+  type OutlineItem,
+} from '@/components/analysis';
+import { Panel } from '@/components/ui/Panel';
+import { Card } from '@/components/ui/Card';
+import { Badge } from '@/components/ui/Badge';
+import { Button } from '@/components/ui/Button';
+import { Chip } from '@/components/ui/Chip';
+
+// ── Types ─────────────────────────────────────────────────────────────────────
 
 interface Document {
   id: string;
@@ -40,6 +58,129 @@ interface DomainRadarResult {
   diagnostics: Record<string, unknown>;
 }
 
+// ── Confidence label → style/icon helpers (preserved from original) ────────────
+
+function confidenceLabelClasses(label: string): string {
+  switch (label.toLowerCase()) {
+    case 'high':   return 'text-conf-high border-conf-high/30 bg-conf-high/10';
+    case 'medium': return 'text-conf-amber border-conf-amber/30 bg-conf-amber/10';
+    case 'low':    return 'text-conf-low border-conf-low/30 bg-conf-low/10';
+    default:       return 'text-text-secondary border-border bg-surface';
+  }
+}
+
+function confidenceIconName(label: string): string {
+  switch (label.toLowerCase()) {
+    case 'high':   return 'check_circle';
+    case 'medium': return 'remove_circle_outline';
+    case 'low':    return 'help_outline';
+    default:       return 'info';
+  }
+}
+
+function confidenceBarClass(label: string): string {
+  switch (label.toLowerCase()) {
+    case 'high':   return 'bg-conf-high';
+    case 'medium': return 'bg-conf-amber';
+    case 'low':    return 'bg-conf-low';
+    default:       return 'bg-text-muted';
+  }
+}
+
+function surfaceIconName(surface: string): string {
+  switch (surface.toLowerCase()) {
+    case 'workspace': return 'space_dashboard';
+    case 'audit':     return 'fact_check';
+    case 'clinical':  return 'medical_services';
+    case 'compare':   return 'compare_arrows';
+    case 'code':      return 'code';
+    default:          return 'dashboard';
+  }
+}
+
+// ── Presentation-only sub-components ──────────────────────────────────────────
+
+function ConfidenceBadge({ label }: { label: string }) {
+  return (
+    <span
+      className={`inline-flex items-center gap-1.5 rounded-md border px-2.5 py-1 text-xs font-bold uppercase tracking-wider ${confidenceLabelClasses(label)}`}
+    >
+      <span className="material-symbols-outlined text-[14px]" aria-hidden="true">
+        {confidenceIconName(label)}
+      </span>
+      {label} Confidence
+    </span>
+  );
+}
+
+function DomainBar({
+  domain,
+  score,
+  confidence_label,
+}: DomainRadarResult['candidate_domains'][number]) {
+  const pct = Math.round(score * 100);
+  return (
+    <div className="flex flex-col gap-1">
+      <div className="flex items-center justify-between gap-2">
+        <span className="font-sans text-sm capitalize text-text-primary">{domain}</span>
+        <span className="font-mono text-sm text-text-secondary">{pct}%</span>
+      </div>
+      <div className="h-1.5 w-full overflow-hidden rounded-full border border-border bg-void">
+        <div
+          className={`h-full rounded-full ${confidenceBarClass(confidence_label)}`}
+          style={{ width: `${pct}%` }}
+        />
+      </div>
+    </div>
+  );
+}
+
+function SignalCard({ signal }: { signal: DomainRadarResult['signals'][number] }) {
+  return (
+    <Card noPadding className="flex flex-col gap-2 p-4">
+      <div className="flex items-start justify-between gap-2">
+        <p className="font-sans text-sm font-semibold text-text-primary">{signal.label}</p>
+        <span
+          className={`shrink-0 rounded border px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider ${confidenceLabelClasses(signal.strength)}`}
+        >
+          {signal.strength}
+        </span>
+      </div>
+      <p className="font-sans text-xs leading-relaxed text-text-secondary">{signal.description}</p>
+    </Card>
+  );
+}
+
+function SurfaceCard({
+  surface: s,
+}: {
+  surface: DomainRadarResult['recommended_surfaces'][number];
+}) {
+  return (
+    <Card noPadding className="flex items-start gap-3 p-4">
+      <span
+        className="material-symbols-outlined mt-0.5 shrink-0 text-[20px] text-gold-primary"
+        style={{ fontVariationSettings: "'FILL' 1" }}
+        aria-hidden="true"
+      >
+        {surfaceIconName(s.surface)}
+      </span>
+      <div className="flex flex-col gap-1">
+        <p className="font-sans text-sm font-semibold capitalize text-text-primary">{s.surface}</p>
+        <p className="font-sans text-xs leading-relaxed text-text-secondary">{s.reason}</p>
+      </div>
+    </Card>
+  );
+}
+
+function SectionEmpty({ message }: { message: string }) {
+  return (
+    <p className="py-2 text-center font-sans text-sm text-text-muted">{message}</p>
+  );
+}
+
+// ── Page ──────────────────────────────────────────────────────────────────────
+
 export default function DomainRadar() {
   const [documents, setDocuments] = useState<Document[]>([]);
   const [selectedDocId, setSelectedDocId] = useState<string>('');
@@ -58,7 +199,7 @@ export default function DomainRadar() {
           setSelectedDocId(res.data[0].id);
         }
       } catch (err) {
-        console.error("Failed to load documents", err);
+        console.error('Failed to load documents', err);
       } finally {
         setLoadingDocs(false);
       }
@@ -74,7 +215,7 @@ export default function DomainRadar() {
 
     try {
       const res = await api.post('/api/intelligence/domain-radar', {
-        document_id: selectedDocId
+        document_id: selectedDocId,
       });
       setResult(res.data);
     } catch (err: unknown) {
@@ -91,288 +232,315 @@ export default function DomainRadar() {
     setError(null);
   }, [selectedDocId]);
 
-  const getConfidenceColor = (label: string) => {
-    switch (label.toLowerCase()) {
-      case 'high': return 'text-conf-high border-conf-high/30 bg-conf-high/10';
-      case 'medium': return 'text-conf-amber border-conf-amber/30 bg-conf-amber/10';
-      case 'low': return 'text-conf-low border-conf-low/30 bg-conf-low/10';
-      default: return 'text-text-secondary border-border bg-surface';
-    }
-  };
-
-  const getConfidenceIcon = (label: string) => {
-    switch (label.toLowerCase()) {
-      case 'high': return 'check_circle';
-      case 'medium': return 'remove_circle_outline';
-      case 'low': return 'help_outline';
-      default: return 'info';
-    }
-  };
-
-  const getSurfaceIcon = (surface: string) => {
-    switch (surface.toLowerCase()) {
-      case 'workspace': return 'space_dashboard';
-      case 'audit': return 'fact_check';
-      case 'clinical': return 'medical_services';
-      case 'compare': return 'compare_arrows';
-      case 'code': return 'code';
-      default: return 'dashboard';
-    }
-  };
-
   const activeDocument = documents.find(d => d.id === selectedDocId);
 
-  if (!result && !isAnalyzing) {
-    return (
-      <div className="flex-1 p-8 bg-void min-h-[calc(100vh-60px)] flex flex-col items-center justify-center">
-        <div className="w-full max-w-[600px] text-center space-y-6">
-          <div className="w-16 h-16 rounded-2xl bg-surface border border-border mx-auto flex items-center justify-center shadow-sm">
-            <span className="material-symbols-outlined text-3xl text-primary">radar</span>
-          </div>
-          <div>
-            <h1 className="font-display text-4xl text-text-primary mb-3">Domain Radar</h1>
-            <p className="font-sans text-base text-text-secondary max-w-md mx-auto">
-              Classify a document's domain, inspect classification signals, and see which Proxima workflows are best suited for it.
-            </p>
-          </div>
-          
-          <div className="bg-elevated border border-border rounded-xl p-6 text-left max-w-sm mx-auto">
-            <ul className="space-y-4 text-sm text-text-secondary font-sans">
-              <li className="flex items-center gap-3">
-                <span className="material-symbols-outlined text-primary text-[20px]">category</span>
-                Detect likely domain
-              </li>
-              <li className="flex items-center gap-3">
-                <span className="material-symbols-outlined text-primary text-[20px]">sort</span>
-                Surface confidence-scored candidates
-              </li>
-              <li className="flex items-center gap-3">
-                <span className="material-symbols-outlined text-primary text-[20px]">psychology</span>
-                Explain why it was classified
-              </li>
-              <li className="flex items-center gap-3">
-                <span className="material-symbols-outlined text-primary text-[20px]">route</span>
-                Recommend the right Proxima surface
-              </li>
-            </ul>
-          </div>
+  const outlineItems = useMemo<OutlineItem[]>(() => {
+    if (!result) return [];
+    return [
+      { id: 'sec-summary',         label: 'Classification Summary',  icon: 'psychology'                                                    },
+      { id: 'sec-domains',         label: 'Detected Domains',        icon: 'category',     count: result.candidate_domains.length + 1      },
+      { id: 'sec-signals',         label: 'Detection Signals',       icon: 'track_changes', count: result.signals.length                   },
+      { id: 'sec-recommendations', label: 'Recommended Workflows',   icon: 'route',         count: result.recommended_surfaces.length       },
+      { id: 'sec-profile',         label: 'Document Profile',        icon: 'analytics'                                                     },
+    ];
+  }, [result]);
 
-          <div className="bg-surface border border-border rounded-xl p-6 flex flex-col items-center gap-4 max-w-md mx-auto">
-            <label className="font-sans text-sm font-medium text-text-primary">Select Document to Analyze</label>
-            {loadingDocs ? (
-              <div className="text-text-muted text-sm">Loading documents...</div>
-            ) : documents.length === 0 ? (
-               <div className="text-text-muted text-sm">No documents available. Upload one in Workspace first.</div>
-            ) : (
-              <div className="flex flex-col gap-4 w-full">
-                <select 
-                  value={selectedDocId} 
-                  onChange={(e) => setSelectedDocId(e.target.value)}
-                  className="bg-surface border border-border text-text-primary rounded-lg px-4 py-2 w-full focus:ring-1 focus:ring-primary focus:border-primary text-sm font-sans"
-                >
-                  {documents.map(doc => (
-                    <option key={doc.id} value={doc.id}>{doc.title} ({new Date(doc.created_at).toLocaleDateString()})</option>
-                  ))}
-                </select>
-                <button 
-                  onClick={runAnalysis}
-                  disabled={!selectedDocId}
-                  className="bg-gold-primary text-void px-6 py-2.5 rounded-lg font-sans text-sm font-bold hover:bg-gold-primary/90 disabled:opacity-50 transition-colors flex justify-center items-center gap-2"
-                >
-                  <span className="material-symbols-outlined text-[20px]">radar</span>
-                  Start Radar Scan
-                </button>
-              </div>
-            )}
-          </div>
-        </div>
-      </div>
+  // ── Loading ──────────────────────────────────────────────────────────────
+
+  if (isAnalyzing) {
+    return (
+      <AnalysisLoading
+        title="Running Domain Radar…"
+        message="Scanning document and synthesising domain classification"
+      />
     );
   }
 
-  return (
-    <div className="flex-1 p-8 bg-void min-h-[calc(100vh-60px)] flex gap-6 overflow-hidden">
-      
-      {/* Left Column: Snapshot */}
-      <div className="w-1/3 flex flex-col gap-6 overflow-y-auto pr-2">
-        <header className="flex justify-between items-center">
-          <h1 className="font-display text-2xl text-text-primary flex items-center gap-2">
-            <span className="material-symbols-outlined text-primary">radar</span>
-            Domain Radar
-          </h1>
-          <button onClick={() => setResult(null)} className="text-text-secondary hover:text-text-primary font-sans text-sm underline flex items-center gap-1">
-            <span className="material-symbols-outlined text-[16px]">arrow_back</span>
-            New Scan
-          </button>
-        </header>
+  // ── Empty / onboarding ───────────────────────────────────────────────────
 
-        {/* Selected Document Card */}
-        <div className="bg-surface border border-border rounded-xl p-4">
-          <div className="text-xs font-sans text-text-muted uppercase tracking-wider mb-2">Target Document</div>
-          <div className="flex items-center gap-3">
-            <span className="material-symbols-outlined text-text-secondary">description</span>
-            <span className="font-sans text-sm font-medium text-text-primary truncate">{activeDocument?.title || 'Selected Document'}</span>
-          </div>
-          <button 
-            onClick={runAnalysis}
-            disabled={isAnalyzing}
-            className="w-full mt-4 bg-gold-primary text-void py-2.5 rounded-lg font-sans text-sm font-bold hover:bg-gold-primary/90 disabled:opacity-50 transition-colors flex justify-center items-center gap-2"
-          >
-            {isAnalyzing ? (
-              <><span className="material-symbols-outlined animate-spin text-[18px]">sync</span> Analyzing...</>
-            ) : (
-              <><span className="material-symbols-outlined text-[18px]">refresh</span> Rerun Radar</>
-            )}
-          </button>
-        </div>
-
-        {error && (
-          <div className="bg-conf-critical/10 border border-conf-critical/20 p-4 rounded-xl text-conf-critical flex items-start gap-3">
-            <span className="material-symbols-outlined mt-0.5">error</span>
-            <p className="font-sans text-sm">{error}</p>
-          </div>
-        )}
-
-        {result && (
+  if (!result) {
+    return (
+      <AnalysisEmptyState
+        icon="radar"
+        title="Domain Radar"
+        description="Classify a document's domain, inspect detection signals, and discover which Proxima workflows are best suited for it."
+        expectedOutput={[
+          'Primary domain classification',
+          'Candidate domain scores',
+          'Detection signals',
+          'Recommended workflows',
+          'Document profile',
+        ]}
+        supportedTypes={['PDF', 'DOCX', 'TXT']}
+        error={error}
+      >
+        <label htmlFor="radar-doc" className="font-sans text-sm font-medium text-text-primary">
+          Select a document to scan
+        </label>
+        {loadingDocs ? (
+          <p className="font-sans text-sm text-text-muted">Loading documents…</p>
+        ) : documents.length === 0 ? (
+          <p className="font-sans text-sm text-text-muted">
+            No documents available. Upload one in Workspace first.
+          </p>
+        ) : (
           <>
-            {/* Primary Domain Hero */}
-            <div className="bg-elevated border border-border rounded-xl p-6 shadow-sm relative overflow-hidden">
-              <div className="absolute top-0 right-0 p-4 opacity-5">
-                <span className="material-symbols-outlined text-8xl">domain</span>
-              </div>
-              <div className="text-xs font-sans text-text-muted uppercase tracking-wider mb-4 relative z-10">Primary Domain</div>
-              
-              <div className="flex items-end gap-4 mb-2 relative z-10">
-                <div className="font-display text-4xl text-text-primary capitalize">{result.primary_domain.domain}</div>
-                <div className="font-sans text-lg text-text-secondary pb-1">{Math.round(result.primary_domain.score * 100)}%</div>
-              </div>
-              
-              <div className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md border text-xs font-bold uppercase tracking-wider ${getConfidenceColor(result.primary_domain.confidence_label)} relative z-10`}>
-                <span className="material-symbols-outlined text-[14px]">{getConfidenceIcon(result.primary_domain.confidence_label)}</span>
-                {result.primary_domain.confidence_label} CONFIDENCE
-              </div>
-            </div>
-
-            {/* Candidates */}
-            <div className="bg-surface border border-border rounded-xl p-4">
-               <div className="text-xs font-sans text-text-muted uppercase tracking-wider mb-4">Candidate Domains</div>
-               <div className="space-y-3">
-                 {result.candidate_domains.map(c => (
-                   <div key={c.domain} className="flex flex-col gap-1">
-                     <div className="flex justify-between items-center font-sans text-sm">
-                       <span className="text-text-primary capitalize">{c.domain}</span>
-                       <span className="text-text-secondary">{Math.round(c.score * 100)}%</span>
-                     </div>
-                     <div className="w-full bg-void rounded-full h-1.5 overflow-hidden border border-border">
-                       <div 
-                         className={`h-full rounded-full ${c.confidence_label === 'high' ? 'bg-conf-high' : c.confidence_label === 'medium' ? 'bg-conf-amber' : 'bg-conf-low'}`}
-                         style={{ width: `${Math.round(c.score * 100)}%` }}
-                       />
-                     </div>
-                   </div>
-                 ))}
-               </div>
-            </div>
-
-            {/* Recommended Surfaces */}
-            <div className="bg-surface border border-border rounded-xl p-4">
-              <div className="text-xs font-sans text-text-muted uppercase tracking-wider mb-4">Recommended Proxima Workflows</div>
-              <div className="space-y-3">
-                {result.recommended_surfaces.map((s, i) => (
-                  <div key={i} className="flex gap-3 items-start p-3 bg-elevated rounded-lg border border-border shadow-sm">
-                    <span className="material-symbols-outlined text-primary mt-0.5">{getSurfaceIcon(s.surface)}</span>
-                    <div>
-                      <div className="font-sans text-sm font-bold text-text-primary capitalize mb-1">{s.surface}</div>
-                      <div className="font-sans text-xs text-text-secondary leading-relaxed">{s.reason}</div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
+            <select
+              id="radar-doc"
+              value={selectedDocId}
+              onChange={e => setSelectedDocId(e.target.value)}
+              className="w-full rounded-md border border-border bg-surface px-3.5 py-2.5 font-sans text-sm text-text-primary
+                focus:border-gold-primary focus:outline-none focus:ring-2 focus:ring-gold-primary/15"
+            >
+              {documents.map(doc => (
+                <option key={doc.id} value={doc.id}>
+                  {doc.title} ({new Date(doc.created_at).toLocaleDateString()})
+                </option>
+              ))}
+            </select>
+            <Button
+              variant="primary"
+              onClick={runAnalysis}
+              disabled={!selectedDocId}
+              leftIcon={
+                <span className="material-symbols-outlined text-[18px]" aria-hidden="true">radar</span>
+              }
+              className="w-full"
+            >
+              Start Radar Scan
+            </Button>
           </>
         )}
-      </div>
+      </AnalysisEmptyState>
+    );
+  }
 
-      {/* Right Column: Deep Analysis */}
-      <div className="w-2/3 bg-elevated border border-border rounded-xl flex flex-col overflow-hidden relative">
-        {isAnalyzing ? (
-           <div className="flex-1 flex flex-col items-center justify-center text-text-muted gap-4">
-             <span className="material-symbols-outlined animate-spin text-4xl text-primary">radar</span>
-             <p className="font-sans text-sm animate-pulse">Scanning document and synthesizing domain...</p>
-           </div>
-        ) : result && (
-          <div className="flex-1 overflow-y-auto p-8 space-y-8">
-            
-            {/* Summary */}
-            <div>
-              <h3 className="font-sans text-sm font-medium text-text-muted uppercase tracking-wider flex items-center gap-2 mb-4">
-                <span className="material-symbols-outlined text-sm">psychology</span>
-                Classification Summary
-              </h3>
-              <div className="font-sans text-lg text-text-primary font-medium leading-relaxed p-6 bg-surface border border-border rounded-xl shadow-sm">
-                {result.summary}
-              </div>
-            </div>
+  // ── Result — three-panel workspace ───────────────────────────────────────
 
-            {/* Signals */}
-            <div>
-              <h3 className="font-sans text-sm font-medium text-text-muted uppercase tracking-wider flex items-center gap-2 mb-4">
-                <span className="material-symbols-outlined text-sm">track_changes</span>
-                Detected Signals
-              </h3>
-              {result.signals.length === 0 ? (
-                <div className="p-4 font-sans text-sm text-text-secondary bg-surface border border-border rounded-xl">No strong deterministic signals detected.</div>
-              ) : (
-                <div className="grid grid-cols-2 gap-4">
-                  {result.signals.map((sig, i) => (
-                    <div key={i} className="p-4 bg-surface border border-border rounded-xl shadow-sm">
-                      <div className="flex justify-between items-start mb-2">
-                        <div className="font-sans text-sm font-bold text-text-primary">{sig.label}</div>
-                        <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider border ${getConfidenceColor(sig.strength)}`}>
-                          {sig.strength}
-                        </span>
-                      </div>
-                      <div className="font-sans text-xs text-text-secondary leading-relaxed">{sig.description}</div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
+  const primaryPct = Math.round(result.primary_domain.score * 100);
 
-            {/* Document Profile Diagnostics */}
-            <div>
-              <h3 className="font-sans text-sm font-medium text-text-muted uppercase tracking-wider flex items-center gap-2 mb-4">
-                <span className="material-symbols-outlined text-sm">analytics</span>
-                Document Profile
-              </h3>
-              <div className="flex flex-wrap gap-4">
-                <div className="bg-surface border border-border rounded-lg p-3 flex-1 min-w-[120px]">
-                  <div className="text-[10px] font-bold text-text-muted uppercase tracking-wider mb-1">Words</div>
-                  <div className="font-mono text-lg text-text-primary">{result.document_profile.word_count}</div>
-                </div>
-                <div className="bg-surface border border-border rounded-lg p-3 flex-1 min-w-[120px]">
-                  <div className="text-[10px] font-bold text-text-muted uppercase tracking-wider mb-1">Lines</div>
-                  <div className="font-mono text-lg text-text-primary">{result.document_profile.line_count}</div>
-                </div>
-                <div className="bg-surface border border-border rounded-lg p-3 flex-1 min-w-[120px]">
-                  <div className="text-[10px] font-bold text-text-muted uppercase tracking-wider mb-1">Paragraphs</div>
-                  <div className="font-mono text-lg text-text-primary">{result.document_profile.paragraph_count}</div>
-                </div>
-                <div className="bg-surface border border-border rounded-lg p-3 flex-1 min-w-[120px]">
-                  <div className="text-[10px] font-bold text-text-muted uppercase tracking-wider mb-1">Headings</div>
-                  <div className="font-mono text-lg text-text-primary">{result.document_profile.heading_like_lines}</div>
-                </div>
-                <div className="bg-surface border border-border rounded-lg p-3 flex-1 min-w-[120px]">
-                  <div className="text-[10px] font-bold text-text-muted uppercase tracking-wider mb-1">Tables/Grids</div>
-                  <div className="font-mono text-lg text-text-primary">{result.document_profile.table_like_lines}</div>
-                </div>
-              </div>
-            </div>
+  const header = (
+    <AnalysisHeader
+      icon="radar"
+      title="Domain Radar"
+      documentName={activeDocument?.title ?? result.document_title}
+      status={<Badge variant="success" size="sm">Complete</Badge>}
+      confidence={primaryPct}
+      actions={
+        <Button
+          variant="secondary"
+          size="sm"
+          onClick={runAnalysis}
+          leftIcon={
+            <span className="material-symbols-outlined text-[16px]" aria-hidden="true">refresh</span>
+          }
+        >
+          Re-run
+        </Button>
+      }
+    />
+  );
 
+  const sidebar = <AnalysisSidebar items={outlineItems} />;
+
+  const inspector = (
+    <AnalysisInspector>
+      {/* Domain confidence ring */}
+      <Panel title="Domain Confidence">
+        <div className="flex flex-col items-center gap-3 py-1">
+          <ConfidenceRing value={primaryPct} size="lg" />
+          <ConfidenceBadge label={result.primary_domain.confidence_label} />
+        </div>
+      </Panel>
+
+      {/* Domain snapshot */}
+      <Panel title="Domain Snapshot">
+        <div className="flex flex-col gap-3">
+          <div className="flex flex-col gap-0.5">
+            <span className="font-sans text-[10px] font-bold uppercase tracking-wider text-text-muted">
+              Primary Domain
+            </span>
+            <span className="font-display text-xl capitalize text-text-primary">
+              {result.primary_domain.domain}
+            </span>
           </div>
-        )}
-      </div>
+          <InspectorStat icon="percent"  label="Domain Score" value={`${primaryPct}%`} />
+          {result.candidate_domains[0] && (
+            <InspectorStat
+              icon="category"
+              label="Runner-up"
+              value={`${result.candidate_domains[0].domain} (${Math.round(result.candidate_domains[0].score * 100)}%)`}
+            />
+          )}
+        </div>
+      </Panel>
 
-    </div>
+      {/* Detection summary */}
+      <Panel title="Detection Summary">
+        <div className="flex flex-col gap-3">
+          <InspectorStat icon="category"     label="Domains"       value={result.candidate_domains.length + 1} />
+          <InspectorStat icon="track_changes" label="Signals"       value={result.signals.length}              />
+          <InspectorStat icon="route"         label="Workflows"     value={result.recommended_surfaces.length} />
+        </div>
+      </Panel>
+
+      {/* Document Profile */}
+      <Panel title="Document Profile">
+        <div className="flex flex-col gap-3">
+          <InspectorStat icon="format_size"         label="Words"      value={result.document_profile.word_count.toLocaleString()}       />
+          <InspectorStat icon="reorder"             label="Lines"      value={result.document_profile.line_count.toLocaleString()}       />
+          <InspectorStat icon="article"             label="Paragraphs" value={result.document_profile.paragraph_count.toLocaleString()}  />
+          <InspectorStat icon="title"               label="Headings"   value={result.document_profile.heading_like_lines.toLocaleString()} />
+          <InspectorStat icon="table_chart"         label="Tables"     value={result.document_profile.table_like_lines.toLocaleString()} />
+        </div>
+      </Panel>
+
+      {/* Signals as chips */}
+      {result.signals.length > 0 && (
+        <Panel title="Signals">
+          <div className="flex flex-wrap gap-1.5">
+            {result.signals.map((sig, idx) => (
+              <Chip key={idx} variant="default">{sig.label}</Chip>
+            ))}
+          </div>
+        </Panel>
+      )}
+
+      {/* Engine */}
+      <Panel title="Engine">
+        <div className="flex flex-col gap-2">
+          <InspectorStat icon="bolt" label="Analyzer" value="Domain Radar" />
+          <p className="font-sans text-xs leading-relaxed text-text-muted">
+            Cross-domain semantic classification and domain detection.
+          </p>
+        </div>
+      </Panel>
+    </AnalysisInspector>
+  );
+
+  return (
+    <AnalysisLayout header={header} sidebar={sidebar} inspector={inspector} mobileContents={outlineItems}>
+      <div className="flex flex-col gap-6">
+
+        {/* Classification Summary */}
+        <Panel id="sec-summary" title="Classification Summary" className="scroll-mt-6">
+          <p className="whitespace-pre-wrap font-sans text-sm leading-relaxed text-text-secondary">
+            {result.summary}
+          </p>
+        </Panel>
+
+        {/* Detected Domains */}
+        <Panel
+          id="sec-domains"
+          title="Detected Domains"
+          className="scroll-mt-6"
+          headerAction={
+            <Badge variant="default" size="sm" uppercase={false}>
+              {result.candidate_domains.length + 1}
+            </Badge>
+          }
+        >
+          {/* Primary domain — featured */}
+          <Card noPadding className="relative overflow-hidden border-gold-primary/20 bg-gold-primary/5 p-5">
+            <div className="pointer-events-none absolute right-4 top-4 select-none opacity-5" aria-hidden="true">
+              <span className="material-symbols-outlined text-8xl text-gold-primary">domain</span>
+            </div>
+            <div className="relative z-10 flex flex-col gap-2">
+              <div className="flex flex-wrap items-start justify-between gap-2">
+                <span className="font-sans text-[10px] font-bold uppercase tracking-wider text-text-muted">
+                  Primary Domain
+                </span>
+                <ConfidenceBadge label={result.primary_domain.confidence_label} />
+              </div>
+              <div className="flex items-end gap-3">
+                <span className="font-display text-3xl capitalize text-text-primary">
+                  {result.primary_domain.domain}
+                </span>
+                <span className="pb-0.5 font-sans text-lg text-text-secondary">{primaryPct}%</span>
+              </div>
+            </div>
+          </Card>
+
+          {/* Candidate domains — confidence bars */}
+          {result.candidate_domains.length > 0 && (
+            <div className="mt-4 flex flex-col gap-3">
+              <p className="font-sans text-[10px] font-bold uppercase tracking-wider text-text-muted">
+                Additional Candidates
+              </p>
+              {result.candidate_domains.map((c, idx) => (
+                <DomainBar key={idx} {...c} />
+              ))}
+            </div>
+          )}
+        </Panel>
+
+        {/* Detection Signals */}
+        <Panel
+          id="sec-signals"
+          title="Detection Signals"
+          className="scroll-mt-6"
+          headerAction={
+            <Badge variant="default" size="sm" uppercase={false}>
+              {result.signals.length}
+            </Badge>
+          }
+        >
+          {result.signals.length > 0 ? (
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              {result.signals.map((sig, idx) => (
+                <SignalCard key={idx} signal={sig} />
+              ))}
+            </div>
+          ) : (
+            <SectionEmpty message="No strong deterministic signals detected." />
+          )}
+        </Panel>
+
+        {/* Recommended Workflows */}
+        <Panel
+          id="sec-recommendations"
+          title="Recommended Workflows"
+          className="scroll-mt-6"
+          headerAction={
+            <Badge variant="default" size="sm" uppercase={false}>
+              {result.recommended_surfaces.length}
+            </Badge>
+          }
+        >
+          {result.recommended_surfaces.length > 0 ? (
+            <div className="flex flex-col gap-3">
+              {result.recommended_surfaces.map((s, idx) => (
+                <SurfaceCard key={idx} surface={s} />
+              ))}
+            </div>
+          ) : (
+            <SectionEmpty message="No workflow recommendations available." />
+          )}
+        </Panel>
+
+        {/* Document Profile */}
+        <Panel id="sec-profile" title="Document Profile" className="scroll-mt-6">
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+            {(
+              [
+                { label: 'Words',      value: result.document_profile.word_count       },
+                { label: 'Lines',      value: result.document_profile.line_count       },
+                { label: 'Paragraphs', value: result.document_profile.paragraph_count  },
+                { label: 'Headings',   value: result.document_profile.heading_like_lines },
+                { label: 'Tables',     value: result.document_profile.table_like_lines },
+              ] as const
+            ).map(({ label, value }) => (
+              <Card key={label} noPadding className="flex flex-col gap-1 p-3">
+                <span className="font-sans text-[10px] font-bold uppercase tracking-wider text-text-muted">
+                  {label}
+                </span>
+                <span className="font-mono text-lg text-text-primary">{value.toLocaleString()}</span>
+              </Card>
+            ))}
+          </div>
+        </Panel>
+
+      </div>
+    </AnalysisLayout>
   );
 }

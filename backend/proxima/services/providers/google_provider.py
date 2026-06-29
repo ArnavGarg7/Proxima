@@ -14,10 +14,8 @@ class GoogleProvider:
             genai.configure(api_key=self.api_key)
 
     def _get_model_id(self, requested_id: str) -> str:
-        if not requested_id or "gemini" not in requested_id:
-            # gemini-2.0-flash-lite: 30 RPM on free tier vs 2 RPM for 2.5-flash
-            return os.getenv("DEFAULT_GEMINI_MODEL", "gemini-2.0-flash-lite")
-        return requested_id
+        # Force using gemini-1.5-flash to avoid strict rate limits on 2.5-flash and unallowed 2.0-lite
+        return os.getenv("DEFAULT_GEMINI_MODEL", "gemini-1.5-flash")
 
     def _handle_error(self, e: Exception):
         err_msg = str(e).lower()
@@ -30,12 +28,19 @@ class GoogleProvider:
         else:
             raise HTTPException(status_code=500, detail=f"Provider Error: {str(e)}")
 
-    async def complete(self, model_id: str, system_prompt: str, user_message: str, temperature: float, max_tokens: int) -> str:
+    async def complete(self, model_id: str, system_prompt: str, user_message: str, temperature: float, max_tokens: int, response_format: str = "text") -> str:
         if not self.api_key:
             raise HTTPException(status_code=401, detail="Invalid API key provided. API key is missing.")
 
         model_name = self._get_model_id(model_id)
         model = genai.GenerativeModel(model_name, system_instruction=system_prompt)
+        
+        generation_config = {
+            'temperature': temperature,
+            'max_output_tokens': max_tokens,
+        }
+        if response_format == "json":
+            generation_config['response_mime_type'] = 'application/json'
         
         try:
             # Running synchronous generate_content in a thread since genai API can be tricky, 
@@ -44,10 +49,7 @@ class GoogleProvider:
             response = await asyncio.wait_for(
                 model.generate_content_async(
                     user_message,
-                    generation_config={
-                        'temperature': temperature,
-                        'max_output_tokens': max_tokens,
-                    }
+                    generation_config=generation_config
                 ),
                 timeout=30.0
             )

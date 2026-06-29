@@ -1,6 +1,24 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { api } from '@/lib/axios';
 import { diffWords } from 'diff';
+import {
+  AnalysisLayout,
+  AnalysisHeader,
+  AnalysisSidebar,
+  AnalysisInspector,
+  InspectorStat,
+  AnalysisEmptyState,
+  AnalysisLoading,
+  ConfidenceRing,
+  type OutlineItem,
+} from '@/components/analysis';
+import { Panel } from '@/components/ui/Panel';
+import { Card } from '@/components/ui/Card';
+import { Badge } from '@/components/ui/Badge';
+import { Button } from '@/components/ui/Button';
+import { Chip } from '@/components/ui/Chip';
+
+// ── Types ─────────────────────────────────────────────────────────────────────
 
 interface Document {
   id: string;
@@ -78,11 +96,212 @@ interface CompareResult {
   document_profile: DocumentProfileDelta;
 }
 
+// ── Diff highlight renderers (preserved from original) ────────────────────────
+
+function renderOldWithHighlight(oldStr: string | null, newStr: string | null) {
+  if (!oldStr) return <span className="italic opacity-50">Not present</span>;
+  if (!newStr) return oldStr;
+  const diffs = diffWords(oldStr, newStr);
+  return diffs.filter(p => !p.added).map((part, i) => {
+    if (part.removed) return <span key={i} className="bg-conf-critical/30 text-conf-critical font-bold">{part.value}</span>;
+    return <span key={i}>{part.value}</span>;
+  });
+}
+
+function renderNewWithHighlight(oldStr: string | null, newStr: string | null) {
+  if (!newStr) return <span className="italic opacity-50">Not present</span>;
+  if (!oldStr) return newStr;
+  const diffs = diffWords(oldStr, newStr);
+  return diffs.filter(p => !p.removed).map((part, i) => {
+    if (part.added) return <span key={i} className="bg-conf-high/30 text-conf-high font-bold">{part.value}</span>;
+    return <span key={i}>{part.value}</span>;
+  });
+}
+
+// ── Structural change type → style tokens ─────────────────────────────────────
+
+function structuralChangeStyle(changeType: string) {
+  const t = changeType.toLowerCase();
+  if (t.includes('add'))    return { icon: 'add_circle',    text: 'text-conf-high',     bg: 'bg-conf-high/10'     };
+  if (t.includes('remove')) return { icon: 'remove_circle', text: 'text-conf-critical', bg: 'bg-conf-critical/10' };
+  return                           { icon: 'edit',           text: 'text-conf-amber',    bg: 'bg-conf-amber/10'    };
+}
+
+function riskTone(risk: string): string {
+  const r = risk.toLowerCase();
+  if (r.includes('high') || r.includes('critical')) return 'text-conf-critical';
+  if (r.includes('medium'))                          return 'text-conf-amber';
+  return 'text-conf-high';
+}
+
+// ── Presentation-only sub-components ──────────────────────────────────────────
+
+function SeverityIcon({ severity }: { severity: string }) {
+  const s = severity.toLowerCase();
+  if (s.includes('high') || s.includes('critical')) {
+    return <span className="material-symbols-outlined mt-0.5 shrink-0 text-sm text-conf-critical">report</span>;
+  }
+  if (s.includes('medium')) {
+    return <span className="material-symbols-outlined mt-0.5 shrink-0 text-sm text-conf-amber">warning</span>;
+  }
+  return <span className="material-symbols-outlined mt-0.5 shrink-0 text-sm text-conf-high">info</span>;
+}
+
+function ChangeMetricCard({
+  icon,
+  label,
+  value,
+  tone = 'text-text-primary',
+}: {
+  icon: string;
+  label: string;
+  value: string | number;
+  tone?: string;
+}) {
+  return (
+    <Card noPadding className="flex flex-col items-center gap-1.5 p-4 text-center">
+      <span className={`material-symbols-outlined text-[20px] ${tone}`} aria-hidden="true">{icon}</span>
+      <span className={`font-mono text-2xl font-bold tabular-nums ${tone}`}>{value}</span>
+      <span className="font-sans text-xs text-text-muted">{label}</span>
+    </Card>
+  );
+}
+
+function SemanticChangeCard({ change }: { change: SemanticChange }) {
+  return (
+    <Card noPadding className="flex flex-col gap-3 p-4">
+      <div className="flex items-center gap-2">
+        <span className="rounded border border-border bg-elevated px-2 py-0.5 font-sans text-[10px] font-bold uppercase tracking-wider text-text-muted">
+          {change.category}
+        </span>
+      </div>
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+        <div
+          className="flex-1 truncate rounded border border-conf-critical/20 bg-conf-critical/5 px-2.5 py-1.5 font-sans text-xs text-text-secondary line-through decoration-conf-critical/40"
+          title={change.old_value}
+        >
+          {change.old_value}
+        </div>
+        <span
+          className="material-symbols-outlined shrink-0 text-[16px] text-text-muted sm:block rotate-90 sm:rotate-0 self-center"
+          aria-hidden="true"
+        >
+          arrow_forward
+        </span>
+        <div
+          className="flex-1 truncate rounded border border-conf-high/20 bg-conf-high/5 px-2.5 py-1.5 font-sans text-xs font-medium text-text-primary"
+          title={change.new_value}
+        >
+          {change.new_value}
+        </div>
+      </div>
+      <p className="font-sans text-xs leading-relaxed text-text-secondary">{change.description}</p>
+    </Card>
+  );
+}
+
+function StructuralChangeItem({ change }: { change: StructuralChange }) {
+  const style = structuralChangeStyle(change.change_type);
+  return (
+    <Card noPadding className="flex items-start gap-3 p-4">
+      <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full ${style.bg}`}>
+        <span className={`material-symbols-outlined text-[18px] ${style.text}`} aria-hidden="true">
+          {style.icon}
+        </span>
+      </div>
+      <div className="flex min-w-0 flex-col gap-0.5">
+        <div className="flex items-center gap-2">
+          <span className={`text-[10px] font-bold uppercase tracking-wider ${style.text}`}>
+            {change.change_type}
+          </span>
+          <span className="text-text-muted" aria-hidden="true">·</span>
+          <span className="font-mono text-sm text-text-primary">{change.heading}</span>
+        </div>
+        <p className="font-sans text-sm text-text-secondary">{change.description}</p>
+      </div>
+    </Card>
+  );
+}
+
+function CompareRiskCard({ risk }: { risk: RiskChange }) {
+  const tone = riskTone(risk.severity);
+  return (
+    <Card noPadding className="flex flex-col gap-2 p-4">
+      <span className={`self-start rounded border px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider
+        ${risk.severity.toLowerCase().includes('high')
+          ? 'border-conf-critical/30 bg-conf-critical/10 text-conf-critical'
+          : risk.severity.toLowerCase().includes('medium')
+            ? 'border-conf-amber/30 bg-conf-amber/10 text-conf-amber'
+            : 'border-conf-high/30 bg-conf-high/10 text-conf-high'
+        }`}
+      >
+        {risk.severity}
+      </span>
+      <p className={`font-sans text-sm font-semibold ${tone}`}>{risk.title}</p>
+      <p className="font-sans text-sm leading-relaxed text-text-secondary">{risk.description}</p>
+    </Card>
+  );
+}
+
+function CompareEvidenceCard({ ev }: { ev: CompareEvidence }) {
+  return (
+    <Card noPadding className="overflow-hidden">
+      {/* Label bar */}
+      <div className="border-b border-border bg-elevated px-4 py-2">
+        <span className="font-sans text-xs font-bold uppercase tracking-wider text-text-muted">
+          {ev.label}
+        </span>
+      </div>
+      {/* Side-by-side diff */}
+      <div className="flex flex-col divide-y divide-border sm:flex-row sm:divide-x sm:divide-y-0">
+        <div className="flex-1 bg-conf-critical/5 p-4">
+          <div className="mb-2 font-sans text-[10px] font-bold uppercase tracking-wider text-conf-critical/80">
+            Old Clause
+          </div>
+          <div className="whitespace-pre-wrap font-mono text-sm leading-relaxed text-text-secondary line-through decoration-conf-critical/30">
+            {renderOldWithHighlight(ev.old_excerpt, ev.new_excerpt)}
+          </div>
+        </div>
+        <div className="flex-1 bg-conf-high/5 p-4">
+          <div className="mb-2 font-sans text-[10px] font-bold uppercase tracking-wider text-conf-high/80">
+            New Clause
+          </div>
+          <div className="whitespace-pre-wrap font-mono text-sm leading-relaxed text-text-primary">
+            {renderNewWithHighlight(ev.old_excerpt, ev.new_excerpt)}
+          </div>
+        </div>
+      </div>
+    </Card>
+  );
+}
+
+function ReviewerPriorityCard({ priority }: { priority: ReviewerPriority }) {
+  return (
+    <div className="rounded-lg border border-border bg-elevated p-3 transition-colors hover:border-gold-primary/40">
+      <div className="mb-1 flex items-start justify-between gap-2">
+        <p className="font-sans text-sm font-semibold text-text-primary">{priority.title}</p>
+        <SeverityIcon severity={priority.severity} />
+      </div>
+      <p className="line-clamp-2 font-sans text-xs leading-relaxed text-text-secondary">
+        {priority.description}
+      </p>
+    </div>
+  );
+}
+
+function SectionEmpty({ message }: { message: string }) {
+  return (
+    <p className="py-2 text-center font-sans text-sm text-text-muted">{message}</p>
+  );
+}
+
+// ── Page ──────────────────────────────────────────────────────────────────────
+
 export default function Compare() {
   const [documents, setDocuments] = useState<Document[]>([]);
   const [sourceId, setSourceId] = useState<string>('');
   const [targetId, setTargetId] = useState<string>('');
-  
+
   const [result, setResult] = useState<CompareResult | null>(null);
   const [comparing, setComparing] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -101,7 +320,7 @@ export default function Compare() {
           setTargetId(res.data[0].id);
         }
       } catch (err) {
-        console.error("Failed to load documents", err);
+        console.error('Failed to load documents', err);
       }
     };
     fetchDocs();
@@ -112,11 +331,11 @@ export default function Compare() {
     setComparing(true);
     setError(null);
     setResult(null);
-    
+
     try {
       const res = await api.post('/api/intelligence/compare', {
         source_document_id: sourceId,
-        target_document_id: targetId
+        target_document_id: targetId,
       });
       const data = res.data;
       // Ensure arrays exist if LLM drops them
@@ -126,396 +345,443 @@ export default function Compare() {
       data.risk_changes = data.risk_changes || [];
       data.evidence = data.evidence || [];
       data.deterministic_signals = data.deterministic_signals || [];
-      
+
       setResult(data);
-    } catch (err: any /* eslint-disable-line @typescript-eslint/no-explicit-any */) {
-      if (err.response) {
-        setError(err.response.data.detail || `Error ${err.response.status}`);
+    } catch (err: unknown) {
+      const e = err as { response?: { data?: { detail?: string }; status?: number }; message?: string };
+      if (e.response) {
+        setError(e.response.data?.detail || `Error ${e.response.status}`);
       } else {
-        setError(err.message || 'Failed to run comparison');
+        setError(e.message || 'Failed to run comparison');
       }
     } finally {
       setComparing(false);
     }
   };
 
-  const getSeverityIcon = (severity: string) => {
-    const s = severity.toLowerCase();
-    if (s.includes('high') || s.includes('critical')) return <span className="material-symbols-outlined text-conf-critical text-sm mt-0.5">report</span>;
-    if (s.includes('medium')) return <span className="material-symbols-outlined text-conf-amber text-sm mt-0.5">warning</span>;
-    return <span className="material-symbols-outlined text-conf-low text-sm mt-0.5">info</span>;
-  };
+  const outlineItems = useMemo<OutlineItem[]>(() => {
+    if (!result) return [];
+    return [
+      { id: 'sec-summary',    label: 'Executive Summary',   icon: 'summarize'                                              },
+      { id: 'sec-overview',   label: 'Change Overview',     icon: 'analytics'                                              },
+      { id: 'sec-semantic',   label: 'Semantic Changes',    icon: 'manage_search',  count: result.semantic_changes.length   },
+      { id: 'sec-structural', label: 'Structural Changes',  icon: 'account_tree',   count: result.structural_changes.length },
+      { id: 'sec-risks',      label: 'Risk Impact',         icon: 'warning',        count: result.risk_changes.length       },
+      { id: 'sec-evidence',   label: 'Direct Evidence',     icon: 'plagiarism',     count: result.evidence.length           },
+      { id: 'sec-profile',    label: 'Document Profile',    icon: 'difference'                                             },
+    ];
+  }, [result]);
 
-  const renderOldWithHighlight = (oldStr: string | null, newStr: string | null) => {
-    if (!oldStr) return <span className="italic opacity-50">Not present</span>;
-    if (!newStr) return oldStr;
-    const diffs = diffWords(oldStr, newStr);
-    return diffs.filter(p => !p.added).map((part, i) => {
-      if (part.removed) return <span key={i} className="bg-conf-critical/30 text-conf-critical font-bold">{part.value}</span>;
-      return <span key={i}>{part.value}</span>;
-    });
-  };
+  // ── Loading ──────────────────────────────────────────────────────────────
 
-  const renderNewWithHighlight = (oldStr: string | null, newStr: string | null) => {
-    if (!newStr) return <span className="italic opacity-50">Not present</span>;
-    if (!oldStr) return newStr;
-    const diffs = diffWords(oldStr, newStr);
-    return diffs.filter(p => !p.removed).map((part, i) => {
-      if (part.added) return <span key={i} className="bg-conf-high/30 text-conf-high font-bold">{part.value}</span>;
-      return <span key={i}>{part.value}</span>;
-    });
-  };
+  if (comparing) {
+    return (
+      <AnalysisLoading
+        title="Comparing Documents…"
+        message="Extracting structural, semantic, and risk-level differences"
+      />
+    );
+  }
+
+  // ── Empty / onboarding ───────────────────────────────────────────────────
+
+  if (!result) {
+    return (
+      <AnalysisEmptyState
+        icon="difference"
+        title="Revision Intelligence"
+        description="Select a baseline and a revised document to generate a structured comparison — semantic shifts, structural changes, risk impact, and direct evidence."
+        expectedOutput={[
+          'Executive comparison summary',
+          'Semantic & meaning shifts',
+          'Structural section changes',
+          'Risk impact analysis',
+          'Word-level diff evidence',
+          'Document profile delta',
+        ]}
+        supportedTypes={['PDF', 'DOCX', 'TXT']}
+        error={error}
+      >
+        {/* Source selector */}
+        <div className="flex flex-col gap-1.5">
+          <div className="flex items-center gap-2">
+            <span className="inline-block h-2.5 w-2.5 rounded-full bg-text-muted/40 shrink-0" aria-hidden="true" />
+            <label htmlFor="compare-source" className="font-sans text-sm font-medium text-text-primary">
+              Source Document <span className="text-text-muted font-normal">(Baseline)</span>
+            </label>
+          </div>
+          <select
+            id="compare-source"
+            value={sourceId}
+            onChange={e => setSourceId(e.target.value)}
+            className="w-full rounded-md border border-border bg-surface px-3.5 py-2.5 font-sans text-sm text-text-primary
+              focus:border-gold-primary focus:outline-none focus:ring-2 focus:ring-gold-primary/15"
+          >
+            <option value="">— Select source —</option>
+            {documents.map(d => (
+              <option key={d.id} value={d.id}>{d.title}</option>
+            ))}
+          </select>
+        </div>
+
+        {/* Swap button */}
+        <div className="flex justify-center">
+          <button
+            type="button"
+            onClick={() => { const tmp = sourceId; setSourceId(targetId); setTargetId(tmp); }}
+            aria-label="Swap source and target documents"
+            className="flex items-center justify-center rounded-full border border-border bg-elevated p-2 text-text-muted
+              transition-colors hover:border-gold-primary/40 hover:text-text-primary focus:outline-none focus:ring-2 focus:ring-gold-primary/30"
+          >
+            <span className="material-symbols-outlined text-[20px]" aria-hidden="true">swap_vert</span>
+          </button>
+        </div>
+
+        {/* Target selector */}
+        <div className="flex flex-col gap-1.5">
+          <div className="flex items-center gap-2">
+            <span className="inline-block h-2.5 w-2.5 rounded-full bg-gold-primary/60 shrink-0" aria-hidden="true" />
+            <label htmlFor="compare-target" className="font-sans text-sm font-medium text-text-primary">
+              Target Document <span className="text-text-muted font-normal">(Revision)</span>
+            </label>
+          </div>
+          <select
+            id="compare-target"
+            value={targetId}
+            onChange={e => setTargetId(e.target.value)}
+            className="w-full rounded-md border border-border bg-surface px-3.5 py-2.5 font-sans text-sm text-text-primary
+              focus:border-gold-primary focus:outline-none focus:ring-2 focus:ring-gold-primary/15"
+          >
+            <option value="">— Select target —</option>
+            {documents.map(d => (
+              <option key={d.id} value={d.id}>{d.title}</option>
+            ))}
+          </select>
+        </div>
+
+        <Button
+          variant="primary"
+          onClick={runCompare}
+          disabled={!sourceId || !targetId || sourceId === targetId}
+          leftIcon={
+            <span className="material-symbols-outlined text-[18px]" aria-hidden="true">analytics</span>
+          }
+          className="w-full"
+        >
+          Analyze Diff
+        </Button>
+        {sourceId === targetId && sourceId !== '' && (
+          <p className="text-center font-sans text-xs text-text-muted">
+            Select two different documents to compare.
+          </p>
+        )}
+      </AnalysisEmptyState>
+    );
+  }
+
+  // ── Result — three-panel workspace ───────────────────────────────────────
+
+  const header = (
+    <AnalysisHeader
+      icon="difference"
+      eyebrow="Comparison Workbench"
+      title="Revision Intelligence"
+      documentName={`${result.source_document.title} → ${result.target_document.title}`}
+      status={<Badge variant="success" size="sm">Complete</Badge>}
+      actions={
+        <Button
+          variant="secondary"
+          size="sm"
+          onClick={runCompare}
+          leftIcon={
+            <span className="material-symbols-outlined text-[16px]" aria-hidden="true">refresh</span>
+          }
+        >
+          Re-run
+        </Button>
+      }
+    />
+  );
+
+  const sidebar = <AnalysisSidebar items={outlineItems} />;
+
+  const inspector = (
+    <AnalysisInspector>
+      {/* Similarity score as the hero ring */}
+      <Panel title="Similarity Score">
+        <div className="flex flex-col items-center gap-3 py-1">
+          <ConfidenceRing value={result.similarity_score} size="lg" />
+          <span className="font-sans text-sm font-medium text-text-secondary">
+            {result.overall_change_level} Change
+          </span>
+        </div>
+      </Panel>
+
+      {/* Documents being compared */}
+      <Panel title="Comparison">
+        <div className="flex flex-col gap-3">
+          <div className="flex flex-col gap-0.5">
+            <span className="flex items-center gap-1.5 font-sans text-[10px] font-bold uppercase tracking-wider text-text-muted">
+              <span className="inline-block h-2 w-2 rounded-full bg-text-muted/40 shrink-0" aria-hidden="true" />
+              Base
+            </span>
+            <span className="truncate font-sans text-xs leading-relaxed text-text-secondary">
+              {result.source_document.title}
+            </span>
+          </div>
+          <div className="flex flex-col gap-0.5">
+            <span className="flex items-center gap-1.5 font-sans text-[10px] font-bold uppercase tracking-wider text-text-muted">
+              <span className="inline-block h-2 w-2 rounded-full bg-gold-primary/60 shrink-0" aria-hidden="true" />
+              Revision
+            </span>
+            <span className="truncate font-sans text-xs leading-relaxed text-text-secondary">
+              {result.target_document.title}
+            </span>
+          </div>
+        </div>
+      </Panel>
+
+      {/* Change counts */}
+      <Panel title="Change Snapshot">
+        <div className="flex flex-col gap-3">
+          <InspectorStat icon="add_circle_outline"    label="Added"    value={result.change_snapshot.added_sections_count.toString()}    />
+          <InspectorStat icon="remove_circle_outline" label="Removed"  value={result.change_snapshot.removed_sections_count.toString()}  />
+          <InspectorStat icon="edit"                  label="Modified" value={result.change_snapshot.modified_sections_count.toString()} />
+          <InspectorStat
+            icon="warning"
+            label="Risk Shift"
+            value={
+              <span className={riskTone(result.change_snapshot.overall_risk)}>
+                {result.change_snapshot.overall_risk}
+              </span>
+            }
+          />
+        </div>
+      </Panel>
+
+      {/* Reviewer priorities */}
+      {result.reviewer_priorities.length > 0 && (
+        <Panel title="Reviewer Priorities">
+          <div className="flex flex-col gap-2">
+            {result.reviewer_priorities.map((p, idx) => (
+              <ReviewerPriorityCard key={idx} priority={p} />
+            ))}
+          </div>
+        </Panel>
+      )}
+
+      {/* Signals */}
+      {result.deterministic_signals.length > 0 && (
+        <Panel title="Signals Detected">
+          <div className="flex flex-wrap gap-1.5">
+            {result.deterministic_signals.map((sig, idx) => (
+              <Chip key={idx} variant="default">{sig}</Chip>
+            ))}
+          </div>
+        </Panel>
+      )}
+
+      {/* Engine */}
+      <Panel title="Engine">
+        <div className="flex flex-col gap-2">
+          <InspectorStat icon="bolt" label="Analyzer" value="Compare" />
+          <p className="font-sans text-xs leading-relaxed text-text-muted">
+            Structural and semantic diff with word-level evidence highlighting.
+          </p>
+        </div>
+      </Panel>
+    </AnalysisInspector>
+  );
 
   return (
-    <div className="flex-1 flex flex-col h-[calc(100vh-60px)] bg-void overflow-hidden">
-      
-      {/* Header & Controls */}
-      <header className="px-8 py-6 border-b border-border bg-surface shrink-0 z-10 shadow-sm relative">
-        <h1 className="font-display text-3xl text-text-primary mb-2 flex items-center gap-3">
-          <span className="material-symbols-outlined text-gold-primary">difference</span>
-          Revision Intelligence
-        </h1>
-        <p className="font-sans text-sm text-text-secondary mb-6 max-w-2xl">
-          Analyze structural and semantic deviations between two documents. Understand what changed, where it changed, and what it means for you.
-        </p>
-        
-        <div className="flex flex-col md:flex-row gap-6 items-end">
-          <div className="flex-1 w-full bg-void p-4 rounded-lg border border-border relative overflow-hidden">
-            <div className="absolute top-0 left-0 w-1 h-full bg-text-muted/30"></div>
-            <label className="font-sans text-xs font-medium text-text-muted mb-2 block uppercase tracking-wide">Source Document (Baseline)</label>
-            <select 
-              value={sourceId} onChange={(e) => setSourceId(e.target.value)}
-              className="w-full bg-surface border border-border rounded px-3 py-2 text-text-primary focus:ring-1 focus:ring-primary"
-            >
-              <option value="">-- Select Source --</option>
-              {documents.map(d => <option key={d.id} value={d.id}>{d.title}</option>)}
-            </select>
-          </div>
-          
-          <button 
-            onClick={() => { const temp = sourceId; setSourceId(targetId); setTargetId(temp); }}
-            className="flex-shrink-0 flex items-center justify-center p-3 rounded-full hover:bg-elevated text-text-muted hover:text-text-primary transition-colors border border-transparent hover:border-border"
-            title="Swap Documents"
-          >
-            <span className="material-symbols-outlined">swap_horiz</span>
-          </button>
+    <AnalysisLayout header={header} sidebar={sidebar} inspector={inspector} mobileContents={outlineItems}>
+      <div className="flex flex-col gap-6">
 
-          <div className="flex-1 w-full bg-void p-4 rounded-lg border border-border relative overflow-hidden">
-            <div className="absolute top-0 left-0 w-1 h-full bg-gold-primary/50"></div>
-            <label className="font-sans text-xs font-medium text-text-muted mb-2 block uppercase tracking-wide">Target Document (Revision)</label>
-            <select 
-              value={targetId} onChange={(e) => setTargetId(e.target.value)}
-              className="w-full bg-surface border border-border rounded px-3 py-2 text-text-primary focus:ring-1 focus:ring-primary"
-            >
-              <option value="">-- Select Target --</option>
-              {documents.map(d => <option key={d.id} value={d.id}>{d.title}</option>)}
-            </select>
-          </div>
-          
-          <button 
-            onClick={runCompare}
-            disabled={comparing || !sourceId || !targetId || sourceId === targetId}
-            className="h-[68px] bg-gold-primary text-void px-8 rounded-lg font-sans text-sm font-bold hover:bg-gold-primary/90 disabled:opacity-50 transition-colors flex items-center gap-2 shadow-sm uppercase tracking-wide"
-          >
-            {comparing ? <span className="material-symbols-outlined animate-spin">refresh</span> : <span className="material-symbols-outlined">analytics</span>}
-            {comparing ? "Analyzing..." : "Analyze Diff"}
-          </button>
-        </div>
-        
-        {error && (
-          <div className="mt-6 bg-conf-critical/10 border border-conf-critical/20 p-4 rounded-lg text-conf-critical flex items-start gap-3">
-            <span className="material-symbols-outlined">error</span>
-            <span className="font-sans text-sm">{error}</span>
-          </div>
-        )}
-      </header>
+        {/* Executive Summary */}
+        <Panel id="sec-summary" title="Executive Summary" className="scroll-mt-6">
+          <p className="whitespace-pre-wrap font-sans text-sm leading-relaxed text-text-secondary">
+            {result.executive_summary}
+          </p>
+        </Panel>
 
-      {/* Main Area */}
-      {!result && !comparing && !error && (
-        <div className="flex-1 flex flex-col items-center justify-center p-8 opacity-50">
-          <span className="material-symbols-outlined text-[64px] text-text-muted mb-4">compare_arrows</span>
-          <p className="font-sans text-text-secondary max-w-md text-center">Select a baseline document and a revised document above to generate a structured revision intelligence report.</p>
-        </div>
-      )}
+        {/* Change Overview — metric cards grid */}
+        <Panel id="sec-overview" title="Change Overview" className="scroll-mt-6">
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+            <ChangeMetricCard
+              icon="add_circle"
+              label="Added"
+              value={result.change_snapshot.added_sections_count}
+              tone="text-conf-high"
+            />
+            <ChangeMetricCard
+              icon="remove_circle"
+              label="Removed"
+              value={result.change_snapshot.removed_sections_count}
+              tone="text-conf-critical"
+            />
+            <ChangeMetricCard
+              icon="edit"
+              label="Modified"
+              value={result.change_snapshot.modified_sections_count}
+              tone="text-conf-amber"
+            />
+            <ChangeMetricCard
+              icon="percent"
+              label="Similarity"
+              value={`${result.similarity_score}%`}
+              tone={
+                result.similarity_score >= 85 ? 'text-conf-high' :
+                result.similarity_score >= 65 ? 'text-conf-amber' :
+                'text-conf-critical'
+              }
+            />
+          </div>
+        </Panel>
 
-      {result && !error && (
-        <div className="flex-1 overflow-y-auto p-8 flex gap-8 bg-void">
-          
-          {/* LEFT SIDEBAR: Snapshot & Priorities */}
-          <div className="w-[340px] shrink-0 flex flex-col gap-6">
-            
-            {/* Top Hero Similarity */}
-            <div className="bg-surface border border-border rounded-xl p-6 shadow-sm text-center relative overflow-hidden">
-              <div className={`absolute top-0 left-0 w-full h-1 ${
-                  result.similarity_score >= 90 ? 'bg-conf-high' : 
-                  result.similarity_score >= 70 ? 'bg-conf-amber' : 'bg-conf-critical'
-                }`} 
-              />
-              <h2 className="font-sans text-xs font-bold text-text-muted uppercase tracking-wider mb-2">Similarity Score</h2>
-              <div className={`font-display text-5xl leading-none mb-2 ${
-                  result.similarity_score >= 90 ? 'text-conf-high' : 
-                  result.similarity_score >= 70 ? 'text-conf-amber' : 'text-conf-critical'
-                }`}>
-                {result.similarity_score}%
-              </div>
-              <div className="font-sans text-sm font-medium text-text-primary">
-                {result.overall_change_level} Change
-              </div>
-              <div className="mt-4 inline-block px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider bg-elevated border border-border text-text-primary">
-                {result.overall_change_level} Revision
-              </div>
+        {/* Semantic Changes */}
+        <Panel
+          id="sec-semantic"
+          title="Semantic Changes"
+          className="scroll-mt-6"
+          headerAction={
+            <Badge variant="default" size="sm" uppercase={false}>
+              {result.semantic_changes.length}
+            </Badge>
+          }
+        >
+          {result.semantic_changes.length > 0 ? (
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              {result.semantic_changes.map((sc, idx) => (
+                <SemanticChangeCard key={idx} change={sc} />
+              ))}
             </div>
+          ) : (
+            <SectionEmpty message="No semantic shifts detected between these documents." />
+          )}
+        </Panel>
 
-            {/* Quick Snapshot */}
-            <div className="bg-elevated border border-border rounded-xl p-5 shadow-sm">
-              <h3 className="font-sans text-xs font-bold text-text-muted uppercase tracking-wider mb-4 flex items-center gap-2">
-                <span className="material-symbols-outlined text-[16px]">data_exploration</span>
-                Structural Diff
-              </h3>
-              <div className="flex flex-col gap-3">
-                <div className="flex justify-between items-center text-sm">
-                  <span className="text-text-secondary flex items-center gap-2"><span className="w-2 h-2 rounded-full bg-conf-high"></span>Added Sections</span>
-                  <span className="font-mono text-text-primary font-bold">{result.change_snapshot.added_sections_count}</span>
-                </div>
-                <div className="flex justify-between items-center text-sm">
-                  <span className="text-text-secondary flex items-center gap-2"><span className="w-2 h-2 rounded-full bg-conf-critical"></span>Removed Sections</span>
-                  <span className="font-mono text-text-primary font-bold">{result.change_snapshot.removed_sections_count}</span>
-                </div>
-                <div className="flex justify-between items-center text-sm">
-                  <span className="text-text-secondary flex items-center gap-2"><span className="w-2 h-2 rounded-full bg-conf-amber"></span>Modified Sections</span>
-                  <span className="font-mono text-text-primary font-bold">{result.change_snapshot.modified_sections_count}</span>
-                </div>
-                <div className="h-px bg-border my-1"></div>
-                <div className="flex justify-between items-center text-sm">
-                  <span className="text-text-secondary">Overall Risk Shift</span>
-                  <span className={`font-sans font-bold ${
-                    result.change_snapshot.overall_risk.toLowerCase() === 'high' ? 'text-conf-critical' :
-                    result.change_snapshot.overall_risk.toLowerCase() === 'medium' ? 'text-conf-amber' : 'text-conf-low'
-                  }`}>{result.change_snapshot.overall_risk}</span>
-                </div>
-              </div>
+        {/* Structural Changes */}
+        <Panel
+          id="sec-structural"
+          title="Structural Changes"
+          className="scroll-mt-6"
+          headerAction={
+            <Badge variant="default" size="sm" uppercase={false}>
+              {result.structural_changes.length}
+            </Badge>
+          }
+        >
+          {result.structural_changes.length > 0 ? (
+            <div className="flex flex-col gap-3">
+              {(expandedStructural
+                ? result.structural_changes
+                : result.structural_changes.slice(0, 5)
+              ).map((st, idx) => (
+                <StructuralChangeItem key={idx} change={st} />
+              ))}
+              {result.structural_changes.length > 5 && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setExpandedStructural(!expandedStructural)}
+                  className="mt-1 w-full"
+                >
+                  {expandedStructural
+                    ? 'Show less'
+                    : `Show ${result.structural_changes.length - 5} more`}
+                </Button>
+              )}
             </div>
+          ) : (
+            <SectionEmpty message="No structural section changes detected." />
+          )}
+        </Panel>
 
-            {/* Reviewer Priorities */}
-            {result.reviewer_priorities.length > 0 && (
-              <div className="bg-surface border border-border rounded-xl p-5 shadow-sm">
-                <h3 className="font-sans text-xs font-bold text-text-muted uppercase tracking-wider mb-4 flex items-center gap-2">
-                  <span className="material-symbols-outlined text-[16px]">rule</span>
-                  Reviewer Priorities
-                </h3>
-                <div className="flex flex-col gap-3">
-                  {result.reviewer_priorities.map((p, idx) => (
-                    <div key={idx} className="p-3 bg-elevated border border-border rounded-lg text-left shadow-sm hover:border-gold-primary/50 transition-colors">
-                      <div className="flex items-start justify-between gap-2 mb-1">
-                        <h4 className="font-sans text-sm font-semibold text-text-primary">{p.title}</h4>
-                        {getSeverityIcon(p.severity)}
-                      </div>
-                      <p className="font-sans text-xs text-text-secondary line-clamp-2">{p.description}</p>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-            
-            {/* Deterministic Signals */}
-            {result.deterministic_signals.length > 0 && (
-              <div className="bg-surface border border-border rounded-xl p-5 shadow-sm">
-                <h3 className="font-sans text-xs font-bold text-text-muted uppercase tracking-wider mb-4 flex items-center gap-2">
-                  <span className="material-symbols-outlined text-[16px]">radar</span>
-                  Semantic Shift Signals
-                </h3>
-                <div className="flex flex-wrap gap-2">
-                  {result.deterministic_signals.map((sig, idx) => (
-                    <span key={idx} className="px-2 py-1 rounded bg-elevated border border-border text-[11px] font-sans text-text-primary whitespace-nowrap">
-                      {sig}
-                    </span>
-                  ))}
-                </div>
-              </div>
-            )}
-            
-          </div>
-
-          {/* RIGHT COLUMN: Main Intelligence Report */}
-          <div className="flex-1 flex flex-col gap-6 max-w-4xl pb-10">
-            
-            {/* Executive Summary */}
-            <div className="bg-gold-primary/5 border border-gold-primary/20 rounded-2xl p-8 relative overflow-hidden shadow-sm">
-              <span className="material-symbols-outlined absolute -top-4 -right-4 text-[120px] text-gold-primary/5 select-none pointer-events-none">summarize</span>
-              <h2 className="font-display text-xl text-gold-primary mb-3 flex items-center gap-2">
-                <span className="material-symbols-outlined text-xl">insights</span>
-                Executive Summary
-              </h2>
-              <p className="font-sans text-base text-text-primary leading-relaxed">
-                {result.executive_summary}
-              </p>
+        {/* Risk Impact */}
+        <Panel
+          id="sec-risks"
+          title="Risk Impact"
+          className="scroll-mt-6"
+          headerAction={
+            <Badge variant="default" size="sm" uppercase={false}>
+              {result.risk_changes.length}
+            </Badge>
+          }
+        >
+          {result.risk_changes.length > 0 ? (
+            <div className="flex flex-col gap-3">
+              {result.risk_changes.map((rc, idx) => (
+                <CompareRiskCard key={idx} risk={rc} />
+              ))}
             </div>
+          ) : (
+            <SectionEmpty message="No risk-level changes detected." />
+          )}
+        </Panel>
 
-            {/* Semantic Changes */}
-            {result.semantic_changes.length > 0 && (
-              <div className="space-y-4">
-                <h3 className="font-display text-xl text-text-primary border-b border-border pb-2">Semantic & Meaning Shifts</h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {result.semantic_changes.map((sc, idx) => (
-                    <div key={idx} className="bg-surface border border-border rounded-xl p-5 shadow-sm">
-                      <div className="flex justify-between items-start mb-3">
-                        <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-elevated text-text-secondary border border-border">
-                          {sc.category}
-                        </span>
-                      </div>
-                      <div className="flex items-center gap-3 mb-3">
-                        <div className="flex-1 p-2 bg-conf-critical/5 border border-conf-critical/20 rounded text-sm text-text-secondary line-through decoration-conf-critical/50 truncate" title={sc.old_value}>
-                          {sc.old_value}
-                        </div>
-                        <span className="material-symbols-outlined text-text-muted">arrow_forward</span>
-                        <div className="flex-1 p-2 bg-conf-high/5 border border-conf-high/20 rounded text-sm text-text-primary font-medium truncate" title={sc.new_value}>
-                          {sc.new_value}
-                        </div>
-                      </div>
-                      <p className="font-sans text-xs text-text-secondary">{sc.description}</p>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
+        {/* Direct Evidence — word-level diff */}
+        <Panel
+          id="sec-evidence"
+          title="Direct Evidence"
+          className="scroll-mt-6"
+          headerAction={
+            <Badge variant="default" size="sm" uppercase={false}>
+              {result.evidence.length}
+            </Badge>
+          }
+        >
+          {result.evidence.length > 0 ? (
+            <div className="flex flex-col gap-4">
+              {result.evidence.map((ev, idx) => (
+                <CompareEvidenceCard key={idx} ev={ev} />
+              ))}
+            </div>
+          ) : (
+            <SectionEmpty message="No direct text evidence extracted." />
+          )}
+        </Panel>
 
-            {/* Structural Changes */}
-            {result.structural_changes.length > 0 && (
-              <div className="space-y-4 mt-4">
-                <h3 className="font-display text-xl text-text-primary border-b border-border pb-2 flex justify-between items-end">
-                  Structural Changes
-                  <span className="text-sm font-sans text-text-secondary">{result.structural_changes.length} total</span>
-                </h3>
-                <div className="flex flex-col gap-3">
-                  {(expandedStructural ? result.structural_changes : result.structural_changes.slice(0, 5)).map((st, idx) => (
-                    <div key={idx} className="bg-surface border border-border rounded-xl p-4 shadow-sm flex items-start gap-4">
-                      <div className={`mt-0.5 w-8 h-8 rounded-full flex items-center justify-center shrink-0 ${
-                        st.change_type.toLowerCase().includes('add') ? 'bg-conf-high/10 text-conf-high' :
-                        st.change_type.toLowerCase().includes('remove') ? 'bg-conf-critical/10 text-conf-critical' : 
-                        (st.change_type.toLowerCase().includes('reorder') || st.change_type.toLowerCase().includes('move')) ? 'bg-blue-500/10 text-blue-500' :
-                        'bg-conf-amber/10 text-conf-amber'
-                      }`}>
-                        <span className="material-symbols-outlined text-[18px]">
-                          {st.change_type.toLowerCase().includes('add') ? 'add' :
-                           st.change_type.toLowerCase().includes('remove') ? 'remove' : 'move_item'}
-                        </span>
-                      </div>
-                      <div>
-                        <div className="flex items-center gap-2 mb-1">
-                          <span className="font-sans text-xs font-bold text-text-muted uppercase">{st.change_type}</span>
-                          <span className="text-text-muted text-xs">•</span>
-                          <span className="font-mono text-sm text-text-primary">{st.heading}</span>
-                        </div>
-                        <p className="font-sans text-sm text-text-secondary">{st.description}</p>
-                      </div>
-                    </div>
-                  ))}
-                  {result.structural_changes.length > 5 && (
-                    <button 
-                      onClick={() => setExpandedStructural(!expandedStructural)}
-                      className="text-xs font-bold uppercase tracking-wider text-text-muted hover:text-text-primary mt-2 flex items-center justify-center gap-1"
+        {/* Document Profile Delta */}
+        <Panel id="sec-profile" title="Document Profile Delta" className="scroll-mt-6">
+          <div className="overflow-x-auto rounded-lg border border-border">
+            <table className="w-full min-w-[360px] border-collapse text-left">
+              <thead>
+                <tr className="border-b border-border bg-elevated">
+                  {['Metric', 'Source', 'Target', 'Delta'].map((h, i) => (
+                    <th
+                      key={h}
+                      className={`p-3 font-sans text-[10px] font-bold uppercase tracking-wider text-text-muted
+                        ${i > 0 ? 'text-right' : ''}`}
                     >
-                      {expandedStructural ? 'Collapse' : `▼ Expand ${result.structural_changes.length - 5} more`}
-                    </button>
-                  )}
-                </div>
-              </div>
-            )}
-
-            {/* Risk Changes */}
-            {result.risk_changes.length > 0 && (
-              <div className="space-y-4 mt-4">
-                <h3 className="font-display text-xl text-text-primary border-b border-border pb-2">Risk Impact Analysis</h3>
-                <div className="grid grid-cols-1 gap-3">
-                  {result.risk_changes.map((rc, idx) => (
-                    <div key={idx} className="bg-surface border border-border rounded-xl p-4 shadow-sm flex items-start gap-4">
-                      <div>
-                        <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider ${
-                            rc.severity.toLowerCase().includes('high') ? 'bg-conf-critical/15 text-conf-critical border border-conf-critical/30' :
-                            rc.severity.toLowerCase().includes('medium') ? 'bg-conf-amber/15 text-conf-amber border border-conf-amber/30' :
-                            'bg-conf-low/15 text-conf-low border border-conf-low/30'
-                          }`}>
-                          {rc.severity}
-                        </span>
-                        <h4 className="font-sans text-sm font-semibold text-text-primary mb-1 mt-2">{rc.title}</h4>
-                        <p className="font-sans text-sm text-text-secondary">{rc.description}</p>
-                      </div>
-                    </div>
+                      {h}
+                    </th>
                   ))}
-                </div>
-              </div>
-            )}
-
-            {/* Side-by-Side Evidence */}
-            {result.evidence.length > 0 && (
-              <div className="space-y-4 mt-4">
-                <h3 className="font-display text-xl text-text-primary border-b border-border pb-2">Direct Evidence</h3>
-                <div className="flex flex-col gap-6">
-                  {result.evidence.map((ev, idx) => (
-                    <div key={idx} className="bg-surface border border-border rounded-xl overflow-hidden shadow-sm">
-                      <div className="bg-elevated px-4 py-2 border-b border-border flex items-center justify-between">
-                        <span className="font-sans text-xs font-bold text-text-muted uppercase tracking-wider">{ev.label}</span>
-                      </div>
-                      <div className="flex flex-col md:flex-row divide-y md:divide-y-0 md:divide-x divide-border">
-                        <div className="flex-1 p-4 bg-conf-critical/5">
-                          <div className="font-sans text-xs font-bold text-conf-critical/80 mb-2 uppercase tracking-wide">Old Clause</div>
-                          <div className="font-mono text-sm text-text-secondary whitespace-pre-wrap leading-relaxed decoration-conf-critical/30 line-through">
-                            {renderOldWithHighlight(ev.old_excerpt, ev.new_excerpt)}
-                          </div>
-                        </div>
-                        <div className="flex-1 p-4 bg-conf-high/5">
-                          <div className="font-sans text-xs font-bold text-conf-high/80 mb-2 uppercase tracking-wide">New Clause</div>
-                          <div className="font-mono text-sm text-text-primary whitespace-pre-wrap leading-relaxed">
-                            {renderNewWithHighlight(ev.old_excerpt, ev.new_excerpt)}
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* Document Profile Delta */}
-            <div className="space-y-4 mt-4">
-              <h3 className="font-display text-xl text-text-primary border-b border-border pb-2">Document Profile Delta</h3>
-              <div className="bg-surface border border-border rounded-xl overflow-hidden shadow-sm">
-                <table className="w-full text-left border-collapse">
-                  <thead>
-                    <tr className="bg-elevated border-b border-border">
-                      <th className="p-3 font-sans text-xs font-bold text-text-muted uppercase tracking-wider">Metric</th>
-                      <th className="p-3 font-sans text-xs font-bold text-text-muted uppercase tracking-wider text-right">Source</th>
-                      <th className="p-3 font-sans text-xs font-bold text-text-muted uppercase tracking-wider text-right">Target</th>
-                      <th className="p-3 font-sans text-xs font-bold text-text-muted uppercase tracking-wider text-right">Delta</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border">
+                {(['word_count', 'paragraph_count', 'heading_count', 'list_count'] as const).map(metric => {
+                  const delta = result.document_profile.delta[metric] ?? 0;
+                  const src   = result.document_profile.source[metric];
+                  const tgt   = result.document_profile.target[metric];
+                  const label = metric.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+                  const deltaClass = delta > 0 ? 'text-conf-high' : delta < 0 ? 'text-conf-critical' : 'text-text-muted';
+                  return (
+                    <tr key={metric} className="transition-colors hover:bg-elevated/50">
+                      <td className="p-3 font-sans text-sm text-text-primary">{label}</td>
+                      <td className="p-3 text-right font-mono text-sm text-text-secondary">{src}</td>
+                      <td className="p-3 text-right font-mono text-sm text-text-primary">{tgt}</td>
+                      <td className={`p-3 text-right font-mono text-sm font-medium ${deltaClass}`}>
+                        {delta > 0 ? `+${delta}` : delta}
+                      </td>
                     </tr>
-                  </thead>
-                  <tbody className="divide-y divide-border">
-                    {['word_count', 'paragraph_count', 'heading_count', 'list_count'].map((metric) => {
-                      const delta = result.document_profile.delta[metric];
-                      const s = result.document_profile.source[metric as keyof DocumentProfileStats];
-                      const t = result.document_profile.target[metric as keyof DocumentProfileStats];
-                      const label = metric.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase());
-                      return (
-                        <tr key={metric} className="hover:bg-elevated/50 transition-colors">
-                          <td className="p-3 font-sans text-sm text-text-primary">{label}</td>
-                          <td className="p-3 font-mono text-sm text-text-secondary text-right">{s}</td>
-                          <td className="p-3 font-mono text-sm text-text-primary text-right">{t}</td>
-                          <td className={`p-3 font-mono text-sm font-medium text-right ${
-                            delta > 0 ? 'text-conf-high' : delta < 0 ? 'text-conf-critical' : 'text-text-muted'
-                          }`}>
-                            {delta > 0 ? `+${delta}` : delta}
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-
+                  );
+                })}
+              </tbody>
+            </table>
           </div>
-        </div>
-      )}
-    </div>
+        </Panel>
+
+      </div>
+    </AnalysisLayout>
   );
 }

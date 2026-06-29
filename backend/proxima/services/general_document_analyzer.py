@@ -53,12 +53,26 @@ DOCUMENT TEXT:
 """
         model = await model_registry.get_default_generation(db)
         
+        system_prompt_with_schema = system_prompt + f"\n\nJSON SCHEMA TO MATCH:\n{json.dumps(GeneralAnalysisResult.model_json_schema(), indent=2)}\n\nIMPORTANT: Return ONLY valid JSON, without any markdown formatting like ```json"
+        
         try:
-            response_json = await model.generate_json(
-                prompt=prompt,
-                system_prompt=system_prompt,
-                schema=GeneralAnalysisResult.model_json_schema()
+            response_json = await model_registry.complete(
+                model=model,
+                system_prompt=system_prompt_with_schema,
+                user_message=prompt,
+                temperature=0.1,
+                max_tokens=2048,
+                response_format="json"
             )
+            
+            # Clean up potential markdown formatting from the response
+            if response_json.startswith("```json"):
+                response_json = response_json[7:]
+            if response_json.startswith("```"):
+                response_json = response_json[3:]
+            if response_json.endswith("```"):
+                response_json = response_json[:-3]
+            response_json = response_json.strip()
             
             result_dict = json.loads(response_json)
             result_dict["metadata"] = {
@@ -74,6 +88,9 @@ DOCUMENT TEXT:
             return result_dict
             
         except Exception as e:
+            import structlog
+            logger = structlog.get_logger()
+            logger.error("GeneralDocumentAnalyzer LLM fallback triggered", error=str(e))
             # Deterministic fallback
             return {
                 "executive_summary": "Failed to generate LLM summary. Showing deterministic fallback.",

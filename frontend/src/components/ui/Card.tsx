@@ -19,33 +19,40 @@ interface CardProps extends React.HTMLAttributes<HTMLDivElement> {
   className?: string;
 }
 
-const baseStyles = 'bg-surface border border-border rounded-lg transition-all duration-150';
+const baseStyles =
+  'bg-surface border border-border rounded-lg transition-all duration-150 ' +
+  'motion-safe:will-change-transform';
 
 const variantStyles: Record<CardVariant, string> = {
   /** Standard card — subtle hover lift */
   default:
-    'hover:border-border-strong hover:bg-elevated',
+    'hover:border-border-strong hover:bg-elevated ' +
+    'motion-safe:hover:-translate-y-0.5',
 
-  /** Metric card — top accent border, no hover */
+  /** Metric card — top accent border, lift on hover */
   metric:
-    'border-t-2',
+    'border-t-2 ' +
+    'motion-safe:hover:-translate-y-0.5',
 
   /** Result card — slightly more prominent, gold left accent */
   result:
-    'border-l-2 border-l-gold-primary/50 hover:border-l-gold-primary hover:border-border-strong',
+    'border-l-2 border-l-gold-primary/50 hover:border-l-gold-primary hover:border-border-strong ' +
+    'motion-safe:hover:-translate-y-0.5',
 
   /** Info panel — no hover state, softer appearance */
   info:
     'bg-elevated border-border',
 
-  /** Glass card — translucent surface for overlays (backdrop-blur requires parent with bg) */
+  /** Glass card — translucent surface for overlays */
   glass:
-    'bg-surface/60 backdrop-blur-sm border-border/50 hover:border-border',
+    'bg-surface/60 backdrop-blur-sm border-border/50 hover:border-border ' +
+    'motion-safe:hover:-translate-y-0.5',
 
   /** Interactive card — stronger hover signal, pointer cursor */
   interactive:
     'hover:border-gold-primary/50 hover:bg-elevated cursor-pointer ' +
-    'active:scale-[0.995] active:border-gold-primary',
+    'motion-safe:hover:-translate-y-0.5 ' +
+    'motion-safe:active:scale-[0.99] active:border-gold-primary',
 };
 
 const accentBorderColors: Record<NonNullable<CardProps['accentColor']>, string> = {
@@ -89,7 +96,7 @@ export function Card({
         baseStyles,
         variantStyles[variant],
         variant === 'metric' && accentBorderColors[accentColor],
-        !noPadding && 'p-6',
+        !noPadding && 'p-4 sm:p-6',
         className,
       )}
       {...rest}

@@ -22,33 +22,34 @@ const baseStyles =
   'inline-flex items-center justify-center gap-2 font-sans font-medium rounded ' +
   'transition-all duration-150 cursor-pointer select-none ' +
   'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold-primary/50 focus-visible:ring-offset-1 focus-visible:ring-offset-void ' +
-  'disabled:opacity-40 disabled:cursor-not-allowed disabled:pointer-events-none';
+  'disabled:opacity-40 disabled:cursor-not-allowed disabled:pointer-events-none ' +
+  'motion-safe:will-change-transform';
 
 const variantStyles: Record<ButtonVariant, string> = {
   primary:
     'bg-gold-primary text-void ' +
-    'hover:bg-gold-bright hover:-translate-y-px ' +
-    'active:translate-y-0 active:bg-gold-primary',
+    'hover:bg-gold-bright motion-safe:hover:-translate-y-px ' +
+    'motion-safe:active:translate-y-0 motion-safe:active:scale-[0.98] active:bg-gold-primary',
 
   secondary:
     'bg-transparent text-text-primary border border-border-strong ' +
     'hover:bg-elevated hover:border-border-strong ' +
-    'active:bg-surface',
+    'motion-safe:active:scale-[0.98] active:bg-surface',
 
   ghost:
     'bg-transparent text-text-secondary ' +
     'hover:text-text-primary hover:bg-white/5 ' +
-    'active:bg-white/10',
+    'motion-safe:active:scale-[0.98] active:bg-white/10',
 
   danger:
     'bg-red-900/20 text-red-300 border border-red-800 ' +
     'hover:bg-red-900/40 hover:border-red-700 ' +
-    'active:bg-red-900/30',
+    'motion-safe:active:scale-[0.98] active:bg-red-900/30',
 
   outline:
     'bg-transparent text-gold-primary border border-gold-primary/50 ' +
     'hover:border-gold-primary hover:bg-gold-primary/5 ' +
-    'active:bg-gold-primary/10',
+    'motion-safe:active:scale-[0.98] active:bg-gold-primary/10',
 };
 
 const sizeStyles: Record<ButtonSize, string> = {

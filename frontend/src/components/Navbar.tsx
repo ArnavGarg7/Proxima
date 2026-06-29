@@ -1,34 +1,58 @@
 import { Link } from 'react-router-dom';
 import { useAuthStore } from '@/store/useAuthStore';
+import { cn } from '@/lib/cn';
 
-export default function Navbar() {
+interface NavbarProps {
+  onMenuClick: () => void;
+  isDrawerOpen: boolean;
+}
+
+export default function Navbar({ onMenuClick, isDrawerOpen }: NavbarProps) {
   const { user, logout } = useAuthStore();
 
   return (
-    <header className="border-b border-border bg-surface px-6 py-3 flex items-center justify-between">
-      <div className="flex items-center space-x-6">
-        <Link to="/workspace" className="font-display text-gold-primary text-xl font-semibold">Proxima</Link>
-        <nav className="flex items-center space-x-4">
-          <Link to="/dashboard" className="text-text-secondary hover:text-text-primary text-sm transition-colors">Dashboard</Link>
-          <Link to="/workspace" className="text-text-secondary hover:text-text-primary text-sm transition-colors">Workspace</Link>
-          <Link to="/templates" className="text-text-secondary hover:text-text-primary text-sm transition-colors">Templates</Link>
-          <Link to="/analyze" className="text-text-secondary hover:text-text-primary text-sm transition-colors">Analyze</Link>
-          <Link to="/legal" className="text-text-secondary hover:text-text-primary text-sm transition-colors">Legal</Link>
-          <Link to="/clinical" className="text-text-secondary hover:text-text-primary text-sm transition-colors">Clinical</Link>
-          <Link to="/compare" className="text-text-secondary hover:text-text-primary text-sm transition-colors">Compare</Link>
-          <Link to="/audit" className="text-text-secondary hover:text-text-primary text-sm transition-colors">Audit</Link>
-          <Link to="/code" className="text-text-secondary hover:text-text-primary text-sm transition-colors">Code Suite</Link>
-          <Link to="/radar" className="text-text-secondary hover:text-text-primary text-sm transition-colors">Domain Radar</Link>
-        </nav>
+    <header className="flex h-[60px] shrink-0 items-center border-b border-border bg-surface px-4 sm:px-6">
+      {/* Left: hamburger (mobile) + brand (mobile) */}
+      <div className="flex items-center gap-3">
+        <button
+          type="button"
+          className={cn(
+            'flex md:hidden h-9 w-9 items-center justify-center rounded-lg',
+            'text-text-secondary hover:text-text-primary hover:bg-white/5',
+            'transition-colors duration-150',
+            'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold-primary/50',
+          )}
+          onClick={onMenuClick}
+          aria-expanded={isDrawerOpen}
+          aria-controls="app-sidebar"
+          aria-label="Toggle navigation"
+        >
+          <span className="material-symbols-outlined text-[22px]" aria-hidden="true">
+            {isDrawerOpen ? 'close' : 'menu'}
+          </span>
+        </button>
+        {/* Brand visible on mobile only — sidebar carries it on tablet+ */}
+        <span className="font-display text-gold-primary text-lg font-semibold md:hidden">
+          Proxima
+        </span>
       </div>
-      <div className="flex items-center space-x-4">
+
+      {/* Right: admin link · email · sign out */}
+      <div className="ml-auto flex items-center gap-3">
         {user?.role === 'admin' && (
-          <Link to="/admin" className="text-xs bg-red-900/30 text-red-400 px-3 py-1.5 rounded border border-red-900 hover:bg-red-900/50 transition-colors font-medium">
-            Admin Dashboard
+          <Link
+            to="/admin"
+            className="hidden sm:block text-xs bg-red-900/30 text-red-400 px-3 py-1.5 rounded border border-red-900 hover:bg-red-900/50 transition-colors font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-400/50"
+          >
+            Admin
           </Link>
         )}
-        <span className="text-sm text-text-muted">{user?.email}</span>
-        <button onClick={logout} className="btn-ghost text-sm">Sign Out</button>
+        <span className="hidden sm:block text-sm text-text-muted truncate max-w-[200px]">
+          {user?.email}
+        </span>
+        <button type="button" onClick={logout} className="btn-ghost text-sm">
+          Sign Out
+        </button>
       </div>
     </header>
   );
