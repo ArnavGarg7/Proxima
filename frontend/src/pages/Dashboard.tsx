@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, useReducedMotion } from 'framer-motion';
 import { api } from '@/lib/axios';
@@ -16,6 +16,7 @@ import { Panel } from '@/components/ui/Panel';
 import { Badge } from '@/components/ui/Badge';
 import { Divider } from '@/components/ui/Divider';
 import { cn } from '@/lib/cn';
+import { useDocumentTitle } from '@/hooks/useDocumentTitle';
 
 /* ── Framer Motion helpers ───────────────────────────────────────────────────
    Bezier arrays matching motion.ts ease values.
@@ -140,9 +141,17 @@ function runStatusVariant(status: string): 'success' | 'error' | 'warning' {
   return 'warning';
 }
 
+interface QuickAction {
+  label:    string;
+  icon:     string;
+  disabled: boolean;
+  onClick:  () => void;
+}
+
 /* ─────────────────────────────────────────────────────────────────────────── */
 
 export default function Dashboard() {
+  useDocumentTitle('Dashboard');
   const navigate = useNavigate();
   const { user } = useAuthStore();
   const firstName = user?.name?.split(' ')[0] ?? '';
@@ -175,6 +184,29 @@ export default function Dashboard() {
     return () => clearInterval(id);
   }, []);
 
+  const handleResume = useCallback((_id: string, analyzer: string) => {
+    const routes: Record<string, string> = {
+      clinical: '/clinical', legal: '/legal',  compare: '/compare',
+      code:     '/code',     audit: '/audit',  analyze: '/analyze',
+    };
+    navigate(routes[analyzer] ?? '/workspace');
+  }, [navigate]);
+
+  const quickActions = useMemo<QuickAction[]>(() => {
+    const session = data?.active_sessions[0];
+    return [
+      { label: 'New Analysis',     icon: 'add_circle',  disabled: false, onClick: () => navigate('/workspace') },
+      { label: 'Browse Templates', icon: 'view_quilt',  disabled: false, onClick: () => navigate('/templates') },
+      { label: 'Workspace',        icon: 'folder_open', disabled: false, onClick: () => navigate('/workspace') },
+      {
+        label:    'Continue Session',
+        icon:     'play_circle',
+        disabled: !session,
+        onClick:  () => { if (session) handleResume(session.id, session.analyzer); },
+      },
+    ];
+  }, [data, navigate, handleResume]);
+
   /* ── Loading ─────────────────────────────────────────────────────────────── */
 
   if (loading) {
@@ -201,16 +233,6 @@ export default function Dashboard() {
     );
   }
 
-  /* ── Handlers ────────────────────────────────────────────────────────────── */
-
-  const handleResume = (_id: string, analyzer: string) => {
-    const routes: Record<string, string> = {
-      clinical: '/clinical', legal: '/legal',  compare: '/compare',
-      code:     '/code',     audit: '/audit',  analyze: '/analyze',
-    };
-    navigate(routes[analyzer] ?? '/workspace');
-  };
-
   /* ── Derived ─────────────────────────────────────────────────────────────── */
 
   const distTotal = Object.values(data.analyzer_distribution ?? {}).reduce(
@@ -220,32 +242,6 @@ export default function Dashboard() {
   const distributionItems = ANALYZER_ORDER
     .map((key) => ({ key, ...ANALYZER_META[key], count: data.analyzer_distribution[key] ?? 0 }))
     .filter((a) => a.count > 0);
-
-  /* ── Quick Actions ───────────────────────────────────────────────────────── */
-
-  const firstSession = data.active_sessions[0];
-  const hasSession   = Boolean(firstSession);
-
-  interface QuickAction {
-    label:    string;
-    icon:     string;
-    disabled: boolean;
-    onClick:  () => void;
-  }
-
-  const QUICK_ACTIONS: QuickAction[] = [
-    { label: 'New Analysis',     icon: 'add_circle',  disabled: false, onClick: () => navigate('/workspace') },
-    { label: 'Browse Templates', icon: 'view_quilt',  disabled: false, onClick: () => navigate('/templates') },
-    { label: 'Workspace',        icon: 'folder_open', disabled: false, onClick: () => navigate('/workspace') },
-    {
-      label:    'Continue Session',
-      icon:     'play_circle',
-      disabled: !hasSession,
-      onClick:  () => {
-        if (firstSession) handleResume(firstSession.id, firstSession.analyzer);
-      },
-    },
-  ];
 
   /* ── Render ──────────────────────────────────────────────────────────────── */
 
@@ -284,7 +280,7 @@ export default function Dashboard() {
           transition={{ duration: fm.slow, ease: EASE_OUT, delay: fm.fast }}
           className="flex flex-wrap items-center gap-2 mb-8"
         >
-          {QUICK_ACTIONS.map((action) => (
+          {quickActions.map((action) => (
             <button
               key={action.label}
               onClick={action.onClick}
@@ -296,6 +292,7 @@ export default function Dashboard() {
                 'bg-elevated border border-border text-text-muted',
                 'hover:border-border-strong hover:bg-surface hover:text-text-primary',
                 'transition-all duration-150',
+                'motion-safe:active:scale-[0.97] motion-safe:will-change-transform',
                 'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold-primary/50',
                 'disabled:opacity-35 disabled:cursor-not-allowed disabled:pointer-events-none',
               )}

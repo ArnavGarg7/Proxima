@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom';
 import { useAuthStore } from '@/store/useAuthStore';
+import { Button } from '@/components/ui/Button';
 import { cn } from '@/lib/cn';
 
 interface NavbarProps {
@@ -50,9 +51,9 @@ export default function Navbar({ onMenuClick, isDrawerOpen }: NavbarProps) {
         <span className="hidden sm:block text-sm text-text-muted truncate max-w-[200px]">
           {user?.email}
         </span>
-        <button type="button" onClick={logout} className="btn-ghost text-sm">
+        <Button variant="ghost" size="sm" onClick={logout}>
           Sign Out
-        </button>
+        </Button>
       </div>
     </header>
   );

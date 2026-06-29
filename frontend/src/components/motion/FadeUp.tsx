@@ -1,5 +1,5 @@
 import React from 'react';
-import { motion, useReducedMotion } from 'framer-motion';
+import { m, useReducedMotion } from 'framer-motion';
 import { duration, easeArr, stagger } from '@/theme/motion';
 
 interface FadeUpProps {
@@ -28,13 +28,13 @@ export function FadeUp({ children, className, delay = 0, index = 0 }: FadeUpProp
   if (reduced) return <div className={className}>{children}</div>;
 
   return (
-    <motion.div
+    <m.div
       className={className}
       initial="hidden"
       animate="visible"
       variants={makeVariants(totalDelay)}
     >
       {children}
-    </motion.div>
+    </m.div>
   );
 }

@@ -17,12 +17,16 @@ import {
   ConfidenceRing,
   type OutlineItem,
 } from '@/components/analysis';
+import { FadeUp } from '@/components/motion';
 import { Panel } from '@/components/ui/Panel';
 import { Card } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { Chip } from '@/components/ui/Chip';
 import { confidenceLabel } from '@/lib/confidence';
+import { useCopyFeedback } from '@/hooks/useCopyFeedback';
+import { cn } from '@/lib/cn';
+import { useDocumentTitle } from '@/hooks/useDocumentTitle';
 
 /* Risk level → presentation tokens */
 const RISK_STYLES: Record<string, { icon: string; tone: string }> = {
@@ -39,6 +43,7 @@ function SectionEmpty({ message }: { message: string }) {
 }
 
 export default function Analyze() {
+  useDocumentTitle('Analyze');
   const [searchParams] = useSearchParams();
   const documentId = searchParams.get('document_id');
   const templateOrigin = searchParams.get('template');
@@ -139,9 +144,11 @@ export default function Analyze() {
     URL.revokeObjectURL(url);
   };
 
+  const { copied, copy } = useCopyFeedback();
+
   const handleCopySummary = () => {
     if (result?.executive_summary) {
-      navigator.clipboard?.writeText(result.executive_summary).catch(() => { /* ignore */ });
+      copy(result.executive_summary);
     }
   };
 
@@ -251,208 +258,234 @@ export default function Analyze() {
   const inspector = (
     <AnalysisInspector>
       {/* Overall confidence */}
-      <Panel title="Overall Confidence">
-        <div className="flex flex-col items-center gap-3 py-1">
-          <ConfidenceRing value={result.confidence} size="lg" />
-          <span className="font-sans text-sm font-medium text-text-secondary">
-            {confidenceLabel(result.confidence)}
-          </span>
-        </div>
-      </Panel>
+      <FadeUp index={0}>
+        <Panel title="Overall Confidence">
+          <div className="flex flex-col items-center gap-3 py-1">
+            <ConfidenceRing value={result.confidence} size="lg" />
+            <span className="font-sans text-sm font-medium text-text-secondary">
+              {confidenceLabel(result.confidence)}
+            </span>
+          </div>
+        </Panel>
+      </FadeUp>
 
       {/* Document statistics */}
-      <Panel title="Document Statistics">
-        <div className="flex flex-col gap-3">
-          <InspectorStat icon="schedule"    label="Reading time" value={`${result.metadata.reading_time_minutes} min`} />
-          <InspectorStat icon="format_size" label="Word count"   value={result.metadata.word_count.toLocaleString()} />
-          <InspectorStat icon="language"    label="Language"     value={result.metadata.language.toUpperCase()} />
-        </div>
-      </Panel>
+      <FadeUp index={1}>
+        <Panel title="Document Statistics">
+          <div className="flex flex-col gap-3">
+            <InspectorStat icon="schedule"    label="Reading time" value={`${result.metadata.reading_time_minutes} min`} />
+            <InspectorStat icon="format_size" label="Word count"   value={result.metadata.word_count.toLocaleString()} />
+            <InspectorStat icon="language"    label="Language"     value={result.metadata.language.toUpperCase()} />
+          </div>
+        </Panel>
+      </FadeUp>
 
       {/* Signals used */}
-      <Panel title="Signals Used">
-        {result.signals.length > 0 ? (
-          <div className="flex flex-wrap gap-1.5">
-            {result.signals.map((sig, idx) => (
-              <Chip key={idx} variant="default">{sig}</Chip>
-            ))}
-          </div>
-        ) : (
-          <p className="font-sans text-sm text-text-muted">No signals detected.</p>
-        )}
-      </Panel>
+      <FadeUp index={2}>
+        <Panel title="Signals Used">
+          {result.signals.length > 0 ? (
+            <div className="flex flex-wrap gap-1.5">
+              {result.signals.map((sig, idx) => (
+                <Chip key={idx} variant="default">{sig}</Chip>
+              ))}
+            </div>
+          ) : (
+            <p className="font-sans text-sm text-text-muted">No signals detected.</p>
+          )}
+        </Panel>
+      </FadeUp>
 
       {/* Engine / export */}
-      <Panel title="Engine">
-        <div className="flex flex-col gap-3">
-          <InspectorStat icon="bolt" label="Analyzer" value="General" />
-          <p className="font-sans text-xs leading-relaxed text-text-muted">
-            Multi-domain extraction with evidence-backed citations.
-          </p>
-          <div className="flex flex-col gap-2 pt-1">
-            <Button
-              variant="secondary"
-              size="sm"
-              onClick={handleExport}
-              leftIcon={<span className="material-symbols-outlined text-[15px]" aria-hidden="true">download</span>}
-              className="w-full"
-            >
-              Download JSON
-            </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={handleCopySummary}
-              leftIcon={<span className="material-symbols-outlined text-[15px]" aria-hidden="true">content_copy</span>}
-              className="w-full"
-            >
-              Copy summary
-            </Button>
+      <FadeUp index={3}>
+        <Panel title="Engine">
+          <div className="flex flex-col gap-3">
+            <InspectorStat icon="bolt" label="Analyzer" value="General" />
+            <p className="font-sans text-xs leading-relaxed text-text-muted">
+              Multi-domain extraction with evidence-backed citations.
+            </p>
+            <div className="flex flex-col gap-2 pt-1">
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={handleExport}
+                leftIcon={<span className="material-symbols-outlined text-[15px]" aria-hidden="true">download</span>}
+                className="w-full"
+              >
+                Download JSON
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={handleCopySummary}
+                leftIcon={
+                  <span className="material-symbols-outlined text-[15px]" aria-hidden="true">
+                    {copied ? 'check' : 'content_copy'}
+                  </span>
+                }
+                className={cn('w-full transition-colors', copied && 'text-conf-high')}
+              >
+                {copied ? 'Copied!' : 'Copy summary'}
+              </Button>
+            </div>
           </div>
-        </div>
-      </Panel>
+        </Panel>
+      </FadeUp>
     </AnalysisInspector>
   );
 
   return (
     <AnalysisLayout header={header} sidebar={sidebar} inspector={inspector} mobileContents={outlineItems}>
-      <div className="flex flex-col gap-6">
+      <div key={selectedDocId} className="flex flex-col gap-6">
 
         {/* Executive Summary */}
-        <Panel id="sec-summary" title="Executive Summary" className="scroll-mt-6">
-          <p className="whitespace-pre-wrap font-sans text-sm leading-relaxed text-text-secondary">
-            {result.executive_summary}
-          </p>
-        </Panel>
+        <FadeUp index={0}>
+          <Panel id="sec-summary" title="Executive Summary" className="scroll-mt-6">
+            <p className="whitespace-pre-wrap font-sans text-sm leading-relaxed text-text-secondary">
+              {result.executive_summary}
+            </p>
+          </Panel>
+        </FadeUp>
 
         {/* Key Takeaways */}
-        <Panel
-          id="sec-takeaways"
-          title="Key Takeaways"
-          className="scroll-mt-6"
-          headerAction={<Badge variant="default" size="sm" uppercase={false}>{result.takeaways.length}</Badge>}
-        >
-          {result.takeaways.length > 0 ? (
-            <div className="flex flex-col gap-3">
-              {result.takeaways.map((takeaway, idx) => (
-                <TakeawayCard key={idx} takeaway={takeaway} />
-              ))}
-            </div>
-          ) : (
-            <SectionEmpty message="No key takeaways identified." />
-          )}
-        </Panel>
+        <FadeUp index={1}>
+          <Panel
+            id="sec-takeaways"
+            title="Key Takeaways"
+            className="scroll-mt-6"
+            headerAction={<Badge variant="default" size="sm" uppercase={false}>{result.takeaways.length}</Badge>}
+          >
+            {result.takeaways.length > 0 ? (
+              <div className="flex flex-col gap-3">
+                {result.takeaways.map((takeaway, idx) => (
+                  <TakeawayCard key={idx} takeaway={takeaway} />
+                ))}
+              </div>
+            ) : (
+              <SectionEmpty message="No key takeaways identified." />
+            )}
+          </Panel>
+        </FadeUp>
 
         {/* Topics */}
-        <Panel
-          id="sec-topics"
-          title="Topics"
-          className="scroll-mt-6"
-          headerAction={<Badge variant="default" size="sm" uppercase={false}>{result.topics.length}</Badge>}
-        >
-          {result.topics.length > 0 ? (
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-              {result.topics.map((topic, idx) => (
-                <TopicCard key={idx} topic={topic} />
-              ))}
-            </div>
-          ) : (
-            <SectionEmpty message="No distinct topics extracted." />
-          )}
-        </Panel>
+        <FadeUp index={2}>
+          <Panel
+            id="sec-topics"
+            title="Topics"
+            className="scroll-mt-6"
+            headerAction={<Badge variant="default" size="sm" uppercase={false}>{result.topics.length}</Badge>}
+          >
+            {result.topics.length > 0 ? (
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                {result.topics.map((topic, idx) => (
+                  <TopicCard key={idx} topic={topic} />
+                ))}
+              </div>
+            ) : (
+              <SectionEmpty message="No distinct topics extracted." />
+            )}
+          </Panel>
+        </FadeUp>
 
         {/* Named Entities */}
-        <Panel
-          id="sec-entities"
-          title="Named Entities"
-          className="scroll-mt-6"
-          headerAction={<Badge variant="default" size="sm" uppercase={false}>{result.entities.length}</Badge>}
-        >
-          {result.entities.length > 0 ? (
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-              {result.entities.map((ent, idx) => (
-                <EntityCard key={idx} entity={ent} />
-              ))}
-            </div>
-          ) : (
-            <SectionEmpty message="No significant entities found." />
-          )}
-        </Panel>
+        <FadeUp index={3}>
+          <Panel
+            id="sec-entities"
+            title="Named Entities"
+            className="scroll-mt-6"
+            headerAction={<Badge variant="default" size="sm" uppercase={false}>{result.entities.length}</Badge>}
+          >
+            {result.entities.length > 0 ? (
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                {result.entities.map((ent, idx) => (
+                  <EntityCard key={idx} entity={ent} />
+                ))}
+              </div>
+            ) : (
+              <SectionEmpty message="No significant entities found." />
+            )}
+          </Panel>
+        </FadeUp>
 
         {/* Action Items */}
-        <Panel
-          id="sec-actions"
-          title="Action Items"
-          className="scroll-mt-6"
-          headerAction={<Badge variant="default" size="sm" uppercase={false}>{result.actions.length}</Badge>}
-        >
-          {result.actions.length > 0 ? (
-            <div className="flex flex-col gap-3">
-              {result.actions.map((act, idx) => (
-                <ActionItemCard key={idx} action={act} />
-              ))}
-            </div>
-          ) : (
-            <SectionEmpty message="No action items found." />
-          )}
-        </Panel>
+        <FadeUp index={4}>
+          <Panel
+            id="sec-actions"
+            title="Action Items"
+            className="scroll-mt-6"
+            headerAction={<Badge variant="default" size="sm" uppercase={false}>{result.actions.length}</Badge>}
+          >
+            {result.actions.length > 0 ? (
+              <div className="flex flex-col gap-3">
+                {result.actions.map((act, idx) => (
+                  <ActionItemCard key={idx} action={act} />
+                ))}
+              </div>
+            ) : (
+              <SectionEmpty message="No action items found." />
+            )}
+          </Panel>
+        </FadeUp>
 
         {/* Numerical Insights */}
-        <Panel
-          id="sec-numbers"
-          title="Numerical Insights"
-          className="scroll-mt-6"
-          headerAction={<Badge variant="default" size="sm" uppercase={false}>{result.numbers.length}</Badge>}
-        >
-          {result.numbers.length > 0 ? (
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-              {result.numbers.map((num, idx) => (
-                <Card key={idx} noPadding className="flex flex-col gap-2 p-4">
-                  <div className="flex items-center justify-between gap-2">
-                    <span className="font-sans text-xs font-semibold uppercase tracking-wider text-text-muted">
-                      {num.metric}
-                    </span>
-                    <span className="font-mono text-lg font-bold text-gold-primary">{num.value}</span>
-                  </div>
-                  <p className="font-sans text-xs text-text-secondary">{num.context}</p>
-                </Card>
-              ))}
-            </div>
-          ) : (
-            <SectionEmpty message="No significant numerical metrics found." />
-          )}
-        </Panel>
+        <FadeUp index={5}>
+          <Panel
+            id="sec-numbers"
+            title="Numerical Insights"
+            className="scroll-mt-6"
+            headerAction={<Badge variant="default" size="sm" uppercase={false}>{result.numbers.length}</Badge>}
+          >
+            {result.numbers.length > 0 ? (
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                {result.numbers.map((num, idx) => (
+                  <Card key={idx} noPadding className="flex flex-col gap-2 p-4">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="font-sans text-xs font-semibold uppercase tracking-wider text-text-muted">
+                        {num.metric}
+                      </span>
+                      <span className="font-mono text-lg font-bold text-gold-primary">{num.value}</span>
+                    </div>
+                    <p className="font-sans text-xs text-text-secondary">{num.context}</p>
+                  </Card>
+                ))}
+              </div>
+            ) : (
+              <SectionEmpty message="No significant numerical metrics found." />
+            )}
+          </Panel>
+        </FadeUp>
 
         {/* Risks */}
-        <Panel
-          id="sec-risks"
-          title="Risks"
-          className="scroll-mt-6"
-          headerAction={<Badge variant="default" size="sm" uppercase={false}>{result.risks.length}</Badge>}
-        >
-          {result.risks.length > 0 ? (
-            <div className="flex flex-col gap-3">
-              {result.risks.map((risk, idx) => {
-                const style = RISK_STYLES[risk.level] ?? RISK_STYLES.Low;
-                return (
-                  <Card key={idx} noPadding className="flex items-start gap-3 p-4">
-                    <span className={`material-symbols-outlined text-[20px] mt-0.5 ${style.tone}`} aria-hidden="true">
-                      {style.icon}
-                    </span>
-                    <div className="flex flex-col gap-1">
-                      <span className={`text-[10px] font-bold uppercase tracking-wider ${style.tone}`}>
-                        {risk.level} Risk
+        <FadeUp index={6}>
+          <Panel
+            id="sec-risks"
+            title="Risks"
+            className="scroll-mt-6"
+            headerAction={<Badge variant="default" size="sm" uppercase={false}>{result.risks.length}</Badge>}
+          >
+            {result.risks.length > 0 ? (
+              <div className="flex flex-col gap-3">
+                {result.risks.map((risk, idx) => {
+                  const style = RISK_STYLES[risk.level] ?? RISK_STYLES.Low;
+                  return (
+                    <Card key={idx} noPadding className="flex items-start gap-3 p-4">
+                      <span className={`material-symbols-outlined text-[20px] mt-0.5 ${style.tone}`} aria-hidden="true">
+                        {style.icon}
                       </span>
-                      <p className="font-sans text-sm leading-relaxed text-text-primary">{risk.description}</p>
-                    </div>
-                  </Card>
-                );
-              })}
-            </div>
-          ) : (
-            <SectionEmpty message="No significant risks identified." />
-          )}
-        </Panel>
+                      <div className="flex flex-col gap-1">
+                        <span className={`text-[10px] font-bold uppercase tracking-wider ${style.tone}`}>
+                          {risk.level} Risk
+                        </span>
+                        <p className="font-sans text-sm leading-relaxed text-text-primary">{risk.description}</p>
+                      </div>
+                    </Card>
+                  );
+                })}
+              </div>
+            ) : (
+              <SectionEmpty message="No significant risks identified." />
+            )}
+          </Panel>
+        </FadeUp>
 
       </div>
     </AnalysisLayout>

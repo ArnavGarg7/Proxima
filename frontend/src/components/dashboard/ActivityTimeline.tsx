@@ -1,4 +1,5 @@
 import { RecentRun } from '@/types/dashboard';
+import { FadeUp } from '@/components/motion';
 
 interface ActivityTimelineProps {
   runs: RecentRun[];
@@ -31,13 +32,14 @@ const GROUP_ORDER = ['Today', 'Yesterday', 'Older'] as const;
 interface GroupSectionProps {
   title: string;
   runs: TimedRun[];
+  index?: number;
 }
 
-function GroupSection({ title, runs }: GroupSectionProps) {
+function GroupSection({ title, runs, index = 0 }: GroupSectionProps) {
   if (runs.length === 0) return null;
 
   return (
-    <div className="flex flex-col gap-1">
+    <FadeUp index={index} className="flex flex-col gap-1">
       <span className="font-sans text-[10px] font-medium uppercase tracking-widest text-text-muted mb-2">
         {title}
       </span>
@@ -70,7 +72,7 @@ function GroupSection({ title, runs }: GroupSectionProps) {
           </div>
         ))}
       </div>
-    </div>
+    </FadeUp>
   );
 }
 
@@ -93,9 +95,9 @@ export function ActivityTimeline({ runs }: ActivityTimelineProps) {
 
   return (
     <div className="flex flex-col gap-6">
-      {GROUP_ORDER.map((label) =>
+      {GROUP_ORDER.map((label, i) =>
         grouped[label] ? (
-          <GroupSection key={label} title={label} runs={grouped[label]} />
+          <GroupSection key={label} title={label} runs={grouped[label]} index={i} />
         ) : null,
       )}
     </div>

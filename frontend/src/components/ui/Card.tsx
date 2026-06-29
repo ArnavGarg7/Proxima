@@ -21,37 +21,37 @@ interface CardProps extends React.HTMLAttributes<HTMLDivElement> {
 
 const baseStyles =
   'bg-surface border border-border rounded-lg transition-all duration-150 ' +
-  'motion-safe:will-change-transform';
+  'motion-safe:will-change-transform shadow-card';
 
 const variantStyles: Record<CardVariant, string> = {
-  /** Standard card — subtle hover lift */
+  /** Standard card — subtle hover lift + raised shadow */
   default:
-    'hover:border-border-strong hover:bg-elevated ' +
+    'hover:border-border-strong hover:bg-elevated card-shadow-hover ' +
     'motion-safe:hover:-translate-y-0.5',
 
   /** Metric card — top accent border, lift on hover */
   metric:
-    'border-t-2 ' +
+    'border-t-2 card-shadow-hover ' +
     'motion-safe:hover:-translate-y-0.5',
 
-  /** Result card — slightly more prominent, gold left accent */
+  /** Result card — left-accent, lift on hover */
   result:
     'border-l-2 border-l-gold-primary/50 hover:border-l-gold-primary hover:border-border-strong ' +
-    'motion-safe:hover:-translate-y-0.5',
+    'card-shadow-hover motion-safe:hover:-translate-y-0.5',
 
-  /** Info panel — no hover state, softer appearance */
+  /** Info panel — no hover state, slightly deeper surface */
   info:
     'bg-elevated border-border',
 
-  /** Glass card — translucent surface for overlays */
+  /** Glass card — translucent surface, elevated by shadow */
   glass:
     'bg-surface/60 backdrop-blur-sm border-border/50 hover:border-border ' +
-    'motion-safe:hover:-translate-y-0.5',
+    'card-shadow-hover motion-safe:hover:-translate-y-0.5',
 
   /** Interactive card — stronger hover signal, pointer cursor */
   interactive:
     'hover:border-gold-primary/50 hover:bg-elevated cursor-pointer ' +
-    'motion-safe:hover:-translate-y-0.5 ' +
+    'card-shadow-hover motion-safe:hover:-translate-y-0.5 ' +
     'motion-safe:active:scale-[0.99] active:border-gold-primary',
 };
 

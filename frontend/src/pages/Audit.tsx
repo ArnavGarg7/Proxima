@@ -15,6 +15,7 @@ import { Panel } from '@/components/ui/Panel';
 import { Card } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
+import { useDocumentTitle } from '@/hooks/useDocumentTitle';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -177,6 +178,7 @@ function SectionEmpty({ message }: { message: string }) {
 // ── Page ──────────────────────────────────────────────────────────────────────
 
 export default function Audit() {
+  useDocumentTitle('Audit');
   const [documents, setDocuments] = useState<Document[]>([]);
   const [selectedDocId, setSelectedDocId] = useState<string>('');
   const [loadingDocs, setLoadingDocs] = useState(true);

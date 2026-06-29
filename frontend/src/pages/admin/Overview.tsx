@@ -1,9 +1,10 @@
-import { 
-  Users, 
-  UserCheck, 
-  Activity, 
-  Coins, 
-  DollarSign, 
+import { useMemo } from 'react';
+import {
+  Users,
+  UserCheck,
+  Activity,
+  Coins,
+  DollarSign,
   RefreshCw,
   AlertCircle
 } from 'lucide-react';
@@ -11,6 +12,17 @@ import { useAdminAnalytics } from '@/hooks/useAdminAnalytics';
 
 export default function AdminOverview() {
   const { data, isLoading, isError, refetch, isRefetching } = useAdminAnalytics();
+
+  const metrics = useMemo(() => {
+    if (!data) return [];
+    return [
+      { label: 'Total Users',    value: data.total_users.toLocaleString(),    icon: Users,      color: 'text-blue-600',    bg: 'bg-blue-100' },
+      { label: 'Active Users',   value: data.active_users.toLocaleString(),   icon: UserCheck,  color: 'text-emerald-600', bg: 'bg-emerald-100' },
+      { label: 'Total Requests', value: data.total_requests.toLocaleString(), icon: Activity,   color: 'text-indigo-600',  bg: 'bg-indigo-100' },
+      { label: 'Total Tokens',   value: data.total_tokens.toLocaleString(),   icon: Coins,      color: 'text-amber-600',   bg: 'bg-amber-100' },
+      { label: 'Total Cost',     value: `$${data.total_cost.toFixed(2)}`,     icon: DollarSign, color: 'text-rose-600',    bg: 'bg-rose-100' },
+    ];
+  }, [data]);
 
   if (isLoading) {
     return (
@@ -37,14 +49,6 @@ export default function AdminOverview() {
       </div>
     );
   }
-
-  const metrics = [
-    { label: 'Total Users', value: data.total_users.toLocaleString(), icon: Users, color: 'text-blue-600', bg: 'bg-blue-100' },
-    { label: 'Active Users', value: data.active_users.toLocaleString(), icon: UserCheck, color: 'text-emerald-600', bg: 'bg-emerald-100' },
-    { label: 'Total Requests', value: data.total_requests.toLocaleString(), icon: Activity, color: 'text-indigo-600', bg: 'bg-indigo-100' },
-    { label: 'Total Tokens', value: data.total_tokens.toLocaleString(), icon: Coins, color: 'text-amber-600', bg: 'bg-amber-100' },
-    { label: 'Total Cost', value: `$${data.total_cost.toFixed(2)}`, icon: DollarSign, color: 'text-rose-600', bg: 'bg-rose-100' },
-  ];
 
   return (
     <div className="space-y-6">

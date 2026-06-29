@@ -1,8 +1,9 @@
 // frontend/src/pages/Templates.tsx
 // Stage 4.5H — Template Library Redesign
 
-import { useEffect, useState } from 'react';
-import { AnimatePresence } from 'framer-motion';
+import { useEffect, useState, useMemo, useDeferredValue } from 'react';
+import { AnimatePresence, motion } from 'framer-motion';
+import { FadeIn, FadeUp } from '@/components/motion';
 import { api } from '@/lib/axios';
 import { type TemplateListItem, type LaunchMode } from '@/types/template';
 import TemplateLaunchModal from '@/components/templates/TemplateLaunchModal';
@@ -11,6 +12,7 @@ import { Button } from '@/components/ui/Button';
 import { Spinner } from '@/components/ui/Spinner';
 import { SidebarSection } from '@/components/ui/Panel';
 import { cn } from '@/lib/cn';
+import { useDocumentTitle } from '@/hooks/useDocumentTitle';
 
 // ── Domain constants (all preserved from original) ────────────────────────────
 
@@ -368,15 +370,15 @@ function TemplateSearch({
         className="w-full sm:w-52 rounded-lg border border-border bg-surface py-2 pl-9 pr-8 font-sans text-sm text-text-primary
           placeholder-text-muted focus:border-gold-primary focus:outline-none focus:ring-2 focus:ring-gold-primary/15"
       />
-      {value && (
+      <FadeIn show={!!value} className="absolute right-2.5 top-1/2 -translate-y-1/2">
         <button
           onClick={() => onChange('')}
           aria-label="Clear search"
-          className="absolute right-2.5 top-1/2 -translate-y-1/2 text-text-muted transition-colors hover:text-text-primary"
+          className="text-text-muted transition-colors hover:text-text-primary"
         >
           <span className="material-symbols-outlined text-[16px]">close</span>
         </button>
-      )}
+      </FadeIn>
     </div>
   );
 }
@@ -720,6 +722,7 @@ function EmptyTemplates({ onReset }: { onReset: () => void }) {
 // ── Page ──────────────────────────────────────────────────────────────────────
 
 export default function Templates() {
+  useDocumentTitle('Templates');
   // ── State (original preserved) ───────────────────────────────────────────
   const [templates, setTemplates]               = useState<TemplateListItem[]>([]);
   const [loading, setLoading]                   = useState(true);
@@ -734,6 +737,8 @@ export default function Templates() {
   const [viewMode, setViewMode]                     = useState<'grid' | 'list'>('grid');
   const [filterDrawerOpen, setFilterDrawerOpen]     = useState(false);
 
+  const deferredQuery = useDeferredValue(searchQuery);
+
   // ── Load templates from registry API (preserved) ────────────────────────
   useEffect(() => {
     api.get('/api/templates/')
@@ -745,32 +750,32 @@ export default function Templates() {
       .finally(() => setLoading(false));
   }, []);
 
-  // ── Filtering — existing domain logic preserved, search/requirement additive
-  const domainFiltered = domainFilter
-    ? templates.filter(t => t.domain === domainFilter)
-    : templates;
+  // ── Filtering — deferred query keeps the input responsive on every keystroke
+  const filteredTemplates = useMemo(() => {
+    const domainFiltered = domainFilter
+      ? templates.filter(t => t.domain === domainFilter)
+      : templates;
+    const requirementFiltered =
+      requirementFilter === 'all'
+        ? domainFiltered
+        : domainFiltered.filter(t => t.launch_mode === requirementFilter);
+    const q = deferredQuery.trim().toLowerCase();
+    const searchFiltered = q
+      ? requirementFiltered.filter(
+          t =>
+            t.name.toLowerCase().includes(q) ||
+            t.description.toLowerCase().includes(q) ||
+            t.badge_label.toLowerCase().includes(q),
+        )
+      : requirementFiltered;
+    return [...searchFiltered].sort((a, b) => {
+      if (sortOrder === 'name')   return a.name.localeCompare(b.name);
+      if (sortOrder === 'domain') return a.domain.localeCompare(b.domain);
+      return 0;
+    });
+  }, [templates, domainFilter, requirementFilter, deferredQuery, sortOrder]);
 
-  const requirementFiltered =
-    requirementFilter === 'all'
-      ? domainFiltered
-      : domainFiltered.filter(t => t.launch_mode === requirementFilter);
-
-  const q = searchQuery.trim().toLowerCase();
-  const searchFiltered = q
-    ? requirementFiltered.filter(
-        t =>
-          t.name.toLowerCase().includes(q) ||
-          t.description.toLowerCase().includes(q) ||
-          t.badge_label.toLowerCase().includes(q),
-      )
-    : requirementFiltered;
-
-  const filteredTemplates = [...searchFiltered].sort((a, b) => {
-    if (sortOrder === 'name')   return a.name.localeCompare(b.name);
-    if (sortOrder === 'domain') return a.domain.localeCompare(b.domain);
-    return 0;
-  });
-
+  const q              = deferredQuery.trim().toLowerCase();
   const popularId        = templates[0]?.id ?? null;
   const featuredTemplate = templates[0] ?? null;
   const showHero         = !domainFilter && requirementFilter === 'all' && !q;
@@ -916,37 +921,64 @@ export default function Templates() {
           <div className="p-4 sm:p-6 md:p-8">
             {/* Featured hero — only when no filters active */}
             {showHero && featuredTemplate && (
-              <TemplateHero
-                template={featuredTemplate}
-                onSelect={() => setSelectedTemplate(featuredTemplate)}
-              />
+              <FadeUp>
+                <TemplateHero
+                  template={featuredTemplate}
+                  onSelect={() => setSelectedTemplate(featuredTemplate)}
+                />
+              </FadeUp>
             )}
 
-            {filteredTemplates.length === 0 ? (
-              <EmptyTemplates onReset={handleResetFilters} />
-            ) : viewMode === 'grid' ? (
-              <div className="grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-3">
-                {filteredTemplates.map(template => (
-                  <TemplateCard
-                    key={template.id}
-                    template={template}
-                    onSelect={() => setSelectedTemplate(template)}
-                    isPopular={template.id === popularId}
-                  />
-                ))}
-              </div>
-            ) : (
-              <div className="flex flex-col gap-3">
-                {filteredTemplates.map(template => (
-                  <TemplateListRow
-                    key={template.id}
-                    template={template}
-                    onSelect={() => setSelectedTemplate(template)}
-                    isPopular={template.id === popularId}
-                  />
-                ))}
-              </div>
-            )}
+            <AnimatePresence mode="wait">
+              {filteredTemplates.length === 0 ? (
+                <motion.div
+                  key="empty"
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  transition={{ duration: 0.15 }}
+                >
+                  <EmptyTemplates onReset={handleResetFilters} />
+                </motion.div>
+              ) : viewMode === 'grid' ? (
+                <motion.div
+                  key={`grid-${domainFilter ?? 'all'}-${requirementFilter}-${q}`}
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  transition={{ duration: 0.15 }}
+                  className="grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-3"
+                >
+                  {filteredTemplates.map(template => (
+                    <TemplateCard
+                      key={template.id}
+                      template={template}
+                      onSelect={() => setSelectedTemplate(template)}
+                      isPopular={template.id === popularId}
+                    />
+                  ))}
+                </motion.div>
+              ) : (
+                <motion.div
+                  key={`list-${domainFilter ?? 'all'}-${requirementFilter}-${q}`}
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  transition={{ duration: 0.15 }}
+                  className="flex flex-col gap-3"
+                >
+                  {filteredTemplates.map((template, i) => (
+                    <FadeUp key={template.id} index={Math.min(i, 6)}>
+                      <TemplateListRow
+                        template={template}
+                        onSelect={() => setSelectedTemplate(template)}
+                        isPopular={template.id === popularId}
+                      />
+                    </FadeUp>
+                  ))}
+                </motion.div>
+              )}
+            </AnimatePresence>
           </div>
         </main>
       </div>

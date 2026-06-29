@@ -36,11 +36,11 @@ export function Panel({
 
   return (
     <div
-      className={cn('bg-surface border border-border rounded-lg overflow-hidden', className)}
+      className={cn('bg-surface border border-border rounded-lg overflow-hidden shadow-panel', className)}
       {...rest}
     >
       {hasHeader && (
-        <div className="flex items-center justify-between px-4 py-3 border-b border-border bg-elevated/50 sm:px-5">
+        <div className="flex items-center justify-between px-4 py-3 border-b border-border bg-elevated/60 sm:px-5">
           <div className="flex flex-col gap-0.5 min-w-0">
             {title && (
               <span className="text-xs font-medium uppercase tracking-widest text-text-muted font-sans">

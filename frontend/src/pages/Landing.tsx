@@ -11,6 +11,7 @@ import { AnalyzerShowcase } from '@/components/landing/AnalyzerShowcase';
 import { Reveal } from '@/components/landing/Reveal';
 import { staggerContainer, staggerItem, EASE_OUT } from '@/components/landing/landingMotion';
 import { duration } from '@/theme/motion';
+import { useDocumentTitle } from '@/hooks/useDocumentTitle';
 
 /* Action verbs shown beneath the hero headline */
 const HERO_VERBS = ['Upload', 'Analyze', 'Compare', 'Audit'] as const;
@@ -27,6 +28,7 @@ const FOOTER_COLUMNS = [
 ] as const;
 
 export default function Landing() {
+  useDocumentTitle();
   const reduced = useReducedMotion() ?? false;
 
   /* ── Preserved auth logic — Google OAuth PKCE initiated by the server ──── */
@@ -60,9 +62,9 @@ export default function Landing() {
               {/* Eyebrow pill */}
               <motion.span
                 variants={staggerItem}
-                className="inline-flex items-center gap-2 rounded-full border border-gold-primary/25 bg-gold-primary/5 px-3 py-1.5"
+                className="inline-flex items-center gap-2 rounded-full border border-gold-primary/30 bg-gold-primary/8 px-3 py-1.5 shadow-[0_0_16px_rgba(201,168,76,0.12),inset_0_1px_0_rgba(255,255,255,0.06)]"
               >
-                <span className="h-1.5 w-1.5 rounded-full bg-gold-primary" />
+                <span className="h-1.5 w-1.5 rounded-full bg-gold-primary shadow-[0_0_4px_rgba(201,168,76,0.8)]" />
                 <span className="font-sans text-xs font-medium uppercase tracking-widest text-gold-primary">
                   AI Intelligence Suite
                 </span>
@@ -106,7 +108,7 @@ export default function Landing() {
                 <Button
                   variant="primary"
                   size="lg"
-                  className="w-full sm:w-auto"
+                  className="w-full sm:w-auto motion-safe:hover:shadow-[0_0_24px_rgba(201,168,76,0.35)]"
                   onClick={handleLogin}
                   rightIcon={
                     <span className="material-symbols-outlined text-[17px]" aria-hidden="true">

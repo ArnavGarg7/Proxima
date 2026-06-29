@@ -1,5 +1,8 @@
 import { useWorkspaceStore } from '@/store/useWorkspaceStore';
 import { useRef, useState, useEffect } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { FadeUp } from '@/components/motion';
+import { AnimatedProgress } from '@/components/ui/AnimatedProgress';
 import { api } from '@/lib/axios';
 import { useSearchParams, useLocation, useNavigate } from 'react-router-dom';
 import TemplateBanner from '@/components/templates/TemplateBanner';
@@ -9,6 +12,7 @@ import { Card } from '@/components/ui/Card';
 import { Panel } from '@/components/ui/Panel';
 import { Badge } from '@/components/ui/Badge';
 import { cn } from '@/lib/cn';
+import { useDocumentTitle } from '@/hooks/useDocumentTitle';
 
 /* ── Workbench catalogue ─────────────────────────────────────────────────────
    Full literal class names so Tailwind JIT includes them.                     */
@@ -91,6 +95,7 @@ function formatDate(dateStr?: string): string {
 /* ─────────────────────────────────────────────────────────────────────────── */
 
 export default function Workspace() {
+  useDocumentTitle('Workspace');
   const { currentDocumentId, setCurrentDocumentId } = useWorkspaceStore();
 
   const fileInputRef   = useRef<HTMLInputElement>(null);
@@ -243,28 +248,35 @@ export default function Workspace() {
       <div className="max-w-[1400px] mx-auto px-4 sm:px-6 md:px-8 py-6 sm:py-10">
 
         {/* ── Error banner ─────────────────────────────────────────────────── */}
-        {error && (
-          <div
-            role="alert"
-            className="mb-6 flex items-start gap-3 px-4 py-3 rounded-lg
-              bg-conf-critical/8 border border-conf-critical/20 text-conf-critical"
-          >
-            <span className="material-symbols-outlined text-[18px] mt-0.5 shrink-0" aria-hidden="true">
-              error_outline
-            </span>
-            <div className="flex flex-col gap-0.5">
-              <span className="font-sans text-sm font-semibold">Upload failed</span>
-              <span className="font-sans text-sm text-conf-critical/80">{error}</span>
-            </div>
-            <button
-              onClick={() => setError(null)}
-              aria-label="Dismiss error"
-              className="ml-auto shrink-0 text-conf-critical/60 hover:text-conf-critical transition-colors duration-150"
+        <AnimatePresence>
+          {error && (
+            <motion.div
+              key="upload-error"
+              role="alert"
+              initial={{ opacity: 0, y: -6 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -6 }}
+              transition={{ duration: 0.15 }}
+              className="mb-6 flex items-start gap-3 px-4 py-3 rounded-lg
+                bg-conf-critical/8 border border-conf-critical/20 text-conf-critical"
             >
-              <span className="material-symbols-outlined text-[16px]">close</span>
-            </button>
-          </div>
-        )}
+              <span className="material-symbols-outlined text-[18px] mt-0.5 shrink-0" aria-hidden="true">
+                error_outline
+              </span>
+              <div className="flex flex-col gap-0.5">
+                <span className="font-sans text-sm font-semibold">Upload failed</span>
+                <span className="font-sans text-sm text-conf-critical/80">{error}</span>
+              </div>
+              <button
+                onClick={() => setError(null)}
+                aria-label="Dismiss error"
+                className="ml-auto shrink-0 text-conf-critical/60 hover:text-conf-critical transition-colors duration-150"
+              >
+                <span className="material-symbols-outlined text-[16px]">close</span>
+              </button>
+            </motion.div>
+          )}
+        </AnimatePresence>
 
         {/* ── Template banner ───────────────────────────────────────────────── */}
         {templateContext && (
@@ -409,13 +421,8 @@ export default function Workspace() {
                       </p>
                     </div>
 
-                    {/* Indeterminate progress bar */}
-                    <div className="w-48 h-px rounded-full bg-border overflow-hidden">
-                      <div
-                        className="h-full bg-gold-primary rounded-full"
-                        style={{ animation: 'shimmer 1.5s ease-in-out infinite' }}
-                      />
-                    </div>
+                    {/* Progress bar — animates 0 → 100% once to signal activity */}
+                    <AnimatedProgress value={100} className="w-48 h-px" />
                   </div>
                 ) : (
                   /* ── Idle / drag-active state ── */
@@ -639,6 +646,7 @@ export default function Workspace() {
           <div className="flex flex-col gap-8">
 
             {/* Hero */}
+            <FadeUp index={0}>
             <div className="relative flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between sm:gap-6">
               {/* Ambient glow */}
               <div
@@ -676,8 +684,10 @@ export default function Workspace() {
                 Swap Document
               </Button>
             </div>
+            </FadeUp>
 
             {/* Active document card */}
+            <FadeUp index={1}>
             <Panel title="Active Document" noPadding>
               <div className="flex items-center justify-between gap-4 px-5 py-4">
                 <div className="flex items-center gap-4 min-w-0">
@@ -706,8 +716,10 @@ export default function Workspace() {
                 </span>
               </div>
             </Panel>
+            </FadeUp>
 
             {/* Workbench picker */}
+            <FadeUp index={2}>
             <div className="flex flex-col gap-4">
               <div className="flex flex-col gap-0.5">
                 <h2 className="font-sans text-sm font-semibold text-text-primary">
@@ -773,6 +785,7 @@ export default function Workspace() {
                 ))}
               </div>
             </div>
+            </FadeUp>
 
           </div>
         )}

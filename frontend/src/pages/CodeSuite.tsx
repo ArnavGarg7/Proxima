@@ -23,6 +23,7 @@ import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { Chip } from '@/components/ui/Chip';
 import { cn } from '@/lib/cn';
+import { useDocumentTitle } from '@/hooks/useDocumentTitle';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -162,6 +163,7 @@ function CodeEditorSidebar({
 // ── Page ──────────────────────────────────────────────────────────────────────
 
 export default function CodeSuite() {
+  useDocumentTitle('Code Suite');
   const location = useLocation();
   const [snippet, setSnippet] = useState('');
   const [language, setLanguage] = useState('');

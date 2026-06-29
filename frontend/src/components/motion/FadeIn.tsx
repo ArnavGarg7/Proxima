@@ -1,5 +1,5 @@
 import React from 'react';
-import { motion, AnimatePresence, useReducedMotion } from 'framer-motion';
+import { m, AnimatePresence, useReducedMotion } from 'framer-motion';
 import { duration, easeArr } from '@/theme/motion';
 
 interface FadeInProps {
@@ -33,9 +33,9 @@ export function FadeIn({ children, className, delay = 0, show }: FadeInProps) {
     return (
       <AnimatePresence>
         {show && (
-          <motion.div className={className} initial="hidden" animate="visible" exit="exit" variants={variants}>
+          <m.div className={className} initial="hidden" animate="visible" exit="exit" variants={variants}>
             {children}
-          </motion.div>
+          </m.div>
         )}
       </AnimatePresence>
     );
@@ -44,8 +44,8 @@ export function FadeIn({ children, className, delay = 0, show }: FadeInProps) {
   if (reduced) return <div className={className}>{children}</div>;
 
   return (
-    <motion.div className={className} initial="hidden" animate="visible" variants={variants}>
+    <m.div className={className} initial="hidden" animate="visible" variants={variants}>
       {children}
-    </motion.div>
+    </m.div>
   );
 }

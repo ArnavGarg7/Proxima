@@ -157,7 +157,7 @@ export default function TemplateLaunchModal({ template, onClose }: TemplateLaunc
         role="dialog"
         aria-modal="true"
         aria-labelledby="tl-modal-title"
-        className="w-full max-w-[520px] bg-elevated border border-border rounded-2xl shadow-2xl flex flex-col overflow-hidden"
+        className="w-full max-w-[520px] bg-elevated border border-white/[0.07] rounded-2xl shadow-dialog flex flex-col overflow-hidden"
         initial="hidden"
         animate="visible"
         exit="exit"

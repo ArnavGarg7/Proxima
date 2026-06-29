@@ -28,11 +28,13 @@ const baseStyles =
 const variantStyles: Record<ButtonVariant, string> = {
   primary:
     'bg-gold-primary text-void ' +
+    'shadow-[0_1px_3px_rgba(0,0,0,0.4),inset_0_1px_0_rgba(255,255,255,0.18)] ' +
     'hover:bg-gold-bright motion-safe:hover:-translate-y-px ' +
     'motion-safe:active:translate-y-0 motion-safe:active:scale-[0.98] active:bg-gold-primary',
 
   secondary:
     'bg-transparent text-text-primary border border-border-strong ' +
+    'shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] ' +
     'hover:bg-elevated hover:border-border-strong ' +
     'motion-safe:active:scale-[0.98] active:bg-surface',
 
@@ -48,6 +50,7 @@ const variantStyles: Record<ButtonVariant, string> = {
 
   outline:
     'bg-transparent text-gold-primary border border-gold-primary/50 ' +
+    'shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] ' +
     'hover:border-gold-primary hover:bg-gold-primary/5 ' +
     'motion-safe:active:scale-[0.98] active:bg-gold-primary/10',
 };

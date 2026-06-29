@@ -1,5 +1,5 @@
 import React from 'react';
-import { motion, useReducedMotion } from 'framer-motion';
+import { m, useReducedMotion } from 'framer-motion';
 import { duration, easeArr, lift, scale } from '@/theme/motion';
 import { cn } from '@/lib/cn';
 
@@ -59,17 +59,17 @@ export function Pressable({ children, className, asDiv = false, onClick, ...rest
 
   if (asDiv) {
     return (
-      <motion.div
+      <m.div
         {...motionProps}
         onClick={onClick as React.MouseEventHandler<HTMLDivElement>}
       >
         {children}
-      </motion.div>
+      </m.div>
     );
   }
 
   return (
-    <motion.button
+    <m.button
       {...motionProps}
       onClick={onClick as React.MouseEventHandler<HTMLButtonElement>}
       type={rest.type ?? 'button'}
@@ -80,6 +80,6 @@ export function Pressable({ children, className, asDiv = false, onClick, ...rest
       tabIndex={rest.tabIndex}
     >
       {children}
-    </motion.button>
+    </m.button>
   );
 }

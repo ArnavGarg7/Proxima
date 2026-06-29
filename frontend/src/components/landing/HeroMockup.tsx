@@ -40,14 +40,16 @@ export function HeroMockup() {
 
   return (
     <div aria-hidden="true" className="relative select-none">
-      {/* Ambient lift glow behind the panel */}
-      <div className="absolute -inset-6 rounded-[28px] bg-[radial-gradient(ellipse_at_center,rgba(201,168,76,0.10)_0%,transparent_70%)] blur-xl" />
+      {/* Outer ambient glow — warm gold light source */}
+      <div className="absolute -inset-10 rounded-[36px] bg-[radial-gradient(ellipse_at_center,rgba(201,168,76,0.13)_0%,transparent_68%)] blur-2xl" />
+      {/* Secondary glow — tighter, brighter center */}
+      <div className="absolute -inset-2 rounded-[28px] bg-[radial-gradient(ellipse_at_40%_30%,rgba(201,168,76,0.07)_0%,transparent_60%)] blur-lg" />
 
-      {/* Window frame */}
-      <div className="relative overflow-hidden rounded-2xl border border-border/80 bg-surface/90 shadow-[0_24px_64px_rgba(0,0,0,0.55)] backdrop-blur-sm">
+      {/* Window frame — layered shadow hierarchy */}
+      <div className="relative overflow-hidden rounded-2xl border border-white/[0.07] bg-surface/95 shadow-[0_32px_80px_rgba(0,0,0,0.70),0_8px_24px_rgba(0,0,0,0.45),0_2px_6px_rgba(0,0,0,0.35),inset_0_1px_0_rgba(255,255,255,0.06)] backdrop-blur-md">
 
-        {/* Title bar */}
-        <div className="flex items-center gap-3 border-b border-border bg-elevated/60 px-4 py-3">
+        {/* Title bar — glass chrome */}
+        <div className="flex items-center gap-3 border-b border-white/[0.06] bg-[rgba(26,26,26,0.85)] px-4 py-3 backdrop-blur-sm">
           <div className="flex items-center gap-1.5">
             <span className="h-3 w-3 rounded-full bg-conf-critical/60" />
             <span className="h-3 w-3 rounded-full bg-conf-amber/60" />
@@ -99,8 +101,8 @@ export function HeroMockup() {
 
           {/* Confidence + metrics row */}
           <div className="grid grid-cols-[auto_1fr] gap-4">
-            {/* Ring */}
-            <div className="flex items-center justify-center rounded-xl border border-border bg-void/40 px-4">
+            {/* Ring — inset shadow for recessed look */}
+            <div className="flex items-center justify-center rounded-xl border border-border/70 bg-void/60 px-4 shadow-[inset_0_2px_6px_rgba(0,0,0,0.5),inset_0_1px_0_rgba(0,0,0,0.3)]">
               <div className="relative flex items-center justify-center">
                 <svg width={RING} height={RING} viewBox={`0 0 ${RING} ${RING}`}>
                   <circle
@@ -199,8 +201,8 @@ export function HeroMockup() {
             ))}
           </div>
 
-          {/* Upload footer — filling bar */}
-          <div className="flex flex-col gap-1.5 rounded-lg border border-border bg-void/40 p-3">
+          {/* Upload footer — recessed panel */}
+          <div className="flex flex-col gap-1.5 rounded-lg border border-border/70 bg-void/60 p-3 shadow-[inset_0_1px_3px_rgba(0,0,0,0.4)]">
             <div className="flex items-center justify-between">
               <span className="font-sans text-xs text-text-secondary">Uploading Contract_v2.docx</span>
               <span className="font-mono text-[11px] text-text-muted tabular-nums">{progress}%</span>

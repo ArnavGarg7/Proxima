@@ -45,27 +45,30 @@ export function LandingBackground() {
         }}
       />
 
-      {/* Top gold radial glow — primary light source */}
-      <div className="absolute -top-48 left-1/2 -translate-x-1/2 w-[1000px] h-[640px] rounded-full bg-[radial-gradient(ellipse_at_center,rgba(201,168,76,0.10)_0%,transparent_70%)] blur-2xl" />
+      {/* Top gold radial glow — primary light source, slightly wider */}
+      <div className="absolute -top-56 left-1/2 -translate-x-1/2 w-[1100px] h-[700px] rounded-full bg-[radial-gradient(ellipse_at_center,rgba(201,168,76,0.12)_0%,rgba(201,168,76,0.04)_45%,transparent_70%)] blur-2xl" />
+
+      {/* Secondary focused hot-spot — tighter, brighter center */}
+      <div className="absolute -top-32 left-1/2 -translate-x-1/2 w-[480px] h-[360px] rounded-full bg-[radial-gradient(ellipse_at_center,rgba(201,168,76,0.08)_0%,transparent_65%)] blur-xl" />
 
       {/* Mesh blob — warm, left (parallax down) */}
       <motion.div
         style={{ y: warmY }}
-        className="absolute top-[22%] -left-40 w-[520px] h-[520px] rounded-full bg-[radial-gradient(circle,rgba(138,111,50,0.10)_0%,transparent_70%)] blur-3xl"
+        className="absolute top-[18%] -left-40 w-[560px] h-[560px] rounded-full bg-[radial-gradient(circle,rgba(138,111,50,0.09)_0%,transparent_70%)] blur-3xl"
       />
 
       {/* Mesh blob — cool, right (parallax up) */}
       <motion.div
         style={{ y: coolY }}
-        className="absolute top-[34%] -right-40 w-[520px] h-[520px] rounded-full bg-[radial-gradient(circle,rgba(96,165,250,0.06)_0%,transparent_70%)] blur-3xl"
+        className="absolute top-[32%] -right-40 w-[480px] h-[480px] rounded-full bg-[radial-gradient(circle,rgba(96,165,250,0.05)_0%,transparent_70%)] blur-3xl"
       />
 
-      {/* Vignette — darkens corners for depth */}
+      {/* Vignette — tighter corners for more focused depth */}
       <div
         className="absolute inset-0"
         style={{
           background:
-            'radial-gradient(ellipse 100% 80% at 50% 40%, transparent 55%, rgba(0,0,0,0.55) 100%)',
+            'radial-gradient(ellipse 90% 75% at 50% 35%, transparent 50%, rgba(0,0,0,0.65) 100%)',
         }}
       />
     </div>

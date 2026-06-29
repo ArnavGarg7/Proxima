@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { m, useReducedMotion } from 'framer-motion';
 import { cn } from '@/lib/cn';
 
 /** Mirrors OutlineItem from AnalysisSidebar — kept local to avoid circular import */
@@ -113,6 +114,7 @@ function MobileContentsNav({ items }: { items: MobileOutlineItem[] }) {
 }
 
 export function AnalysisLayout({ header, sidebar, inspector, mobileContents, children }: AnalysisLayoutProps) {
+  const reduced = useReducedMotion();
   const cols =
     sidebar && inspector
       ? 'lg:grid-cols-[1fr_320px] xl:grid-cols-[248px_minmax(0,1fr)_320px]'
@@ -124,7 +126,12 @@ export function AnalysisLayout({ header, sidebar, inspector, mobileContents, chi
 
   return (
     <div className="flex-1 min-h-[calc(100vh-60px)] bg-void overflow-x-hidden">
-      <div className="mx-auto w-full max-w-[1600px] px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
+      <m.div
+        className="mx-auto w-full max-w-[1600px] px-4 sm:px-6 lg:px-8 py-6 sm:py-8"
+        initial={reduced ? false : { opacity: 0, y: 8 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.25, ease: [0, 0, 0.2, 1] }}
+      >
 
         {/* Header — full width */}
         <header className="mb-6 sm:mb-8">{header}</header>
@@ -159,7 +166,7 @@ export function AnalysisLayout({ header, sidebar, inspector, mobileContents, chi
             </div>
           )}
         </div>
-      </div>
+      </m.div>
     </div>
   );
 }

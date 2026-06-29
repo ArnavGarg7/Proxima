@@ -1,5 +1,5 @@
 import React from 'react';
-import { motion, useReducedMotion } from 'framer-motion';
+import { m, useReducedMotion } from 'framer-motion';
 import { duration, easeArr, lift, scale } from '@/theme/motion';
 import { cn } from '@/lib/cn';
 
@@ -16,7 +16,7 @@ interface HoverCardProps {
 }
 
 /**
- * HoverCard — motion.div with the standard card hover behavior.
+ * HoverCard — m.div with the standard card hover behavior.
  *
  * Hover: translateY(-2px)
  * Press: scale(0.99)
@@ -37,7 +37,7 @@ export function HoverCard({ children, className, noPress = false, ...rest }: Hov
   }
 
   return (
-    <motion.div
+    <m.div
       whileHover={{ y: lift.card }}
       whileTap={noPress ? undefined : { scale: scale.cardPress }}
       transition={{ duration: duration.fast / 1000, ease: easeArr.out }}
@@ -45,6 +45,6 @@ export function HoverCard({ children, className, noPress = false, ...rest }: Hov
       {...rest}
     >
       {children}
-    </motion.div>
+    </m.div>
   );
 }

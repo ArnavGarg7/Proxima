@@ -1,5 +1,5 @@
 import React from 'react';
-import { motion, AnimatePresence, useReducedMotion } from 'framer-motion';
+import { m, AnimatePresence, useReducedMotion } from 'framer-motion';
 import { motionVariants } from '@/theme/motion';
 
 interface SlideInProps {
@@ -28,7 +28,7 @@ export function SlideIn({ children, className, direction = 'left', show }: Slide
     return (
       <AnimatePresence>
         {show && (
-          <motion.div
+          <m.div
             className={className}
             initial="hidden"
             animate="visible"
@@ -36,7 +36,7 @@ export function SlideIn({ children, className, direction = 'left', show }: Slide
             variants={variants}
           >
             {children}
-          </motion.div>
+          </m.div>
         )}
       </AnimatePresence>
     );
@@ -45,13 +45,13 @@ export function SlideIn({ children, className, direction = 'left', show }: Slide
   if (reduced) return <div className={className}>{children}</div>;
 
   return (
-    <motion.div
+    <m.div
       className={className}
       initial="hidden"
       animate="visible"
       variants={variants}
     >
       {children}
-    </motion.div>
+    </m.div>
   );
 }

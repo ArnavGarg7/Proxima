@@ -17,6 +17,7 @@ import { Card } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { Chip } from '@/components/ui/Chip';
+import { useDocumentTitle } from '@/hooks/useDocumentTitle';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -298,6 +299,7 @@ function SectionEmpty({ message }: { message: string }) {
 // ── Page ──────────────────────────────────────────────────────────────────────
 
 export default function Compare() {
+  useDocumentTitle('Compare');
   const [documents, setDocuments] = useState<Document[]>([]);
   const [sourceId, setSourceId] = useState<string>('');
   const [targetId, setTargetId] = useState<string>('');

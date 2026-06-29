@@ -1,5 +1,5 @@
 import React from 'react';
-import { motion, useReducedMotion } from 'framer-motion';
+import { m, useReducedMotion } from 'framer-motion';
 import { motionVariants } from '@/theme/motion';
 
 interface PageTransitionProps {
@@ -28,7 +28,7 @@ export function PageTransition({ children, className }: PageTransitionProps) {
   if (reduced) return <div className={className}>{children}</div>;
 
   return (
-    <motion.div
+    <m.div
       className={className}
       initial="initial"
       animate="animate"
@@ -36,6 +36,6 @@ export function PageTransition({ children, className }: PageTransitionProps) {
       variants={motionVariants.page}
     >
       {children}
-    </motion.div>
+    </m.div>
   );
 }
