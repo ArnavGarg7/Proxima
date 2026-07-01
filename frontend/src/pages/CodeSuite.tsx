@@ -8,6 +8,7 @@ import { loadTemplateLaunchContext, type TemplateLaunchContext } from '@/types/t
 import { CodeReviewResult } from '@/types/code';
 import { CodeMetricCard } from '@/components/code/CodeMetricCard';
 import { SecurityFindingCard } from '@/components/code/SecurityFindingCard';
+import { ComingSoon } from '@/components/ComingSoon';
 import {
   AnalysisLayout,
   AnalysisHeader,
@@ -61,6 +62,33 @@ const MODE_ICONS: Record<AnalysisMode, string> = {
   docs:     'menu_book',
   optimize: 'speed',
   security: 'security',
+};
+
+/* Modes that intentionally await backend implementation — rendered as polished
+   product placeholders rather than dispatched to the API. */
+type PlaceholderMode = 'optimize' | 'security';
+
+const COMING_SOON: Record<PlaceholderMode, { title: string; description: string; capabilities: string[] }> = {
+  optimize: {
+    title: 'Optimization',
+    description: 'Performance-focused code analysis is under active development.',
+    capabilities: [
+      'Complexity and hotspot detection',
+      'Algorithmic improvement suggestions',
+      'Memory and allocation insights',
+      'Runtime performance scoring',
+    ],
+  },
+  security: {
+    title: 'Security Analysis',
+    description: 'Dedicated security scanning is under active development.',
+    capabilities: [
+      'Vulnerability and CWE detection',
+      'Injection and data-flow analysis',
+      'Dependency risk checks',
+      'Severity-ranked findings',
+    ],
+  },
 };
 
 // ── Sub-components ────────────────────────────────────────────────────────────
@@ -173,6 +201,7 @@ export default function CodeSuite() {
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [result, setResult] = useState<CodeReviewResult | LegacyCodeResult | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [comingSoon, setComingSoon] = useState<PlaceholderMode | null>(null);
 
   useEffect(() => {
     const ctx: TemplateLaunchContext | null =
@@ -186,6 +215,13 @@ export default function CodeSuite() {
   const runAnalysis = async (overrideMode?: AnalysisMode) => {
     const activeMode = overrideMode || mode;
     if (overrideMode && overrideMode !== mode) setMode(overrideMode);
+
+    // Optimize / Security intentionally await backend work — show the polished
+    // placeholder instead of dispatching a request that has no implementation.
+    if (activeMode === 'optimize' || activeMode === 'security') {
+      setComingSoon(activeMode);
+      return;
+    }
 
     if (!snippet.trim()) return;
     setIsAnalyzing(true);
@@ -210,6 +246,7 @@ export default function CodeSuite() {
   const handleReset = () => {
     setResult(null);
     setError(null);
+    setComingSoon(null);
   };
 
   // ── Loading ────────────────────────────────────────────────────────────────
@@ -219,6 +256,22 @@ export default function CodeSuite() {
       <AnalysisLoading
         title={`Running ${mode.charAt(0).toUpperCase() + mode.slice(1)} analysis…`}
         message="Inspecting snippet and synthesizing result"
+      />
+    );
+  }
+
+  // ── Coming soon — modes awaiting backend implementation ────────────────────
+
+  if (comingSoon) {
+    const cs = COMING_SOON[comingSoon];
+    return (
+      <ComingSoon
+        icon={MODE_ICONS[comingSoon]}
+        title={cs.title}
+        description={cs.description}
+        capabilities={cs.capabilities}
+        onBack={() => setComingSoon(null)}
+        backLabel="Back to Code Suite"
       />
     );
   }
@@ -306,7 +359,7 @@ export default function CodeSuite() {
         <Button
           variant="primary"
           onClick={() => runAnalysis()}
-          disabled={!snippet.trim()}
+          disabled={!snippet.trim() && mode !== 'optimize' && mode !== 'security'}
           leftIcon={
             <span className="material-symbols-outlined text-[18px]" aria-hidden="true">
               {MODE_ICONS[mode]}
@@ -314,7 +367,7 @@ export default function CodeSuite() {
           }
           className="w-full"
         >
-          Analyze Code
+          {mode === 'optimize' || mode === 'security' ? 'View Availability' : 'Analyze Code'}
         </Button>
       </AnalysisEmptyState>
     );
@@ -550,13 +603,7 @@ export default function CodeSuite() {
             </p>
             <div className="prose prose-invert prose-sm max-w-none rounded-xl border border-border bg-surface p-6 text-text-secondary">
               <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                {legacyResult.result_markdown || (
-                  mode === 'optimize'
-                    ? 'Optimization mode will be available in a future release. Current implementation supports Review, Explain and Documentation.'
-                    : mode === 'security'
-                      ? 'Security mode will be available in a future release. Current implementation supports Review, Explain and Documentation.'
-                      : 'Coming soon'
-                )}
+                {legacyResult.result_markdown || 'No output was generated for this snippet.'}
               </ReactMarkdown>
             </div>
           </Panel>
