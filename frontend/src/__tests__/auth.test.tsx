@@ -5,6 +5,8 @@ import { useAuthStore } from '@/store/useAuthStore';
 import Navbar from '@/components/Navbar';
 import { BrowserRouter } from 'react-router-dom';
 
+import { InteractionProvider } from '@/components/interaction/InteractionProvider';
+
 describe('Auth Store & Components', () => {
   beforeEach(() => {
     act(() => {
@@ -29,7 +31,9 @@ describe('Auth Store & Components', () => {
 
     render(
       <BrowserRouter>
-        <Navbar onMenuClick={() => undefined} isDrawerOpen={false} />
+        <InteractionProvider>
+          <Navbar onMenuClick={() => undefined} isDrawerOpen={false} />
+        </InteractionProvider>
       </BrowserRouter>
     );
 
