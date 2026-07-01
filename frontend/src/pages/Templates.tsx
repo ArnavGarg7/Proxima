@@ -615,7 +615,7 @@ function TemplateListRow({
     <div
       className={cn(
         'group relative flex cursor-default items-center gap-4 rounded-xl border border-border bg-elevated p-4',
-        'transition-all duration-200 hover:-translate-y-px hover:shadow-sm',
+        'transition-all duration-200 hover:-translate-y-px hover:shadow-card',
         DOMAIN_GLOW[dk],
       )}
     >

@@ -48,8 +48,7 @@ export default function Analyze() {
   const documentId = searchParams.get('document_id');
   const templateOrigin = searchParams.get('template');
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const [documents, setDocuments] = useState<any[]>([]);
+  const [documents, setDocuments] = useState<{ id: string; title: string; created_at: string }[]>([]);
   const [selectedDocId, setSelectedDocId] = useState<string>('');
   const [loadingDocs, setLoadingDocs] = useState(true);
 

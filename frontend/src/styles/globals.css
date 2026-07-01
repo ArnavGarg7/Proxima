@@ -99,14 +99,37 @@
   }
   body { min-width: 0; }
   * { box-sizing: border-box; }
-  /* Scrollbars — thin, unobtrusive, gold accent on hover */
-  ::-webkit-scrollbar { width: 4px; height: 4px; }
+  /* Scrollbars — golden and "magnetic": a slim gold line at rest that thickens
+     and warms toward the cursor as you hover/drag it. The transparent border +
+     padding-box clip insets the thumb, so shrinking the border on interaction
+     makes the gold appear to grow toward you. */
+  ::-webkit-scrollbar { width: 12px; height: 12px; }
   ::-webkit-scrollbar-track { background: transparent; }
-  ::-webkit-scrollbar-thumb { background: rgba(58,58,58,0.85); border-radius: 4px; }
-  ::-webkit-scrollbar-thumb:hover { background: rgba(201,168,76,0.55); }
+  ::-webkit-scrollbar-thumb {
+    background-color: rgba(201,168,76,0.42);
+    border-radius: 999px;
+    border: 4px solid transparent;      /* rest: ~4px visible gold line */
+    background-clip: padding-box;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background-color: rgba(201,168,76,0.80);
+    border-width: 2px;                   /* pull toward the cursor — grows + brightens */
+    box-shadow: inset 0 0 8px rgba(229,199,107,0.55);
+  }
+  ::-webkit-scrollbar-thumb:active {
+    background-color: #E5C76B;           /* dragging — full bright gold */
+    border-width: 2px;
+    box-shadow: inset 0 0 10px rgba(255,255,255,0.28);
+  }
   ::-webkit-scrollbar-corner { background: transparent; }
-  /* Firefox */
-  * { scrollbar-width: thin; scrollbar-color: rgba(58,58,58,0.85) transparent; }
+  /* Firefox — no interaction states available; resting gold */
+  * { scrollbar-width: thin; scrollbar-color: rgba(201,168,76,0.55) transparent; }
+  /* Smooth the magnetic pull only when motion is allowed */
+  @media (prefers-reduced-motion: no-preference) {
+    ::-webkit-scrollbar-thumb {
+      transition: background-color 200ms ease, border-color 200ms ease, box-shadow 200ms ease;
+    }
+  }
 
   ::selection { background: rgba(201,168,76,0.22); color: #F0EFE9; }
 }
@@ -117,11 +140,33 @@
    identically on small viewports. All values mirror src/theme/spacing.ts.
    ─────────────────────────────────────────────────────────────────────────── */
 @layer utilities {
-  /* Shadow utilities — mapped to design-system shadow tokens */
+  /* Shadow utilities — mapped to design-system shadow tokens.
+     Hierarchy: card → card-raised → panel → dialog → hero-window (inline).
+     Use shadow-card for all dark-surface cards; never use shadow-sm/md/lg on dark surfaces. */
   .shadow-card        { box-shadow: var(--shadow-card); }
   .shadow-card-raised { box-shadow: var(--shadow-card-raised); }
   .shadow-panel       { box-shadow: var(--shadow-panel); }
   .shadow-dialog      { box-shadow: var(--shadow-dialog); }
+  .shadow-input       { box-shadow: var(--shadow-input); }
+  .shadow-glow        { box-shadow: var(--shadow-glow); }
+  .shadow-glow-error  { box-shadow: var(--shadow-glow-error); }
+
+  /* Brand wordmark — elegant Playfair caps with a soft metallic-gold sheen.
+     Size is set by the caller (e.g. text-lg); this fixes the family, weight,
+     casing, tracking and the gold gradient fill. */
+  .brand-wordmark {
+    @apply font-display font-semibold uppercase;
+    letter-spacing: 0.1em;
+    background-image: linear-gradient(
+      180deg,
+      var(--color-gold-bright) 0%,
+      var(--color-gold-primary) 55%,
+      var(--color-gold-dim) 100%
+    );
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
 
   /* Responsive horizontal page gutters (mirrors layout.pagePx) */
   .page-px  { @apply px-4 sm:px-6 lg:px-8; }

@@ -16,7 +16,7 @@ export function SecurityFindingCard({ finding }: SecurityFindingCardProps) {
       : 'bg-conf-low/15 text-conf-low border-conf-low/30';
       
   return (
-    <div className="bg-surface border border-border rounded-xl p-5 shadow-sm">
+    <div className="bg-surface border border-border rounded-xl p-5 shadow-card">
       <div className="flex items-start justify-between mb-3">
         <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider border ${severityClasses}`}>
           {finding.severity}

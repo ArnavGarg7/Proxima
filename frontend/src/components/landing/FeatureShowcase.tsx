@@ -1,123 +1,13 @@
 import React from 'react';
 import { motion, useReducedMotion } from 'framer-motion';
-import { Badge } from '@/components/ui/Badge';
 import { cn } from '@/lib/cn';
+import { ProductShowcase } from '@/components/product-showcase/ProductShowcase';
+import { CompareShowcase } from '@/components/product-showcase/CompareShowcase';
+import { IntelligenceShowcase } from '@/components/product-showcase/IntelligenceShowcase';
+import { RoutingShowcase } from '@/components/product-showcase/RoutingShowcase';
 import { Reveal } from './Reveal';
 import { duration } from '@/theme/motion';
 import { EASE_OUT } from './landingMotion';
-
-/* ─────────────────────────────────────────────────────────────────────────────
-   Mini mock visuals — each feature gets a distinct, on-brand panel built from
-   tokens (no images). All decorative, hence aria-hidden.
-   ──────────────────────────────────────────────────────────────────────────── */
-
-/** Visual 1 — intelligent routing: one document fans out to engines */
-function RoutingVisual() {
-  const engines = [
-    { icon: 'medical_services', label: 'Clinical', cls: 'text-domain-medical', on: true  },
-    { icon: 'gavel',            label: 'Legal',    cls: 'text-domain-legal',   on: false },
-    { icon: 'code',             label: 'Code',     cls: 'text-domain-code',    on: false },
-  ];
-  return (
-    <div aria-hidden="true" className="flex items-center gap-6">
-      <div className="flex flex-col items-center gap-2">
-        <div className="flex h-14 w-12 items-center justify-center rounded-md border border-border bg-elevated">
-          <span className="material-symbols-outlined text-[22px] text-text-secondary">description</span>
-        </div>
-        <span className="font-mono text-[10px] text-text-muted">report.pdf</span>
-      </div>
-
-      <div className="flex flex-col gap-3">
-        {engines.map((e) => (
-          <div key={e.label} className="flex items-center gap-3">
-            <span
-              className={cn(
-                'h-px w-10',
-                e.on ? 'bg-gradient-to-r from-gold-primary/60 to-gold-primary' : 'bg-border',
-              )}
-            />
-            <div
-              className={cn(
-                'flex items-center gap-2 rounded-lg border px-3 py-2',
-                e.on ? 'border-gold-primary/40 bg-gold-primary/5' : 'border-border bg-surface',
-              )}
-            >
-              <span className={cn('material-symbols-outlined text-[16px]', e.cls)}>{e.icon}</span>
-              <span className="font-sans text-xs font-medium text-text-secondary">{e.label}</span>
-              {e.on && <span className="ml-1 h-1.5 w-1.5 rounded-full bg-gold-primary" />}
-            </div>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-/** Visual 2 — quantified confidence: scored extraction rows */
-function ConfidenceVisual() {
-  const rows = [
-    { label: 'Governing law',    pct: 98, variant: 'success' as const },
-    { label: 'Payment terms',    pct: 91, variant: 'success' as const },
-    { label: 'Liability clause', pct: 74, variant: 'warning' as const },
-    { label: 'Ambiguous intent', pct: 42, variant: 'error'   as const },
-  ];
-  const barColor: Record<string, string> = {
-    success: 'bg-conf-high',
-    warning: 'bg-conf-amber',
-    error:   'bg-conf-critical',
-  };
-  return (
-    <div aria-hidden="true" className="flex w-full max-w-xs flex-col gap-3">
-      {rows.map((r) => (
-        <div key={r.label} className="flex flex-col gap-1.5">
-          <div className="flex items-center justify-between">
-            <span className="font-sans text-xs text-text-secondary">{r.label}</span>
-            <span className="font-mono text-[11px] font-semibold text-text-primary tabular-nums">{r.pct}%</span>
-          </div>
-          <div className="h-1.5 w-full overflow-hidden rounded-full bg-border">
-            <div className={cn('h-full rounded-full', barColor[r.variant])} style={{ width: `${r.pct}%` }} />
-          </div>
-        </div>
-      ))}
-    </div>
-  );
-}
-
-/** Visual 3 — compare & audit: side-by-side diff */
-function CompareVisual() {
-  const left  = ['Net 30 payment', 'Single jurisdiction', 'Auto-renewal'];
-  const right = ['Net 45 payment', 'Dual jurisdiction', 'Manual renewal'];
-  return (
-    <div aria-hidden="true" className="grid w-full max-w-sm grid-cols-2 gap-3">
-      {[
-        { tag: 'v1', rows: left,  variant: 'default' as const },
-        { tag: 'v2', rows: right, variant: 'warning' as const },
-      ].map((col) => (
-        <div key={col.tag} className="flex flex-col gap-2 rounded-lg border border-border bg-surface p-3">
-          <div className="flex items-center justify-between">
-            <span className="font-mono text-[10px] uppercase tracking-wider text-text-muted">{col.tag}</span>
-            <Badge variant={col.variant} size="sm">
-              {col.variant === 'warning' ? 'Changed' : 'Base'}
-            </Badge>
-          </div>
-          {col.rows.map((row, i) => (
-            <div
-              key={row}
-              className={cn(
-                'rounded border px-2 py-1.5 font-sans text-[11px]',
-                col.variant === 'warning' && i !== 0
-                  ? 'border-conf-amber/30 bg-conf-amber/5 text-text-primary'
-                  : 'border-border bg-void/40 text-text-secondary',
-              )}
-            >
-              {row}
-            </div>
-          ))}
-        </div>
-      ))}
-    </div>
-  );
-}
 
 /* ─────────────────────────────────────────────────────────────────────────────
    Feature definitions
@@ -140,7 +30,7 @@ const FEATURES: Feature[] = [
     desc:    'Proxima reads each document, detects its domain, and routes it to the specialized analyzer best suited to the content — no manual sorting.',
     bullets: ['Automatic domain detection', 'Purpose-built analyzers', 'Zero configuration'],
     chrome:  'proxima · routing',
-    visual:  <RoutingVisual />,
+    visual:  <ProductShowcase type="routing"><RoutingShowcase /></ProductShowcase>,
   },
   {
     eyebrow: 'Quantified confidence',
@@ -148,7 +38,7 @@ const FEATURES: Feature[] = [
     desc:    'Each extraction is graded for reliability so you know exactly what to trust — and what to review. Low-confidence findings are surfaced, not hidden.',
     bullets: ['Per-field confidence scoring', 'Hallucination-risk flags', 'Reviewer-ready output'],
     chrome:  'proxima · confidence',
-    visual:  <ConfidenceVisual />,
+    visual:  <ProductShowcase type="confidence"><IntelligenceShowcase /></ProductShowcase>,
   },
   {
     eyebrow: 'Compare & audit',
@@ -156,7 +46,7 @@ const FEATURES: Feature[] = [
     desc:    'Diff two versions of a contract or audit a single document for quality. Material changes and risk areas are highlighted side by side.',
     bullets: ['Clause-level comparison', 'Deterministic audit pass', 'Change highlighting'],
     chrome:  'proxima · compare',
-    visual:  <CompareVisual />,
+    visual:  <ProductShowcase type="compare"><CompareShowcase /></ProductShowcase>,
   },
 ];
 

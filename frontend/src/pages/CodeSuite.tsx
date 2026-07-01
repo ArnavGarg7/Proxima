@@ -90,7 +90,7 @@ function PriorityCard({
   idx: number;
 }) {
   return (
-    <Card noPadding className="flex items-start gap-3 p-3 shadow-sm">
+    <Card noPadding className="flex items-start gap-3 p-3">
       <span className="mt-0.5 font-mono text-xs font-bold text-text-muted">{idx + 1}</span>
       <div className="flex flex-col gap-1 min-w-0">
         <div className="flex flex-wrap items-center gap-2">

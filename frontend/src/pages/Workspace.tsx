@@ -243,6 +243,7 @@ export default function Workspace() {
         onChange={handleFileInputChange}
         className="hidden"
         accept=".txt,.pdf,.docx"
+        aria-label="Upload document"
       />
 
       <div className="max-w-[1400px] mx-auto px-4 sm:px-6 md:px-8 py-6 sm:py-10">

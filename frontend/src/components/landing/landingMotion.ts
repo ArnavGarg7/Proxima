@@ -6,7 +6,7 @@
  * Pure constants — no component exports.
  */
 import type { Variants } from 'framer-motion';
-import { duration, easeArr } from '@/theme/motion';
+import { duration, easeArr, stagger } from '@/theme/motion';
 
 /** ease.out as a Framer Motion array — re-exported from the motion token system */
 export const EASE_OUT = easeArr.out;
@@ -23,7 +23,7 @@ export const fadeUp: Variants = {
 export const staggerContainer: Variants = {
   hidden:  {},
   visible: {
-    transition: { staggerChildren: 0.08, delayChildren: s(duration.fast) },
+    transition: { staggerChildren: stagger.base, delayChildren: s(duration.fast) },
   },
 };
 
@@ -37,6 +37,6 @@ export const staggerItem: Variants = {
 export const gridContainer: Variants = {
   hidden:  {},
   visible: {
-    transition: { staggerChildren: 0.05 },
+    transition: { staggerChildren: stagger.fast },
   },
 };

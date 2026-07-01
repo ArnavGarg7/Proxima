@@ -2,6 +2,7 @@ import { Link } from 'react-router-dom';
 import { useAuthStore } from '@/store/useAuthStore';
 import { Button } from '@/components/ui/Button';
 import { cn } from '@/lib/cn';
+import proximaLogo from '@/assets/proxima-logo.png';
 
 interface NavbarProps {
   onMenuClick: () => void;
@@ -33,8 +34,11 @@ export default function Navbar({ onMenuClick, isDrawerOpen }: NavbarProps) {
           </span>
         </button>
         {/* Brand visible on mobile only — sidebar carries it on tablet+ */}
-        <span className="font-display text-gold-primary text-lg font-semibold md:hidden">
-          Proxima
+        <span className="flex items-center gap-2 md:hidden">
+          <img src={proximaLogo} alt="" aria-hidden="true" className="h-6 w-auto shrink-0" />
+          <span className="brand-wordmark text-lg">
+            Proxima
+          </span>
         </span>
       </div>
 

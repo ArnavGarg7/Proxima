@@ -52,7 +52,7 @@ export function ConfidenceCard({ value }: ConfidenceCardProps) {
     <Card
       variant="metric"
       accentColor={accentColor(value)}
-      className="flex flex-col gap-4 transition-all duration-150 hover:-translate-y-0.5 hover:shadow-[0_6px_24px_rgba(0,0,0,0.5)]"
+      className="flex flex-col gap-4"
     >
       {/* Label row + ring */}
       <div className="flex items-start justify-between gap-2">

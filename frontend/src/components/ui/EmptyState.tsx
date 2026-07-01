@@ -1,5 +1,6 @@
 import React from 'react';
 import { cn } from '@/lib/cn';
+import { Button } from './Button';
 
 type EmptyStateVariant = 'default' | 'error' | 'success';
 
@@ -88,22 +89,23 @@ export function EmptyState({
       {(action || secondaryAction) && (
         <div className="flex items-center gap-3 mt-2">
           {action && (
-            <button
-              type="button"
-              onClick={action.onClick}
-              className={
-                action.variant === 'ghost'
-                  ? 'inline-flex items-center gap-2 font-sans text-sm font-medium text-text-secondary ' +
-                    'hover:text-text-primary transition-colors duration-150 ' +
-                    'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold-primary/50'
-                  : 'inline-flex items-center gap-2 font-sans text-sm font-medium rounded ' +
-                    'bg-gold-primary text-void px-5 py-2.5 ' +
-                    'hover:bg-gold-bright hover:-translate-y-px transition-all duration-150 ' +
-                    'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold-primary/50'
-              }
-            >
-              {action.label}
-            </button>
+            action.variant === 'ghost' ? (
+              <button
+                type="button"
+                onClick={action.onClick}
+                className={
+                  'inline-flex items-center gap-2 font-sans text-sm font-medium text-text-secondary ' +
+                  'hover:text-text-primary transition-colors duration-150 ' +
+                  'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold-primary/50'
+                }
+              >
+                {action.label}
+              </button>
+            ) : (
+              <Button variant="primary" onClick={action.onClick}>
+                {action.label}
+              </Button>
+            )
           )}
           {secondaryAction && (
             <button

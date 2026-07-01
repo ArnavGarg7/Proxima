@@ -1,5 +1,8 @@
 import React from 'react';
+import { m } from 'framer-motion';
 import { cn } from '@/lib/cn';
+import { useControlInteraction } from '@/components/interaction/InteractionContext';
+import { InteractionHighlight } from '@/components/interaction/InteractionHighlight';
 
 export type ChipVariant = 'default' | 'gold' | 'success' | 'warning' | 'error' | 'code' | 'medical' | 'legal';
 
@@ -17,7 +20,7 @@ interface ChipProps {
 
 const baseStyles =
   'inline-flex items-center gap-1.5 text-xs font-sans font-medium rounded-full px-2.5 py-1 ' +
-  'transition-all duration-150 select-none motion-safe:will-change-transform';
+  'transition-colors duration-150 select-none';
 
 const variantStyles: Record<ChipVariant, string> = {
   default: 'bg-elevated text-text-secondary border border-border hover:border-border-strong',
@@ -41,44 +44,81 @@ const selectedStyles: Record<ChipVariant, string> = {
   legal:   'bg-domain-legal/20 border-domain-legal',
 };
 
+const interactiveStyles =
+  'relative cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold-primary/50';
+
+function DismissButton({ onDismiss }: { onDismiss: () => void }) {
+  return (
+    <button
+      type="button"
+      aria-label="Remove"
+      onClick={(e) => { e.stopPropagation(); onDismiss(); }}
+      className="ml-0.5 rounded-full opacity-60 hover:opacity-100 transition-opacity focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-gold-primary/50"
+    >
+      <svg width="10" height="10" viewBox="0 0 10 10" fill="none" aria-hidden="true">
+        <path d="M2 2L8 8M8 2L2 8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+      </svg>
+    </button>
+  );
+}
+
+/** Clickable chip — shares the Interaction Engine's lift / press / highlight. */
+function InteractiveChip({
+  className,
+  onClick,
+  onDismiss,
+  children,
+}: {
+  className: string;
+  onClick: () => void;
+  onDismiss?: () => void;
+  children: React.ReactNode;
+}) {
+  const { bind, motionStyle, highlightOpacity } = useControlInteraction();
+
+  return (
+    <m.span
+      role="button"
+      tabIndex={0}
+      onClick={onClick}
+      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') onClick(); }}
+      className={cn(className, interactiveStyles)}
+      style={motionStyle}
+      {...bind}
+    >
+      <InteractionHighlight opacity={highlightOpacity} />
+      <span className="relative inline-flex items-center gap-1.5">
+        {children}
+        {onDismiss && <DismissButton onDismiss={onDismiss} />}
+      </span>
+    </m.span>
+  );
+}
+
 /**
- * Chip — small pill for tags, filters, and dismissible selections.
+ * Chip — small pill for tags, filters, and dismissible selections. Interactive
+ * chips (with onClick) lift on hover and compress on press via the shared
+ * Interaction Engine; static chips render unchanged.
  *
  * @example
  * <Chip variant="gold" onDismiss={() => removeTag(tag)}>{tag}</Chip>
  * <Chip variant="code" selected={active === 'code'} onClick={() => setActive('code')}>Code</Chip>
  */
 export function Chip({ variant = 'default', onDismiss, onClick, selected, children, className }: ChipProps) {
-  const isInteractive = Boolean(onClick);
+  const chipClass = cn(baseStyles, variantStyles[variant], selected && selectedStyles[variant], className);
+
+  if (onClick) {
+    return (
+      <InteractiveChip className={chipClass} onClick={onClick} onDismiss={onDismiss}>
+        {children}
+      </InteractiveChip>
+    );
+  }
 
   return (
-    <span
-      role={isInteractive ? 'button' : undefined}
-      tabIndex={isInteractive ? 0 : undefined}
-      onClick={onClick}
-      onKeyDown={isInteractive ? (e) => { if (e.key === 'Enter' || e.key === ' ') onClick?.(); } : undefined}
-      className={cn(
-        baseStyles,
-        variantStyles[variant],
-        selected && selectedStyles[variant],
-        isInteractive && 'cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold-primary/50 motion-safe:active:scale-[0.95]',
-        className,
-      )}
-    >
+    <span className={chipClass}>
       {children}
-
-      {onDismiss && (
-        <button
-          type="button"
-          aria-label="Remove"
-          onClick={(e) => { e.stopPropagation(); onDismiss(); }}
-          className="ml-0.5 rounded-full opacity-60 hover:opacity-100 transition-opacity focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-gold-primary/50"
-        >
-          <svg width="10" height="10" viewBox="0 0 10 10" fill="none" aria-hidden="true">
-            <path d="M2 2L8 8M8 2L2 8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-          </svg>
-        </button>
-      )}
+      {onDismiss && <DismissButton onDismiss={onDismiss} />}
     </span>
   );
 }

@@ -2,7 +2,13 @@ import React from 'react';
 import { motion, useReducedMotion } from 'framer-motion';
 import { api } from '@/lib/axios';
 import { Button } from '@/components/ui/Button';
-import { LandingBackground } from '@/components/landing/LandingBackground';
+import { CursorInfluence } from '@/components/interaction/CursorInfluence';
+import { BackgroundFX } from '@/components/background/BackgroundFX';
+import { StoryProvider } from '@/components/story/StoryProvider';
+import { StoryCameraProvider } from '@/components/story/StoryCamera';
+import { StoryScene } from '@/components/story/StoryScene';
+import { StoryProgress } from '@/components/story/StoryProgress';
+import { ProductShowcaseProvider } from '@/components/product-showcase/ProductShowcaseProvider';
 import { LandingNav } from '@/components/landing/LandingNav';
 import { HeroMockup } from '@/components/landing/HeroMockup';
 import { FeatureShowcase } from '@/components/landing/FeatureShowcase';
@@ -12,6 +18,7 @@ import { Reveal } from '@/components/landing/Reveal';
 import { staggerContainer, staggerItem, EASE_OUT } from '@/components/landing/landingMotion';
 import { duration } from '@/theme/motion';
 import { useDocumentTitle } from '@/hooks/useDocumentTitle';
+import proximaLogo from '@/assets/proxima-logo.png';
 
 /* Action verbs shown beneath the hero headline */
 const HERO_VERBS = ['Upload', 'Analyze', 'Compare', 'Audit'] as const;
@@ -31,10 +38,15 @@ export default function Landing() {
   useDocumentTitle();
   const reduced = useReducedMotion() ?? false;
 
-  /* ── Preserved auth logic — Google OAuth PKCE initiated by the server ──── */
-  const handleLogin = () => {
-    window.location.href = `${api.defaults.baseURL}/api/auth/google`;
+  /* ── Preserved auth logic — Google OAuth PKCE initiated by the server. The
+     single sign-in endpoint is preserved; the `intent` query param carries
+     whether the user is logging in or getting started, so the two CTAs express
+     distinct intent without adding a second route. ──────────────────────── */
+  const startAuth = (intent: 'login' | 'signup') => {
+    window.location.href = `${api.defaults.baseURL}/api/auth/google?intent=${intent}`;
   };
+  const handleLogin  = () => startAuth('login');
+  const handleSignup = () => startAuth('signup');
 
   const scrollToFeatures = () => {
     document.getElementById('features')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -43,11 +55,14 @@ export default function Landing() {
   const heroInitial = reduced ? 'visible' : 'hidden';
 
   return (
-    <div id="top" className="relative min-h-screen w-full overflow-x-hidden">
-      <LandingBackground />
-      <LandingNav onStart={handleLogin} />
+    <StoryProvider>
+      <StoryCameraProvider>
+      <BackgroundFX id="top" intensity="medium" ambient mesh beams particles spotlight grain className="min-h-screen overflow-x-hidden">
+      <ProductShowcaseProvider>
+      <LandingNav onLogin={handleLogin} onSignup={handleSignup} />
 
       {/* ══ Hero ════════════════════════════════════════════════════════════ */}
+      <StoryScene section="hero" depth="front">
       <section className="relative flex min-h-[100svh] items-center pb-20 pt-32 sm:pt-36">
         <div className="mx-auto w-full max-w-[1400px] px-6 sm:px-8">
           <div className="grid grid-cols-1 items-center gap-12 lg:grid-cols-[1.05fr_0.95fr] lg:gap-10">
@@ -105,19 +120,21 @@ export default function Landing() {
 
               {/* CTAs */}
               <motion.div variants={staggerItem} className="mt-1 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
-                <Button
-                  variant="primary"
-                  size="lg"
-                  className="w-full sm:w-auto motion-safe:hover:shadow-[0_0_24px_rgba(201,168,76,0.35)]"
-                  onClick={handleLogin}
-                  rightIcon={
-                    <span className="material-symbols-outlined text-[17px]" aria-hidden="true">
-                      arrow_forward
-                    </span>
-                  }
-                >
-                  Start Analysis
-                </Button>
+                <CursorInfluence className="w-full sm:w-auto">
+                  <Button
+                    variant="primary"
+                    size="lg"
+                    className="w-full motion-safe:hover:shadow-[0_0_24px_rgba(201,168,76,0.35)]"
+                    onClick={handleSignup}
+                    rightIcon={
+                      <span className="material-symbols-outlined text-[17px]" aria-hidden="true">
+                        arrow_forward
+                      </span>
+                    }
+                  >
+                    Start Analysis
+                  </Button>
+                </CursorInfluence>
                 <Button variant="outline" size="lg" className="w-full sm:w-auto" onClick={scrollToFeatures}>
                   Explore Capabilities
                 </Button>
@@ -141,8 +158,10 @@ export default function Landing() {
           </div>
         </div>
       </section>
+      </StoryScene>
 
       {/* ══ Capability strip / social proof ═════════════════════════════════ */}
+      <StoryScene section="capabilities" depth="mid">
       <section id="solutions" className="relative border-y border-border/60 bg-surface/30 py-10 backdrop-blur-sm">
         <div className="mx-auto w-full max-w-[1400px] px-6 sm:px-8">
           <Reveal className="flex flex-col items-center gap-6 sm:flex-row sm:justify-between">
@@ -159,17 +178,25 @@ export default function Landing() {
           </Reveal>
         </div>
       </section>
+      </StoryScene>
 
       {/* ══ Feature showcase (large rhythm) ═════════════════════════════════ */}
-      <FeatureShowcase />
+      <StoryScene section="features" depth="mid">
+        <FeatureShowcase />
+      </StoryScene>
 
       {/* ══ Workflow (medium rhythm) ════════════════════════════════════════ */}
-      <WorkflowSection />
+      <StoryScene section="workflow" depth="back">
+        <WorkflowSection />
+      </StoryScene>
 
       {/* ══ Analyzer showcase ═══════════════════════════════════════════════ */}
-      <AnalyzerShowcase />
+      <StoryScene section="analyzers" depth="mid">
+        <AnalyzerShowcase />
+      </StoryScene>
 
       {/* ══ Final CTA (large rhythm) ════════════════════════════════════════ */}
+      <StoryScene section="cta" depth="front">
       <section className="relative py-32">
         <div className="mx-auto w-full max-w-[1000px] px-6 sm:px-8">
           <Reveal>
@@ -189,25 +216,29 @@ export default function Landing() {
                   Start analyzing in seconds. No setup, no friction — just upload and
                   let Proxima do the reading.
                 </p>
-                <Button
-                  variant="primary"
-                  size="lg"
-                  onClick={handleLogin}
-                  rightIcon={
-                    <span className="material-symbols-outlined text-[17px]" aria-hidden="true">
-                      arrow_forward
-                    </span>
-                  }
-                >
-                  Start Using Proxima
-                </Button>
+                <CursorInfluence>
+                  <Button
+                    variant="primary"
+                    size="lg"
+                    onClick={handleLogin}
+                    rightIcon={
+                      <span className="material-symbols-outlined text-[17px]" aria-hidden="true">
+                        arrow_forward
+                      </span>
+                    }
+                  >
+                    Start Using Proxima
+                  </Button>
+                </CursorInfluence>
               </div>
             </div>
           </Reveal>
         </div>
       </section>
+      </StoryScene>
 
       {/* ══ Footer ══════════════════════════════════════════════════════════ */}
+      <StoryScene section="footer" cinematic={false}>
       <footer className="relative border-t border-border bg-surface/40 backdrop-blur-sm">
         <div className="mx-auto w-full max-w-[1400px] px-6 py-16 sm:px-8">
           <div className="grid grid-cols-2 gap-6 sm:grid-cols-3 sm:gap-10 lg:grid-cols-6">
@@ -215,16 +246,13 @@ export default function Landing() {
             {/* Brand block */}
             <div className="col-span-2 flex flex-col gap-4">
               <div className="flex items-center gap-2.5">
-                <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-gradient-to-br from-gold-bright to-gold-dim">
-                  <span
-                    className="material-symbols-outlined text-[16px] text-void"
-                    style={{ fontVariationSettings: "'FILL' 1" }}
-                    aria-hidden="true"
-                  >
-                    blur_on
-                  </span>
-                </span>
-                <span className="font-display text-lg font-semibold text-text-primary">Proxima</span>
+                <img
+                  src={proximaLogo}
+                  alt=""
+                  aria-hidden="true"
+                  className="h-7 w-auto shrink-0"
+                />
+                <span className="brand-wordmark text-lg">Proxima</span>
               </div>
               <p className="max-w-xs font-sans text-sm leading-relaxed text-text-muted">
                 AI-native document intelligence. Upload, analyze, and audit with
@@ -253,13 +281,24 @@ export default function Landing() {
 
           {/* Bottom bar */}
           <div className="mt-12 flex flex-col items-center justify-between gap-4 border-t border-border pt-6 sm:flex-row">
-            <span className="font-sans text-xs text-text-muted">
-              © {new Date().getFullYear()} Proxima. All rights reserved.
-            </span>
+            <div className="flex flex-col items-center gap-1 sm:items-start">
+              <span className="font-sans text-xs text-text-muted">
+                © {new Date().getFullYear()} Proxima. All rights reserved.
+              </span>
+              <span className="font-sans text-[11px] text-text-muted/70">
+                Engineered by Arnav Garg
+              </span>
+            </div>
             <span className="font-mono text-xs text-text-muted">v4.0</span>
           </div>
         </div>
       </footer>
-    </div>
+      </StoryScene>
+
+      <StoryProgress />
+      </ProductShowcaseProvider>
+      </BackgroundFX>
+      </StoryCameraProvider>
+    </StoryProvider>
   );
 }

@@ -1,10 +1,13 @@
 import { useState } from 'react';
 import { Button } from '@/components/ui/Button';
 import { cn } from '@/lib/cn';
+import proximaLogo from '@/assets/proxima-logo.png';
 
 interface LandingNavProps {
-  /** Triggers the Google OAuth sign-in flow */
-  onStart: () => void;
+  /** Sign-in intent — existing users returning to Proxima */
+  onLogin: () => void;
+  /** Get-started intent — new users creating an account */
+  onSignup: () => void;
 }
 
 /* In-page anchor targets — sections rendered by Landing.tsx */
@@ -22,7 +25,7 @@ const NAV_LINKS = [
  * pill silhouette. Links smooth-scroll to in-page sections; the primary
  * actions kick off the sign-in flow.
  */
-export function LandingNav({ onStart }: LandingNavProps) {
+export function LandingNav({ onLogin, onSignup }: LandingNavProps) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   const scrollTo = (id: string) => (e: React.MouseEvent<HTMLAnchorElement>) => {
@@ -46,16 +49,13 @@ export function LandingNav({ onStart }: LandingNavProps) {
             onClick={scrollTo('top')}
             className="flex items-center gap-2.5 pl-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold-primary/50 rounded-full"
           >
-            <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-gradient-to-br from-gold-bright to-gold-dim shadow-[0_0_12px_rgba(201,168,76,0.35)]">
-              <span
-                className="material-symbols-outlined text-[16px] text-void"
-                style={{ fontVariationSettings: "'FILL' 1" }}
-                aria-hidden="true"
-              >
-                blur_on
-              </span>
-            </span>
-            <span className="font-display text-lg font-semibold text-text-primary">
+            <img
+              src={proximaLogo}
+              alt=""
+              aria-hidden="true"
+              className="h-7 w-auto shrink-0 drop-shadow-[0_0_5px_rgba(201,168,76,0.20)]"
+            />
+            <span className="brand-wordmark text-lg">
               Proxima
             </span>
           </a>
@@ -68,7 +68,7 @@ export function LandingNav({ onStart }: LandingNavProps) {
                 href={`#${link.id}`}
                 onClick={scrollTo(link.id)}
                 className="rounded-full px-3 py-1.5 font-sans text-sm text-text-secondary
-                  transition-colors duration-150 hover:bg-white/5 hover:text-text-primary
+                  transition-colors duration-150 hover:bg-gold-primary/[0.06] hover:text-text-primary
                   focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold-primary/50"
               >
                 {link.label}
@@ -97,13 +97,13 @@ export function LandingNav({ onStart }: LandingNavProps) {
               </span>
             </button>
 
-            <Button variant="ghost" size="sm" onClick={onStart} className="hidden sm:inline-flex">
+            <Button variant="ghost" size="sm" onClick={onLogin} className="hidden sm:inline-flex">
               Log in
             </Button>
             <Button
               variant="primary"
               size="sm"
-              onClick={onStart}
+              onClick={onSignup}
               rightIcon={
                 <span
                   className="material-symbols-outlined text-[15px]"
@@ -137,9 +137,9 @@ export function LandingNav({ onStart }: LandingNavProps) {
               <div className="mt-1 pt-1 border-t border-border">
                 <button
                   type="button"
-                  onClick={() => { setMobileMenuOpen(false); onStart(); }}
+                  onClick={() => { setMobileMenuOpen(false); onLogin(); }}
                   className="w-full rounded-xl px-4 py-3 text-sm text-left text-text-secondary
-                    hover:bg-white/5 hover:text-text-primary transition-colors duration-150
+                    hover:bg-gold-primary/[0.06] hover:text-text-primary transition-colors duration-150
                     focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold-primary/50"
                 >
                   Log in

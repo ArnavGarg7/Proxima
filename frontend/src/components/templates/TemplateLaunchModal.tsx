@@ -31,7 +31,7 @@ const ROUTE_MAP: Record<string, string> = {
 
 const DOMAIN_STYLES: Record<string, string> = {
   clinical: 'text-conf-high bg-conf-high/10 border-conf-high/25',
-  legal:    'text-primary bg-primary/10 border-primary/25',
+  legal:    'text-domain-legal bg-domain-legal/10 border-domain-legal/25',
   code:     'text-conf-amber bg-conf-amber/10 border-conf-amber/25',
   general:  'text-text-secondary bg-surface border-border',
 };
@@ -122,8 +122,9 @@ export default function TemplateLaunchModal({ template, onClose }: TemplateLaunc
       const route = ROUTE_MAP[template.target_workbench] ?? '/workspace';
       navigate(route, { state: { templateContext: ctx } });
       onClose();
-    } catch (err: any /* eslint-disable-line @typescript-eslint/no-explicit-any */) {
-      setError(err.response?.data?.detail || err.message || 'Launch failed');
+    } catch (err: unknown) {
+      const e = err as { response?: { data?: { detail?: string } }; message?: string };
+      setError(e.response?.data?.detail ?? e.message ?? 'Launch failed');
     } finally {
       setIsLaunching(false);
     }
@@ -167,7 +168,7 @@ export default function TemplateLaunchModal({ template, onClose }: TemplateLaunc
         <div className="flex items-start justify-between p-6 border-b border-border">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-xl bg-surface border border-border flex items-center justify-center shrink-0">
-              <span className="material-symbols-outlined text-xl text-primary" aria-hidden="true">{template.icon}</span>
+              <span className="material-symbols-outlined text-xl text-gold-primary" aria-hidden="true">{template.icon}</span>
             </div>
             <div>
               <div className="flex items-center gap-2 mb-0.5">

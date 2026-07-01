@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
 import { cn } from '@/lib/cn';
+import proximaLogo from '@/assets/proxima-logo.png';
 
 interface AppSidebarProps {
   isDrawerOpen: boolean;
@@ -87,18 +88,15 @@ export function AppSidebar({ isDrawerOpen, onClose }: AppSidebarProps) {
             isCollapsed && 'md:justify-center md:px-0 lg:justify-start lg:px-4',
           )}
         >
-          <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-gold-bright to-gold-dim shadow-[0_0_12px_rgba(201,168,76,0.35)]">
-            <span
-              className="material-symbols-outlined text-[15px] text-void"
-              style={{ fontVariationSettings: "'FILL' 1" }}
-              aria-hidden="true"
-            >
-              blur_on
-            </span>
-          </span>
+          <img
+            src={proximaLogo}
+            alt=""
+            aria-hidden="true"
+            className="h-7 w-auto shrink-0 drop-shadow-[0_0_5px_rgba(201,168,76,0.20)]"
+          />
           <span
             className={cn(
-              'ml-3 font-display text-lg font-semibold text-gold-primary whitespace-nowrap',
+              'brand-wordmark ml-3 text-lg whitespace-nowrap',
               isCollapsed && 'md:hidden lg:block',
             )}
           >
@@ -136,8 +134,8 @@ export function AppSidebar({ isDrawerOpen, onClose }: AppSidebarProps) {
                       'motion-safe:transition-colors motion-safe:duration-150',
                       'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold-primary/50',
                       isActive
-                        ? 'bg-gold-primary/10 text-gold-primary'
-                        : 'text-text-secondary hover:text-text-primary hover:bg-white/5',
+                        ? 'bg-gold-primary/10 text-gold-primary ring-1 ring-inset ring-gold-primary/20 shadow-[inset_0_1px_0_rgba(229,199,107,0.10)]'
+                        : 'text-text-secondary hover:text-text-primary hover:bg-gold-primary/[0.06]',
                       isCollapsed && 'md:justify-center lg:justify-start',
                     )
                   }

@@ -2,6 +2,7 @@ import { lazy, Suspense, useState, useCallback, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { LazyMotion, domAnimation } from 'framer-motion';
 import { useAuthStore } from '@/store/useAuthStore';
+import { InteractionProvider } from '@/components/interaction/InteractionProvider';
 import Navbar from '@/components/Navbar';
 import { AppSidebar } from '@/components/AppSidebar';
 import ProtectedRoute from '@/components/ProtectedRoute';
@@ -120,7 +121,9 @@ function App() {
   return (
     <LazyMotion features={domAnimation}>
       <Router>
-        <AppContent />
+        <InteractionProvider>
+          <AppContent />
+        </InteractionProvider>
       </Router>
     </LazyMotion>
   );

@@ -1,8 +1,11 @@
 import React from 'react';
+import { m } from 'framer-motion';
 import { cn } from '@/lib/cn';
-import type { ButtonVariant, ButtonSize } from './Button';
+import { useControlInteraction } from '@/components/interaction/InteractionContext';
+import { InteractionHighlight } from '@/components/interaction/InteractionHighlight';
+import type { ButtonVariant, ButtonSize, NativeButtonProps } from './Button';
 
-interface IconButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
+interface IconButtonProps extends NativeButtonProps {
   /** Accessible label — required because there is no visible text */
   'aria-label': string;
   variant?: ButtonVariant;
@@ -12,14 +15,14 @@ interface IconButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> 
 }
 
 const baseStyles =
-  'inline-flex items-center justify-center shrink-0 rounded ' +
-  'transition-all duration-150 cursor-pointer ' +
+  'relative inline-flex items-center justify-center shrink-0 rounded ' +
+  'transition-colors duration-150 cursor-pointer ' +
   'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold-primary/50 focus-visible:ring-offset-1 focus-visible:ring-offset-void ' +
   'disabled:opacity-40 disabled:cursor-not-allowed disabled:pointer-events-none';
 
 const variantStyles: Record<ButtonVariant, string> = {
   primary:
-    'bg-gold-primary text-void hover:bg-gold-bright hover:scale-105 active:scale-95',
+    'bg-gold-primary text-void hover:bg-gold-bright',
   secondary:
     'bg-transparent text-text-secondary border border-border hover:text-text-primary hover:border-border-strong hover:bg-elevated active:bg-surface',
   ghost:
@@ -37,8 +40,9 @@ const sizeStyles: Record<ButtonSize, string> = {
 };
 
 /**
- * IconButton — a square button designed to hold a single icon with no visible label.
- * The `aria-label` prop is required to maintain accessibility.
+ * IconButton — a square button holding a single icon with no visible label.
+ * The `aria-label` prop is required. Hover/press/focus feel comes from the shared
+ * Interaction Engine, identical to Button.
  *
  * @example
  * <IconButton aria-label="Close panel" variant="ghost" onClick={onClose}>
@@ -50,14 +54,22 @@ export function IconButton({
   size = 'md',
   children,
   className,
+  disabled,
+  style,
   ...rest
 }: IconButtonProps) {
+  const { bind, motionStyle, highlightOpacity } = useControlInteraction({ disabled });
+
   return (
-    <button
+    <m.button
       className={cn(baseStyles, variantStyles[variant], sizeStyles[size], className)}
+      style={{ ...style, ...motionStyle }}
+      disabled={disabled}
       {...rest}
+      {...bind}
     >
-      {children}
-    </button>
+      <InteractionHighlight opacity={highlightOpacity} />
+      <span className="relative inline-flex items-center justify-center">{children}</span>
+    </m.button>
   );
 }

@@ -6,7 +6,7 @@
  *   - Easing curves (CSS strings + Framer Motion arrays)
  *   - Scale / lift / opacity values
  *   - Framer Motion variant blueprints
- *   - Stagger timing
+ *   - Stagger + looping timing
  *
  * Philosophy: Fast. Precise. Confident.
  * Reference: Linear, Vercel, Cursor, Arc Browser.
@@ -32,6 +32,19 @@ export const duration = {
   page:    300,
   /** Complex reveals, staggered grids */
   enter:   400,
+} as const;
+
+// ─── Looping animation durations (seconds) ────────────────────────────────────
+// All repeating effects reference one of these so every loop on the same page
+// runs at a consistent cadence.
+
+export const loopDuration = {
+  /** Blinking caret / cursor-blink rate (s). */
+  blink:   1.1,
+  /** Spinning icon — upload, process, routing (s). */
+  spinner: 1.4,
+  /** Ambient pulse — status dot, live indicator (s). */
+  pulse:   1.8,
 } as const;
 
 // ─── Easings — CSS cubic-bezier strings ───────────────────────────────────────
@@ -74,8 +87,6 @@ export const scale = {
   cardHover:  1.0,
   /** Icon hover scale on parent hover */
   iconHover:  1.1,
-  /** @deprecated Use press */
-  buttonPress: 0.98,
 } as const;
 
 // ─── Opacity ──────────────────────────────────────────────────────────────────
@@ -197,24 +208,12 @@ export const motionVariants: Record<string, Variants> = {
 
 export const stagger = {
   /** Dense grids, tight lists */
-  fast: 0.04,
-  /** Standard card grids */
-  base: 0.07,
+  fast: 0.05,
+  /** Standard card grids and landing content */
+  base: 0.08,
   /** Sparse layouts, hero content */
   slow: 0.10,
 } as const;
-
-/** Framer Motion container variant that staggers children */
-export const staggerContainer: Variants = {
-  hidden:  {},
-  visible: { transition: { staggerChildren: stagger.base } },
-};
-
-/** Item inside staggerContainer */
-export const staggerItem: Variants = {
-  hidden:  { opacity: 0, y: 12 },
-  visible: { opacity: 1, y: 0, transition: motionTransition.slow },
-};
 
 // ─── Hover hierarchy — animation intensity by component importance ─────────────
 // ★★★★★  Primary CTA: lift + press scale
@@ -229,21 +228,4 @@ export const hoverHierarchy = {
   navItem:    { lift: 0,           press: 1 },
   chip:       { lift: 0,           press: 1 },
   badge:      { lift: 0,           press: 1 },
-} as const;
-
-// ─── Legacy compat — used by existing landing components ──────────────────────
-
-/** @deprecated Use motionVariants.page instead */
-export const motionSpec = {
-  pageEnter: {
-    initial:   { opacity: 0, y: 8 },
-    animate:   { opacity: 1, y: 0 },
-    exit:      { opacity: 0, y: -4 },
-    transition: { duration: duration.page / 1000, ease: ease.out },
-  },
-  cardStagger: {
-    container: staggerContainer,
-    item:      staggerItem,
-  },
-  fadeIn: motionVariants.fadeIn,
 } as const;
