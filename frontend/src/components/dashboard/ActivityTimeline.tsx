@@ -1,81 +1,105 @@
 import { RecentRun } from '@/types/dashboard';
+import { FadeUp } from '@/components/motion';
 
 interface ActivityTimelineProps {
   runs: RecentRun[];
 }
 
-function timeAgo(dateString: string) {
-  const date = new Date(dateString);
-  const now = new Date();
-  const seconds = Math.floor((now.getTime() - date.getTime()) / 1000);
+type TimedRun = RecentRun & { agoText: string };
 
-  let interval = seconds / 31536000;
-  if (interval > 1) return Math.floor(interval) + " years ago";
-  interval = seconds / 2592000;
-  if (interval > 1) return Math.floor(interval) + " months ago";
-  interval = seconds / 86400;
-  if (interval > 2) return Math.floor(interval) + " days ago";
-  if (interval >= 1) return "Yesterday";
-  interval = seconds / 3600;
-  if (interval > 1) return Math.floor(interval) + " hours ago";
-  interval = seconds / 60;
-  if (interval > 1) return Math.floor(interval) + " min ago";
-  return Math.floor(seconds) + " seconds ago";
+function timeAgo(dateString: string): string {
+  const seconds = Math.floor((Date.now() - new Date(dateString).getTime()) / 1000);
+  if (seconds < 60)         return `${seconds}s ago`;
+  if (seconds < 3600)       return `${Math.floor(seconds / 60)}m ago`;
+  if (seconds < 86400)      return `${Math.floor(seconds / 3600)}h ago`;
+  if (seconds < 86400 * 2)  return 'Yesterday';
+  if (seconds < 86400 * 30) return `${Math.floor(seconds / 86400)}d ago`;
+  return `${Math.floor(seconds / 2592000)}mo ago`;
+}
+
+function groupCategory(agoText: string): string {
+  if (agoText === 'Yesterday') return 'Yesterday';
+  if (
+    agoText.endsWith('s ago') ||
+    agoText.endsWith('m ago') ||
+    agoText.endsWith('h ago')
+  ) return 'Today';
+  return 'Older';
+}
+
+const GROUP_ORDER = ['Today', 'Yesterday', 'Older'] as const;
+
+interface GroupSectionProps {
+  title: string;
+  runs: TimedRun[];
+  index?: number;
+}
+
+function GroupSection({ title, runs, index = 0 }: GroupSectionProps) {
+  if (runs.length === 0) return null;
+
+  return (
+    <FadeUp index={index} className="flex flex-col gap-1">
+      <span className="font-sans text-[10px] font-medium uppercase tracking-widest text-text-muted mb-2">
+        {title}
+      </span>
+
+      <div className="relative flex flex-col gap-3">
+        {/* Vertical timeline rail */}
+        <div className="absolute left-[7px] top-1.5 bottom-1.5 w-px bg-border" aria-hidden="true" />
+
+        {runs.map((run) => (
+          <div key={run.id} className="flex items-start gap-3 relative">
+            {/* Timeline dot */}
+            <div className="w-3.5 h-3.5 shrink-0 rounded-full border-2 border-gold-primary bg-surface mt-0.5 z-10" />
+
+            {/* Content */}
+            <div className="flex-1 min-w-0 pb-0.5">
+              <div className="flex items-baseline justify-between gap-2">
+                <span className="font-sans text-sm font-medium text-text-primary capitalize leading-snug">
+                  {run.analyzer.replace('_', ' ')} analysis
+                </span>
+                <span className="font-sans text-[11px] text-text-muted shrink-0 tabular-nums">
+                  {run.agoText}
+                </span>
+              </div>
+              {(run.template ?? run.document_name) && (
+                <p className="font-sans text-xs text-text-muted mt-0.5 truncate">
+                  {run.template ?? run.document_name}
+                </p>
+              )}
+            </div>
+          </div>
+        ))}
+      </div>
+    </FadeUp>
+  );
 }
 
 export function ActivityTimeline({ runs }: ActivityTimelineProps) {
   if (runs.length === 0) {
-    return <div className="text-text-secondary text-sm">No recent activity.</div>;
+    return (
+      <p className="font-sans text-sm text-text-muted text-center py-4">
+        No activity yet.
+      </p>
+    );
   }
 
-  // Group by "Today", "Yesterday", "Older"
-  const grouped = runs.reduce((acc, run) => {
-    const ago = timeAgo(run.created_at);
-    let category = "Older";
-    if (ago.includes("seconds") || ago.includes("min") || ago.includes("hours")) {
-      category = "Today";
-    } else if (ago === "Yesterday") {
-      category = "Yesterday";
-    }
-    if (!acc[category]) acc[category] = [];
-    acc[category].push({ ...run, agoText: ago });
+  const grouped = runs.reduce<Record<string, TimedRun[]>>((acc, run) => {
+    const agoText = timeAgo(run.created_at);
+    const cat = groupCategory(agoText);
+    if (!acc[cat]) acc[cat] = [];
+    acc[cat].push({ ...run, agoText });
     return acc;
-  }, {} as Record<string, any[]> /* eslint-disable-line @typescript-eslint/no-explicit-any */);
-
-  const renderGroup = (title: string, groupRuns: any[] /* eslint-disable-line @typescript-eslint/no-explicit-any */) => {
-    if (!groupRuns || groupRuns.length === 0) return null;
-    return (
-      <div key={title} className="mb-6 last:mb-0">
-        <h4 className="font-sans text-xs font-bold text-text-muted uppercase tracking-wider mb-3">{title}</h4>
-        <div className="flex flex-col gap-4 relative">
-          <div className="absolute left-[7px] top-2 bottom-0 w-[2px] bg-border z-0"></div>
-          {groupRuns.map((run) => (
-            <div key={run.id} className="flex items-start gap-4 relative z-10">
-              <div className="w-4 h-4 rounded-full bg-surface border-2 border-primary mt-1 shrink-0 z-10" />
-              <div className="flex-1 bg-surface border border-border p-3 rounded-lg shadow-sm">
-                <div className="flex justify-between items-start mb-1">
-                  <span className="font-sans font-medium text-text-primary capitalize">{run.analyzer.replace('_', ' ')} Analysis</span>
-                  <span className="text-xs text-text-muted">{run.agoText}</span>
-                </div>
-                {run.template && (
-                  <div className="text-sm text-text-secondary">{run.template}</div>
-                )}
-                {!run.template && run.document_name && (
-                  <div className="text-sm text-text-secondary truncate">{run.document_name}</div>
-                )}
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
-    );
-  };
+  }, {});
 
   return (
-    <div className="flex flex-col">
-      {renderGroup("Today", grouped["Today"])}
-      {renderGroup("Yesterday", grouped["Yesterday"])}
-      {renderGroup("Older", grouped["Older"])}
+    <div className="flex flex-col gap-6">
+      {GROUP_ORDER.map((label, i) =>
+        grouped[label] ? (
+          <GroupSection key={label} title={label} runs={grouped[label]} index={i} />
+        ) : null,
+      )}
     </div>
   );
 }

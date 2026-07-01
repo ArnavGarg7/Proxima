@@ -9,7 +9,7 @@ export function ActionItemCard({ action }: ActionItemCardProps) {
   const [showEvidence, setShowEvidence] = useState(false);
 
   return (
-    <div className="bg-surface border border-border rounded-lg p-4 shadow-sm flex flex-col gap-2">
+    <div className="bg-surface border border-border rounded-lg p-4 shadow-card flex flex-col gap-2">
       <div className="flex gap-3 items-start">
         <span className="material-symbols-outlined text-gold-primary mt-0.5">task_alt</span>
         <div className="flex flex-col gap-1 w-full">

@@ -9,7 +9,7 @@ export function TopicCard({ topic }: TopicCardProps) {
   const [showEvidence, setShowEvidence] = useState(false);
 
   return (
-    <div className="bg-surface border border-border rounded-lg p-4 shadow-sm flex flex-col gap-2">
+    <div className="bg-surface border border-border rounded-lg p-4 shadow-card flex flex-col gap-2">
       <div className="flex justify-between items-start">
         <h4 className="font-display font-semibold text-text-primary text-sm flex items-center gap-2">
           <span className="w-2 h-2 rounded-full bg-gold-primary"></span>

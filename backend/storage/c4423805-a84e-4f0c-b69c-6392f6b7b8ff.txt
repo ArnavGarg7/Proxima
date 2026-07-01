@@ -1,0 +1,17 @@
+Subject: Q3 Product Launch Update
+
+The new feature set was developed by our team over the course of several months, and it is anticipated that it will be deployed to production sometime in the near future, although a exact date has not yet been finalized by leadership.
+
+There is a need for us to improve the onboarding flow because alot of users are dropping off after the signup screen, and this is something that has been noticed by multiple team members during recent user testing sessions that were conducted in the last sprint.
+
+Key issues identified:
+1. The loading speed of the dashboard is slow, it takes upwards of 8 seconds to fully render on average for most users.
+2. Error messages are not very clear or helpful, users dont understand what went wrong when something fails.
+3. The mobile experience is inconsistent across devices, with some buttons being to small to tap accurately on smaller screens.
+
+It was decided by the design team that a redesign would be persued, however the timeline for this is uncertain at this point in time due to resourcing constraints and competing priorities across the org.
+
+In conclusion, we believe that this product has alot of potential, but their are several issues that needs to be addressed before we can confidently say its ready for a wider rollout. We would appreciate any feedback that you might have, please reach out if you have any questions or concerns regarding the above.
+
+Thanks,
+Product Team

@@ -9,7 +9,7 @@ export function TakeawayCard({ takeaway }: TakeawayCardProps) {
   const [showEvidence, setShowEvidence] = useState(false);
 
   return (
-    <div className="bg-surface border border-border rounded-lg p-4 shadow-sm flex flex-col gap-3">
+    <div className="bg-surface border border-border rounded-lg p-4 shadow-card flex flex-col gap-3">
       <div className="flex justify-between items-start">
         <div className="flex gap-3">
           <span className="material-symbols-outlined text-gold-primary mt-0.5">check_circle</span>

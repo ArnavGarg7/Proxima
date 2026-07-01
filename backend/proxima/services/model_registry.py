@@ -73,6 +73,17 @@ class ModelRegistry:
             raise ValueError(f"Unknown provider: {provider_name}")
         return provider
 
+    async def complete(self, model: RegisteredModel, system_prompt: str, user_message: str, temperature: float = 0.1, max_tokens: int = 2048, response_format: str = "text") -> str:
+        provider = self._get_provider(model.provider)
+        return await provider.complete(
+            model_id=model.model_id,
+            system_prompt=system_prompt,
+            user_message=user_message,
+            temperature=temperature,
+            max_tokens=max_tokens,
+            response_format=response_format
+        )
+
     async def stream_completion(self, model: RegisteredModel, system_prompt: str, user_message: str, temperature: float, max_tokens: int):
         provider = self._get_provider(model.provider)
         async for chunk in provider.stream_completion(

@@ -14,8 +14,12 @@ class OpenAIProvider:
             raise HTTPException(status_code=401, detail="API key is missing.")
         return AsyncOpenAI(api_key=self.api_key, base_url=self.base_url)
 
-    async def complete(self, model_id: str, system_prompt: str, user_message: str, temperature: float, max_tokens: int) -> str:
+    async def complete(self, model_id: str, system_prompt: str, user_message: str, temperature: float, max_tokens: int, response_format: str = "text") -> str:
         client = self._get_client()
+        kwargs = {}
+        if response_format == "json":
+            kwargs["response_format"] = {"type": "json_object"}
+            
         try:
             response = await client.chat.completions.create(
                 model=model_id,
@@ -24,7 +28,8 @@ class OpenAIProvider:
                     {"role": "user", "content": user_message}
                 ],
                 temperature=temperature,
-                max_tokens=max_tokens
+                max_tokens=max_tokens,
+                **kwargs
             )
             return response.choices[0].message.content
         except Exception as e:
