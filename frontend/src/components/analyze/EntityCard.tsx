@@ -22,7 +22,7 @@ export function EntityCard({ entity }: EntityCardProps) {
   }
 
   return (
-    <div className="bg-surface border border-border rounded-lg p-3 shadow-sm flex flex-col gap-2">
+    <div className="bg-surface border border-border rounded-lg p-3 shadow-card flex flex-col gap-2">
       <div className="flex justify-between items-center">
         <span className="font-display font-semibold text-text-primary text-sm">{entity.name}</span>
         <span className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded border flex items-center gap-1 ${colorClass}`}>

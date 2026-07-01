@@ -6,7 +6,7 @@ from .synthesizer import run_llm_synthesis
 
 class CodeAnalyzer:
     @staticmethod
-    async def analyze(code: str, language_hint: str = None) -> dict:
+    async def analyze(code: str, language_hint: str = None, operation: str = "review") -> dict:
         """
         Orchestrates the Code Suite intelligence pipeline.
         Deterministic first, LLM synthesis second.
@@ -33,7 +33,7 @@ class CodeAnalyzer:
                 signals_used.append(m["title"])
                 
         # Stage F: LLM Synthesis
-        synthesis = await run_llm_synthesis(code, language, metrics, security, maintainability)
+        synthesis = await run_llm_synthesis(code, language, metrics, security, maintainability, operation)
         
         return {
             "language": language,

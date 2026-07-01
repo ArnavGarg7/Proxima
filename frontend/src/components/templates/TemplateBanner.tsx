@@ -5,7 +5,7 @@ import { clearTemplateLaunchContext, type TemplateLaunchContext } from '@/types/
 
 const DOMAIN_STYLES: Record<string, { bg: string; border: string; text: string; dot: string }> = {
   clinical: { bg: 'bg-conf-high/8', border: 'border-conf-high/25', text: 'text-conf-high', dot: 'bg-conf-high' },
-  legal:    { bg: 'bg-primary/8',   border: 'border-primary/25',   text: 'text-primary',   dot: 'bg-primary' },
+  legal:    { bg: 'bg-domain-legal/8', border: 'border-domain-legal/25', text: 'text-domain-legal', dot: 'bg-domain-legal' },
   code:     { bg: 'bg-conf-amber/8',border: 'border-conf-amber/25',text: 'text-conf-amber', dot: 'bg-conf-amber' },
   general:  { bg: 'bg-text-muted/8',border: 'border-border',       text: 'text-text-secondary', dot: 'bg-text-muted' },
 };

@@ -16,28 +16,38 @@ import { useAuthStore } from '@/store/useAuthStore';
 export default function AuthCallback() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const { hydrate } = useAuthStore();
   const [error, setError] = useState<string | null>(null);
+  const [redirectPath] = useState(() => localStorage.getItem('postAuthRedirect') || '/workspace');
 
   useEffect(() => {
+    let timeoutId: ReturnType<typeof setTimeout> | undefined;
+
     const oauthError = searchParams.get('error');
     if (oauthError) {
+      localStorage.removeItem('postAuthRedirect');
       setError(oauthError);
-      setTimeout(() => navigate('/'), 3000);
-      return;
+      timeoutId = setTimeout(() => navigate('/'), 3000);
+      return () => clearTimeout(timeoutId);
     }
 
-    hydrate().then(() => {
-      const { isAuthenticated } = useAuthStore.getState();
-      if (isAuthenticated) {
-        navigate('/workspace', { replace: true });
-      } else {
-        setError('Authentication failed. Please try again.');
-        setTimeout(() => navigate('/'), 3000);
-      }
-    });
+    // Since App.tsx already blocks rendering until hydrate() completes,
+    // if we mount, hydration is done.
+    const { isAuthenticated } = useAuthStore.getState();
+    
+    if (isAuthenticated) {
+      localStorage.removeItem('postAuthRedirect');
+      navigate(redirectPath, { replace: true });
+    } else {
+      localStorage.removeItem('postAuthRedirect');
+      setError('Authentication failed. Please try again.');
+      timeoutId = setTimeout(() => navigate('/'), 3000);
+    }
+    
+    return () => {
+      clearTimeout(timeoutId);
+    };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [redirectPath]);
 
   if (error) {
     return (

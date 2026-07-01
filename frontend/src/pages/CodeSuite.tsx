@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useLocation } from 'react-router-dom';
 import { api } from '@/lib/axios';
 import ReactMarkdown from 'react-markdown';
@@ -8,26 +8,222 @@ import { loadTemplateLaunchContext, type TemplateLaunchContext } from '@/types/t
 import { CodeReviewResult } from '@/types/code';
 import { CodeMetricCard } from '@/components/code/CodeMetricCard';
 import { SecurityFindingCard } from '@/components/code/SecurityFindingCard';
+import { ComingSoon } from '@/components/ComingSoon';
+import {
+  AnalysisLayout,
+  AnalysisHeader,
+  AnalysisInspector,
+  InspectorStat,
+  AnalysisEmptyState,
+  AnalysisLoading,
+  ConfidenceRing,
+} from '@/components/analysis';
+import { Panel } from '@/components/ui/Panel';
+import { Card } from '@/components/ui/Card';
+import { Badge } from '@/components/ui/Badge';
+import { Button } from '@/components/ui/Button';
+import { Chip } from '@/components/ui/Chip';
+import { cn } from '@/lib/cn';
+import { useDocumentTitle } from '@/hooks/useDocumentTitle';
 
-// Legacy Result
+// ── Types ─────────────────────────────────────────────────────────────────────
+
 interface LegacyCodeResult {
   operation: string;
   language_detected: string;
   summary: string;
   result_markdown: string;
-  snippet_profile: any /* eslint-disable-line @typescript-eslint/no-explicit-any */;
+  snippet_profile: unknown;
 }
 
+type AnalysisMode = 'review' | 'explain' | 'docs' | 'optimize' | 'security';
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+
+function scoreBarClass(val: number): string {
+  return val >= 90 ? 'bg-conf-high' : val >= 70 ? 'bg-conf-amber' : 'bg-conf-critical';
+}
+
+function scoreTextClass(val: number): string {
+  return val >= 90 ? 'text-conf-high' : val >= 70 ? 'text-conf-amber' : 'text-conf-critical';
+}
+
+function severityStyle(severity: string): string {
+  switch (severity.toLowerCase()) {
+    case 'critical': return 'border-conf-critical/30 bg-conf-critical/15 text-conf-critical';
+    case 'high': return 'border-conf-amber/30 bg-conf-amber/15 text-conf-amber';
+    case 'medium': return 'border-gold-primary/30 bg-gold-primary/15 text-gold-primary';
+    case 'low': return 'border-text-muted/30 bg-text-muted/15 text-text-muted';
+    default: return 'border-void-light/30 bg-void-light/15 text-text-secondary';
+  }
+}
+
+const MODE_ICONS: Record<AnalysisMode, string> = {
+  review:   'fact_check',
+  explain:  'lightbulb',
+  docs:     'menu_book',
+  optimize: 'speed',
+  security: 'security',
+};
+
+/* Modes that intentionally await backend implementation — rendered as polished
+   product placeholders rather than dispatched to the API. */
+type PlaceholderMode = 'optimize' | 'security';
+
+const COMING_SOON: Record<PlaceholderMode, { title: string; description: string; capabilities: string[] }> = {
+  optimize: {
+    title: 'Optimization',
+    description: 'Performance-focused code analysis is under active development.',
+    capabilities: [
+      'Complexity and hotspot detection',
+      'Algorithmic improvement suggestions',
+      'Memory and allocation insights',
+      'Runtime performance scoring',
+    ],
+  },
+  security: {
+    title: 'Security Analysis',
+    description: 'Dedicated security scanning is under active development.',
+    capabilities: [
+      'Vulnerability and CWE detection',
+      'Injection and data-flow analysis',
+      'Dependency risk checks',
+      'Severity-ranked findings',
+    ],
+  },
+};
+
+// ── Sub-components ────────────────────────────────────────────────────────────
+
+function RadarBar({ label, val }: { label: string; val: number }) {
+  return (
+    <div className="flex flex-col gap-1 text-sm">
+      <div className="flex items-center justify-between">
+        <span className="font-sans text-xs text-text-secondary">{label}</span>
+        <span className={`font-mono text-xs font-bold ${scoreTextClass(val)}`}>{val}</span>
+      </div>
+      <div className="h-1.5 w-full overflow-hidden rounded-full bg-void">
+        <div
+          className={`h-full rounded-full ${scoreBarClass(val)}`}
+          style={{ width: `${val}%` }}
+        />
+      </div>
+    </div>
+  );
+}
+
+function PriorityCard({
+  priority,
+  idx,
+}: {
+  priority: { severity: string; title: string; description: string };
+  idx: number;
+}) {
+  return (
+    <Card noPadding className="flex items-start gap-3 p-3">
+      <span className="mt-0.5 font-mono text-xs font-bold text-text-muted">{idx + 1}</span>
+      <div className="flex flex-col gap-1 min-w-0">
+        <div className="flex flex-wrap items-center gap-2">
+          <span
+            className={`rounded border px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider ${severityStyle(priority.severity)}`}
+          >
+            {priority.severity}
+          </span>
+          <span className="font-sans text-xs font-semibold text-text-primary">{priority.title}</span>
+        </div>
+        <p className="line-clamp-2 font-sans text-[11px] text-text-secondary">{priority.description}</p>
+      </div>
+    </Card>
+  );
+}
+
+function CodeEditorSidebar({
+  snippet,
+  mode,
+  onSnippetChange,
+  onRunMode,
+  activeLine,
+}: {
+  snippet: string;
+  mode: AnalysisMode;
+  activeLine?: number | null;
+  onSnippetChange: (v: string) => void;
+  onRunMode: (m: AnalysisMode) => void;
+}) {
+  const modes: AnalysisMode[] = ['review', 'explain', 'docs', 'optimize', 'security'];
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  useEffect(() => {
+    if (activeLine && textareaRef.current) {
+      const lines = snippet.split('\n');
+      let startPos = 0;
+      for (let i = 0; i < activeLine - 1; i++) {
+        startPos += lines[i].length + 1;
+      }
+      const endPos = startPos + (lines[activeLine - 1]?.length || 0);
+      textareaRef.current.focus();
+      textareaRef.current.setSelectionRange(startPos, endPos);
+      const lineHeight = 18;
+      textareaRef.current.scrollTop = (activeLine - 1) * lineHeight - (textareaRef.current.clientHeight / 2);
+    }
+  }, [activeLine, snippet]);
+  return (
+    <div className="flex flex-col gap-3">
+      {/* Mode selector */}
+      <Panel title="Mode">
+        <div className="flex flex-col gap-1">
+          {modes.map(m => (
+            <button
+              key={m}
+              type="button"
+              onClick={() => onRunMode(m)}
+              aria-pressed={mode === m}
+              className={cn(
+                'flex items-center gap-2 rounded-lg border px-3 py-2 text-left text-xs font-bold capitalize transition-colors',
+                'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold-primary/50',
+                mode === m
+                  ? 'border-border bg-elevated text-text-primary shadow-sm'
+                  : 'border-transparent text-text-secondary hover:bg-elevated/50 hover:text-text-primary'
+              )}
+            >
+              <span className="material-symbols-outlined text-[16px]" aria-hidden="true">{MODE_ICONS[m]}</span>
+              {m}
+            </button>
+          ))}
+        </div>
+      </Panel>
+
+      {/* Snippet editor */}
+      <Panel title="Code Snippet">
+        <textarea
+          ref={textareaRef}
+          aria-label="Code snippet"
+          value={snippet}
+          onChange={e => onSnippetChange(e.target.value)}
+          spellCheck={false}
+          className="h-64 w-full resize-y bg-void/40 font-mono text-xs text-text-primary placeholder-text-muted outline-none focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-gold-primary/40"
+          placeholder="Paste code here…"
+        />
+      </Panel>
+    </div>
+  );
+}
+
+// ── Page ──────────────────────────────────────────────────────────────────────
+
 export default function CodeSuite() {
+  useDocumentTitle('Code Suite');
   const location = useLocation();
   const [snippet, setSnippet] = useState('');
   const [language, setLanguage] = useState('');
-  const [mode, setMode] = useState<'review' | 'explain' | 'docs' | 'optimize' | 'security'>('review');
+  const [mode, setMode] = useState<AnalysisMode>('review');
   const [templateContext, setTemplateContext] = useState<TemplateLaunchContext | null>(null);
+  const [activeLine, setActiveLine] = useState<number | null>(null);
 
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [result, setResult] = useState<CodeReviewResult | LegacyCodeResult | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [comingSoon, setComingSoon] = useState<PlaceholderMode | null>(null);
 
   useEffect(() => {
     const ctx: TemplateLaunchContext | null =
@@ -38,10 +234,10 @@ export default function CodeSuite() {
     }
   }, [location.state]);
 
-  const runAnalysis = async (overrideMode?: 'review' | 'explain' | 'docs' | 'optimize' | 'security') => {
+  const runAnalysis = async (overrideMode?: AnalysisMode) => {
     const activeMode = overrideMode || mode;
     if (overrideMode && overrideMode !== mode) setMode(overrideMode);
-    
+
     if (!snippet.trim()) return;
     setIsAnalyzing(true);
     setError(null);
@@ -51,278 +247,87 @@ export default function CodeSuite() {
       const res = await api.post(`/api/intelligence/code/${activeMode}`, {
         snippet,
         operation: activeMode,
-        language: language || null
+        language: language || null,
       });
       setResult(res.data);
-    } catch (err: any /* eslint-disable-line @typescript-eslint/no-explicit-any */) {
-      setError(err.response?.data?.detail || err.message || 'Analysis failed');
+    } catch (err: unknown) {
+      const e = err as { response?: { data?: { detail?: string } }; message?: string };
+      setError(e.response?.data?.detail || e.message || 'Analysis failed');
     } finally {
       setIsAnalyzing(false);
     }
   };
 
   const handleReset = () => {
+    setActiveLine(null);
     setResult(null);
     setError(null);
+    setComingSoon(null);
   };
 
-  const renderLegacyResult = (res: LegacyCodeResult) => (
-    <div className="p-8 space-y-8">
-      <div className="font-sans text-lg text-text-primary font-medium leading-relaxed">
-        {res.summary}
-      </div>
-      <div className="space-y-4">
-        <h3 className="font-sans text-sm font-medium text-text-muted uppercase tracking-wider flex items-center gap-2">
-          <span className="material-symbols-outlined text-sm">description</span>
-          {res.operation === 'explain' ? 'Explanation' : 'Generated Documentation'}
-        </h3>
-        <div className="prose prose-invert prose-sm max-w-none text-text-secondary bg-surface p-6 rounded-xl border border-border">
-          <ReactMarkdown remarkPlugins={[remarkGfm]}>
-            {res.result_markdown || (
-              mode === 'optimize' ? 'Optimization mode will be available in a future release. Current implementation supports Review, Explain and Documentation.' :
-              mode === 'security' ? 'Security mode will be available in a future release. Current implementation supports Review, Explain and Documentation.' :
-              'Coming soon'
-            )}
-          </ReactMarkdown>
-        </div>
-      </div>
-    </div>
-  );
+  // ── Loading ────────────────────────────────────────────────────────────────
 
-  const renderReviewWorkbench = (res: CodeReviewResult) => {
+  if (isAnalyzing) {
     return (
-      <div className="flex-1 overflow-y-auto p-8 flex gap-8 bg-void">
-        
-        {/* LEFT SIDEBAR */}
-        <div className="w-[340px] shrink-0 flex flex-col gap-6">
-          <div className="bg-elevated border border-border rounded-xl p-6 shadow-sm">
-            <h3 className="font-sans text-xs font-bold text-text-muted uppercase tracking-wider mb-2">Executive Summary</h3>
-            <p className="font-sans text-sm text-text-primary leading-relaxed">
-              {res.executive_summary}
-            </p>
-          </div>
-
-          <div className="bg-surface border border-border rounded-xl p-4 shadow-sm text-center relative overflow-hidden flex items-center justify-between">
-            <div className={`absolute left-0 top-0 w-1 h-full ${
-                res.overall_score >= 90 ? 'bg-conf-high' : 
-                res.overall_score >= 70 ? 'bg-conf-amber' : 'bg-conf-critical'
-              }`} 
-            />
-            <div className="text-left ml-2">
-              <h2 className="font-sans text-xs font-bold text-text-muted uppercase tracking-wider mb-1">Overall Quality</h2>
-              <div className="font-sans text-xs font-medium text-text-primary">{res.language}</div>
-            </div>
-            <div className={`font-display text-4xl leading-none ${
-                res.overall_score >= 90 ? 'text-conf-high' : 
-                res.overall_score >= 70 ? 'text-conf-amber' : 'text-conf-critical'
-              }`}>
-              {res.overall_score}
-            </div>
-          </div>
-
-          <div className="bg-elevated border border-border rounded-xl p-5 shadow-sm">
-            <h3 className="font-sans text-xs font-bold text-text-muted uppercase tracking-wider mb-4 flex items-center gap-2">
-              <span className="material-symbols-outlined text-[16px]">radar</span>
-              Quality Radar
-            </h3>
-            <div className="flex flex-col gap-4">
-              {[
-                { label: 'Security', val: res.radar_scores.security },
-                { label: 'Maintainability', val: res.radar_scores.maintainability },
-                { label: 'Documentation', val: res.radar_scores.documentation },
-                { label: 'Performance', val: res.radar_scores.performance },
-              ].map(r => (
-                <div key={r.label} className="flex flex-col gap-1.5 text-sm">
-                  <div className="flex justify-between items-center">
-                    <span className="text-text-secondary">{r.label}</span>
-                    <span className={`font-mono font-bold ${r.val >= 90 ? 'text-conf-high' : r.val >= 70 ? 'text-conf-amber' : 'text-conf-critical'}`}>
-                      {r.val}
-                    </span>
-                  </div>
-                  <div className="w-full bg-void rounded-full h-1.5 overflow-hidden">
-                    <div className={`h-full rounded-full ${r.val >= 90 ? 'bg-conf-high' : r.val >= 70 ? 'bg-conf-amber' : 'bg-conf-critical'}`} style={{ width: `${r.val}%` }} />
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {res.review_priorities?.length > 0 && (
-            <div className="bg-surface border border-border rounded-xl p-5 shadow-sm">
-              <h3 className="font-sans text-xs font-bold text-text-muted uppercase tracking-wider mb-4 flex items-center gap-2">
-                <span className="material-symbols-outlined text-[16px]">rule</span>
-                Reviewer Priorities
-              </h3>
-              <div className="flex flex-col gap-3">
-                {res.review_priorities.map((p, idx) => (
-                  <div key={idx} className="p-3 bg-elevated border border-border rounded-lg text-left shadow-sm flex gap-3 items-start">
-                    <span className="font-mono text-xs font-bold text-text-muted mt-0.5">{idx + 1}</span>
-                    <div>
-                      <div className="flex items-center gap-2 mb-1">
-                        <span className={`px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider ${
-                          p.severity.toLowerCase() === 'high' ? 'bg-conf-critical/15 text-conf-critical border border-conf-critical/30' :
-                          p.severity.toLowerCase() === 'medium' ? 'bg-conf-amber/15 text-conf-amber border border-conf-amber/30' :
-                          'bg-conf-low/15 text-conf-low border border-conf-low/30'
-                        }`}>{p.severity}</span>
-                        <h4 className="font-sans text-xs font-semibold text-text-primary">{p.title}</h4>
-                      </div>
-                      <p className="font-sans text-[11px] text-text-secondary line-clamp-2">{p.description}</p>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {res.deterministic_signals?.length > 0 && (
-            <div className="bg-surface border border-border rounded-xl p-5 shadow-sm">
-              <h3 className="font-sans text-xs font-bold text-text-muted uppercase tracking-wider mb-4 flex items-center gap-2">
-                <span className="material-symbols-outlined text-[16px]">bolt</span>
-                Signals Used
-              </h3>
-              <div className="flex flex-wrap gap-2">
-                {res.deterministic_signals.map((sig, idx) => (
-                  <span key={idx} className="px-2 py-1 rounded bg-elevated border border-border text-[11px] font-sans text-text-primary">
-                    {sig}
-                  </span>
-                ))}
-              </div>
-            </div>
-          )}
-        </div>
-
-        {/* RIGHT COLUMN */}
-        <div className="flex-1 flex flex-col gap-6 max-w-4xl pb-10">
-          <div className="space-y-4">
-            <h3 className="font-display text-xl text-text-primary border-b border-border pb-2">Code Profile</h3>
-            <div className="grid grid-cols-3 gap-4">
-              <CodeMetricCard label="Lines" value={res.metrics.lines} icon="notes" />
-              <CodeMetricCard label="Functions" value={res.metrics.functions} icon="function" />
-              <CodeMetricCard label="Complexity" value={res.metrics.estimated_cyclomatic_complexity} icon="account_tree" color="text-gold-primary" />
-              <CodeMetricCard label="Comment Ratio" value={`${res.metrics.comment_ratio}%`} icon="chat" />
-              <CodeMetricCard label="Avg Function" value={res.metrics.average_function} icon="align_vertical_center" />
-              <CodeMetricCard label="Longest Function" value={res.metrics.longest_function} icon="straighten" />
-            </div>
-          </div>
-
-          {res.security_findings?.length > 0 && (
-            <div className="space-y-4 mt-4">
-              <h3 className="font-display text-xl text-conf-critical border-b border-conf-critical/20 pb-2 flex items-center gap-2">
-                <span className="material-symbols-outlined">security</span>
-                Security Findings
-              </h3>
-              <div className="grid grid-cols-1 gap-4">
-                {res.security_findings.map((f, i) => <SecurityFindingCard key={i} finding={f} />)}
-              </div>
-            </div>
-          )}
-
-          {res.maintainability_findings?.length > 0 && (
-            <div className="space-y-4 mt-4">
-              <h3 className="font-display text-xl text-conf-amber border-b border-conf-amber/20 pb-2 flex items-center gap-2">
-                <span className="material-symbols-outlined">handyman</span>
-                Maintainability
-              </h3>
-              <div className="grid grid-cols-1 gap-4">
-                {res.maintainability_findings.map((f, i) => <SecurityFindingCard key={i} finding={f} />)}
-              </div>
-            </div>
-          )}
-          
-          {res.documentation_findings?.length > 0 && (
-            <div className="space-y-4 mt-4">
-              <h3 className="font-display text-xl text-blue-500 border-b border-blue-500/20 pb-2 flex items-center gap-2">
-                <span className="material-symbols-outlined">menu_book</span>
-                Documentation
-              </h3>
-              <div className="grid grid-cols-1 gap-4">
-                {res.documentation_findings.map((f, i) => <SecurityFindingCard key={i} finding={f} />)}
-              </div>
-            </div>
-          )}
-        </div>
-      </div>
-    );
-  };
-
-  if (result || isAnalyzing) {
-    const isWorkbench = mode === 'review' && result && 'radar_scores' in result;
-    return (
-      <div className="flex-1 p-8 bg-void min-h-[calc(100vh-60px)] flex gap-6 overflow-hidden">
-        {/* Left Side: Controls */}
-        <div className="w-[300px] shrink-0 flex flex-col gap-4">
-          <header className="flex justify-between items-center">
-            <h1 className="font-display text-2xl text-text-primary">Code Suite</h1>
-            <button onClick={handleReset} className="text-text-secondary hover:text-text-primary font-sans text-sm underline flex items-center gap-1">
-              <span className="material-symbols-outlined text-[16px]">arrow_back</span>
-            </button>
-          </header>
-
-          <div className="flex flex-col gap-2 bg-surface p-2 border border-border rounded-xl">
-            {['review', 'explain', 'docs', 'optimize', 'security'].map((m) => (
-              <button 
-                key={m}
-                onClick={() => { setMode(m as 'review'); runAnalysis(m as 'review'); }}
-                className={`flex-1 py-2 px-3 text-xs font-bold rounded capitalize transition-colors text-left flex items-center gap-2 ${mode === m ? 'bg-elevated text-primary shadow-sm border border-border' : 'text-text-secondary hover:text-text-primary hover:bg-elevated/50 border border-transparent'}`}
-              >
-                <span className="material-symbols-outlined text-[16px]">
-                  {m === 'review' ? 'fact_check' : m === 'explain' ? 'lightbulb' : m === 'docs' ? 'menu_book' : m === 'optimize' ? 'speed' : 'security'}
-                </span>
-                {m}
-              </button>
-            ))}
-          </div>
-
-          <div className="flex-1 bg-surface border border-border rounded-xl flex flex-col overflow-hidden">
-            <textarea 
-              className="w-full flex-1 bg-surface text-text-primary p-4 font-mono text-xs resize-none outline-none focus:ring-1 focus:ring-primary/50"
-              value={snippet}
-              onChange={(e) => setSnippet(e.target.value)}
-            />
-          </div>
-        </div>
-
-        {/* Right Side: Results Panel */}
-        <div className={`flex-1 bg-elevated border border-border rounded-xl flex flex-col overflow-hidden relative`}>
-          {isAnalyzing ? (
-             <div className="flex-1 flex flex-col items-center justify-center text-text-muted gap-4">
-               <span className="material-symbols-outlined animate-spin text-4xl text-primary">sync</span>
-               <p className="font-sans text-sm animate-pulse">Inspecting snippet and synthesizing {mode}...</p>
-             </div>
-          ) : result ? (
-             isWorkbench ? renderReviewWorkbench(result as CodeReviewResult) : renderLegacyResult(result as LegacyCodeResult)
-          ) : null}
-        </div>
-      </div>
+      <AnalysisLoading
+        title={`Running ${mode.charAt(0).toUpperCase() + mode.slice(1)} analysis…`}
+        message="Inspecting snippet and synthesizing result"
+      />
     );
   }
 
-  // Initial Empty State
-  return (
-    <div className="flex-1 p-8 bg-void min-h-[calc(100vh-60px)] flex flex-col items-center overflow-y-auto">
-      <div className="w-full max-w-[1000px] space-y-8 mt-10">
-        <header className="text-left w-full">
-          <h1 className="font-display text-4xl text-text-primary mb-3">Code Suite</h1>
-          <p className="font-sans text-base text-text-secondary">A dedicated code intelligence workbench for explanation, review, and documentation.</p>
-        </header>
+  // ── Coming soon — modes awaiting backend implementation ────────────────────
 
-        {templateContext && <TemplateBanner context={templateContext} onClear={() => setTemplateContext(null)} />}
+  if (comingSoon) {
+    const cs = COMING_SOON[comingSoon];
+    return (
+      <ComingSoon
+        icon={MODE_ICONS[comingSoon]}
+        title={cs.title}
+        description={cs.description}
+        capabilities={cs.capabilities}
+        onBack={() => setComingSoon(null)}
+        backLabel="Back to Code Suite"
+      />
+    );
+  }
 
-        {error && (
-          <div className="bg-conf-critical/10 border border-conf-critical/20 p-4 rounded-xl text-conf-critical flex items-start gap-3">
-            <span className="material-symbols-outlined">error</span>
-            <p className="font-sans text-sm text-conf-critical/80 mt-0.5">{error}</p>
-          </div>
+  // ── Empty / onboarding ─────────────────────────────────────────────────────
+
+  if (!result) {
+    return (
+      <AnalysisEmptyState
+        icon="code"
+        title="Code Suite"
+        description="A dedicated code intelligence workbench for review, explanation, documentation, optimization, and security analysis."
+        expectedOutput={[
+          'Quality score and radar breakdown',
+          'Security findings',
+          'Maintainability issues',
+          'Documentation gaps',
+          'Review priorities',
+        ]}
+        supportedTypes={['Python', 'TypeScript', 'JavaScript', 'Java', 'C++', 'SQL']}
+        error={error}
+      >
+        {templateContext && (
+          <TemplateBanner context={templateContext} onClear={() => setTemplateContext(null)} />
         )}
 
-        <div className="bg-elevated border border-border rounded-2xl p-6 shadow-sm">
-          <div className="flex gap-4 mb-6">
-            <select 
+        {/* Language + mode row */}
+        <div className="flex flex-wrap gap-3">
+          <div className="flex flex-col gap-1.5">
+            <label htmlFor="cs-language" className="font-sans text-sm font-medium text-text-primary">
+              Language
+            </label>
+            <select
+              id="cs-language"
               value={language}
-              onChange={(e) => setLanguage(e.target.value)}
-              className="bg-surface border border-border text-text-primary rounded-lg px-4 py-2 font-sans text-sm focus:ring-1 focus:ring-primary focus:outline-none w-48"
+              onChange={e => setLanguage(e.target.value)}
+              className="rounded-md border border-border bg-surface px-3.5 py-2.5 font-sans text-sm text-text-primary
+                focus:border-gold-primary focus:outline-none focus:ring-2 focus:ring-gold-primary/15"
             >
-              <option value="">▼ Auto Detect</option>
+              <option value="">Auto Detect</option>
               <option value="python">Python</option>
               <option value="javascript">JavaScript</option>
               <option value="typescript">TypeScript</option>
@@ -332,24 +337,329 @@ export default function CodeSuite() {
             </select>
           </div>
 
-          <div className="relative mb-6">
-            <textarea 
-              className="w-full h-[300px] bg-surface text-text-primary p-4 font-mono text-sm rounded-xl border border-border focus:ring-1 focus:ring-primary focus:outline-none resize-y"
-              value={snippet}
-              onChange={(e) => setSnippet(e.target.value)}
-              placeholder="Paste your code snippet here..."
-            />
+          <div className="flex flex-col gap-1.5">
+            <label htmlFor="cs-mode" className="font-sans text-sm font-medium text-text-primary">
+              Mode
+            </label>
+            <select
+              id="cs-mode"
+              value={mode}
+              onChange={e => setMode(e.target.value as AnalysisMode)}
+              className="rounded-md border border-border bg-surface px-3.5 py-2.5 font-sans text-sm text-text-primary
+                focus:border-gold-primary focus:outline-none focus:ring-2 focus:ring-gold-primary/15"
+            >
+              {(['review', 'explain', 'docs', 'optimize', 'security'] as const).map(m => (
+                <option key={m} value={m} className="capitalize">{m.charAt(0).toUpperCase() + m.slice(1)}</option>
+              ))}
+            </select>
           </div>
-
-          <button 
-            onClick={() => runAnalysis()}
-            disabled={isAnalyzing || !snippet.trim()}
-            className="w-full bg-primary text-void py-3 rounded-lg font-sans text-sm font-bold hover:bg-primary/90 disabled:opacity-50 transition-colors"
-          >
-            Analyze Code
-          </button>
         </div>
+
+        {/* Code textarea */}
+        <div className="flex flex-col gap-1.5">
+          <label htmlFor="cs-snippet" className="font-sans text-sm font-medium text-text-primary">
+            Code Snippet
+          </label>
+          <textarea
+            id="cs-snippet"
+            rows={10}
+            value={snippet}
+            onChange={e => setSnippet(e.target.value)}
+            spellCheck={false}
+            placeholder="Paste your code snippet here…"
+            className="w-full rounded-md border border-border bg-surface p-3.5 font-mono text-sm text-text-primary
+              placeholder-text-muted resize-y focus:border-gold-primary focus:outline-none focus:ring-2 focus:ring-gold-primary/15"
+          />
+        </div>
+
+        <Button
+          variant="primary"
+          onClick={() => runAnalysis()}
+          disabled={!snippet.trim() && mode !== 'optimize' && mode !== 'security'}
+          leftIcon={
+            <span className="material-symbols-outlined text-[18px]" aria-hidden="true">
+              {MODE_ICONS[mode]}
+            </span>
+          }
+          className="w-full"
+        >
+          {mode === 'optimize' || mode === 'security' ? 'View Availability' : 'Analyze Code'}
+        </Button>
+      </AnalysisEmptyState>
+    );
+  }
+
+  // ── Result — three-panel workspace ─────────────────────────────────────────
+
+  const isStructured = ['review', 'optimize', 'security'].includes(mode) && result && 'radar_scores' in result;
+  const reviewResult = isStructured ? (result as CodeReviewResult) : null;
+  const legacyResult = !isStructured ? (result as LegacyCodeResult) : null;
+
+  const header = (
+    <AnalysisHeader
+      icon="code"
+      title="Code Suite"
+      documentName={
+        reviewResult?.language ?? legacyResult?.language_detected ?? undefined
+      }
+      status={
+        <Badge variant="default" size="sm" uppercase>
+          {mode}
+        </Badge>
+      }
+      actions={
+        <Button
+          variant="secondary"
+          size="sm"
+          onClick={handleReset}
+          leftIcon={
+            <span className="material-symbols-outlined text-[16px]" aria-hidden="true">
+              arrow_back
+            </span>
+          }
+        >
+          New Analysis
+        </Button>
+      }
+    />
+  );
+
+  const sidebar = (
+    <CodeEditorSidebar
+      snippet={snippet}
+      mode={mode}
+      onSnippetChange={setSnippet}
+      activeLine={activeLine}
+      onRunMode={runAnalysis}
+    />
+  );
+
+  // Inspector varies by result type
+  const inspector = (
+    <AnalysisInspector>
+      {reviewResult ? (
+        <>
+          {/* Code quality ring */}
+          <Panel title="Code Quality">
+            <div className="flex flex-col items-center gap-2 py-1">
+              <ConfidenceRing value={reviewResult.overall_score} size="lg" />
+              <span className={`font-mono text-xl font-bold ${scoreTextClass(reviewResult.overall_score)}`}>
+                {reviewResult.overall_score}
+              </span>
+            </div>
+          </Panel>
+
+          {/* Quality radar */}
+          <Panel title="Quality Breakdown">
+            <div className="flex flex-col gap-3">
+              <RadarBar label="Security"        val={reviewResult.radar_scores.security}        />
+              <RadarBar label="Maintainability" val={reviewResult.radar_scores.maintainability} />
+              <RadarBar label="Documentation"   val={reviewResult.radar_scores.documentation}   />
+              <RadarBar label="Performance"     val={reviewResult.radar_scores.performance}     />
+            </div>
+          </Panel>
+
+          {/* Signals */}
+          {reviewResult.deterministic_signals && reviewResult.deterministic_signals.length > 0 && (
+            <Panel title="Signals">
+              <div className="flex flex-wrap gap-1.5">
+                {reviewResult.deterministic_signals.map((sig, idx) => (
+                  <Chip key={idx} variant="default">{sig}</Chip>
+                ))}
+              </div>
+            </Panel>
+          )}
+
+          {/* Engine */}
+          <Panel title="Engine">
+            <div className="flex flex-col gap-2">
+              <InspectorStat icon="bolt"      label="Analyzer" value="Code Suite"  />
+              <InspectorStat icon="tune"      label="Mode" value={mode.charAt(0).toUpperCase() + mode.slice(1)}  />
+              <InspectorStat icon="code"      label="Language" value={reviewResult.language} />
+            </div>
+          </Panel>
+        </>
+      ) : legacyResult ? (
+        <>
+          <Panel title="Operation">
+            <div className="flex flex-col gap-3">
+              <InspectorStat icon={MODE_ICONS[mode as AnalysisMode] ?? 'code'} label="Mode"     value={mode.charAt(0).toUpperCase() + mode.slice(1)} />
+              <InspectorStat icon="translate"                                  label="Language" value={legacyResult.language_detected || 'Auto-detected'} />
+            </div>
+          </Panel>
+          <Panel title="Engine">
+            <InspectorStat icon="bolt" label="Analyzer" value="Code Suite" />
+          </Panel>
+        </>
+      ) : null}
+    </AnalysisInspector>
+  );
+
+  return (
+    <AnalysisLayout header={header} sidebar={sidebar} inspector={inspector}>
+      <div className="flex flex-col gap-6">
+
+        {/* Mobile editor — visible on < xl only (desktop sidebar carries this) */}
+        <div className="xl:hidden">
+          <CodeEditorSidebar
+            snippet={snippet}
+            mode={mode}
+            onSnippetChange={setSnippet}
+            onRunMode={runAnalysis}
+          />
+        </div>
+
+        {/* ── Review workbench ── */}
+        {reviewResult && (
+          <>
+            {/* Executive Summary */}
+            <Panel id="sec-summary" title="Executive Summary" className="scroll-mt-6">
+              <p className="font-sans text-sm leading-relaxed text-text-primary">
+                {reviewResult.executive_summary}
+              </p>
+            </Panel>
+
+            {/* Code Profile */}
+            <Panel id="sec-profile" title="Code Profile" className="scroll-mt-6">
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4">
+                <CodeMetricCard label="Lines"             value={reviewResult.metrics.lines}                              icon="notes"                   />
+                <CodeMetricCard label="Functions"         value={reviewResult.metrics.functions}                          icon="function"                />
+                <CodeMetricCard label="Complexity"        value={reviewResult.metrics.estimated_cyclomatic_complexity}    icon="account_tree"            color="text-gold-primary" />
+                <CodeMetricCard label="Comment Ratio"     value={`${reviewResult.metrics.comment_ratio}%`}               icon="chat"                    />
+                <CodeMetricCard label="Avg Function"      value={reviewResult.metrics.average_function}                   icon="align_vertical_center"   />
+                <CodeMetricCard label="Longest Function"  value={reviewResult.metrics.longest_function}                   icon="straighten"              />
+              </div>
+            </Panel>
+
+            {/* Review Priorities */}
+            {reviewResult.review_priorities && reviewResult.review_priorities.length > 0 && (
+              <Panel
+                id="sec-priorities"
+                title="Review Priorities"
+                className="scroll-mt-6"
+                headerAction={
+                  <Badge variant="default" size="sm" uppercase={false}>
+                    {reviewResult.review_priorities.length}
+                  </Badge>
+                }
+              >
+                <div className="flex flex-col gap-3">
+                  {reviewResult.review_priorities.map((p, idx) => (
+                    <PriorityCard key={idx} priority={p} idx={idx} />
+                  ))}
+                </div>
+              </Panel>
+            )}
+
+            {/* Security Findings */}
+            {reviewResult.security_findings && (
+              <Panel
+                id="sec-security"
+                title="Security Findings"
+                className="scroll-mt-6 border-conf-critical/20"
+                headerAction={
+                  <Badge variant="error" size="sm" uppercase={false}>
+                    {reviewResult.security_findings.length}
+                  </Badge>
+                }
+              >
+                <div className="flex flex-col gap-4">
+                  {reviewResult.security_findings.length === 0 ? (
+                    <div className="flex flex-col items-center justify-center p-6 text-center bg-elevated/50 rounded-lg border border-border/50">
+                      <span className="material-symbols-outlined text-conf-high text-3xl mb-2">verified_user</span>
+                      <span className="font-sans text-sm font-medium text-text-primary">No security vulnerabilities detected.</span>
+                      <span className="font-sans text-xs text-text-muted mt-1">Your code is secure.</span>
+                    </div>
+                  ) : reviewResult.security_findings.map((f, i) => (
+                    <SecurityFindingCard key={i} finding={f} onLineClick={setActiveLine} />
+                  ))}
+                </div>
+              </Panel>
+            )}
+
+            {/* Maintainability Findings */}
+            {reviewResult.maintainability_findings && reviewResult.maintainability_findings.length > 0 && (
+              <Panel
+                id="sec-maintainability"
+                title="Maintainability"
+                className="scroll-mt-6"
+                headerAction={
+                  <Badge variant="warning" size="sm" uppercase={false}>
+                    {reviewResult.maintainability_findings.length}
+                  </Badge>
+                }
+              >
+                <div className="flex flex-col gap-4">
+                  {reviewResult.maintainability_findings.map((f, i) => (
+                    <SecurityFindingCard key={i} finding={f} onLineClick={setActiveLine} />
+                  ))}
+                </div>
+              </Panel>
+            )}
+
+            {/* Performance Findings */}
+            {reviewResult.performance_findings && (
+              <Panel
+                id="sec-performance"
+                title="Performance & Optimization"
+                className="scroll-mt-6 border-conf-amber/20"
+                headerAction={
+                  <Badge variant="warning" size="sm" uppercase={false}>
+                    {reviewResult.performance_findings.length}
+                  </Badge>
+                }
+              >
+                <div className="flex flex-col gap-4">
+                  {reviewResult.performance_findings.length === 0 ? (
+                    <div className="flex flex-col items-center justify-center p-6 text-center bg-elevated/50 rounded-lg border border-border/50">
+                      <span className="material-symbols-outlined text-conf-high text-3xl mb-2">check_circle</span>
+                      <span className="font-sans text-sm font-medium text-text-primary">No optimization opportunities detected.</span>
+                      <span className="font-sans text-xs text-text-muted mt-1">Great job.</span>
+                    </div>
+                  ) : reviewResult.performance_findings.map((f, i) => (
+                    <SecurityFindingCard key={i} finding={f} onLineClick={setActiveLine} />
+                  ))}
+                </div>
+              </Panel>
+            )}
+
+            {/* Documentation Findings */}
+            {reviewResult.documentation_findings && reviewResult.documentation_findings.length > 0 && (
+              <Panel
+                id="sec-documentation"
+                title="Documentation"
+                className="scroll-mt-6"
+                headerAction={
+                  <Badge variant="default" size="sm" uppercase={false}>
+                    {reviewResult.documentation_findings.length}
+                  </Badge>
+                }
+              >
+                <div className="flex flex-col gap-4">
+                  {reviewResult.documentation_findings.map((f, i) => (
+                    <SecurityFindingCard key={i} finding={f} onLineClick={setActiveLine} />
+                  ))}
+                </div>
+              </Panel>
+            )}
+          </>
+        )}
+
+        {/* ── Legacy result (explain / docs / optimize / security) ── */}
+        {legacyResult && (
+          <Panel id="sec-result" title={legacyResult.operation === 'explain' ? 'Explanation' : 'Generated Output'} className="scroll-mt-6">
+            <p className="mb-6 font-sans text-sm font-medium leading-relaxed text-text-primary">
+              {legacyResult.summary}
+            </p>
+            <div className="prose prose-invert prose-sm max-w-none rounded-xl border border-border bg-surface p-6 text-text-secondary">
+              <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                {legacyResult.result_markdown || 'No output was generated for this snippet.'}
+              </ReactMarkdown>
+            </div>
+          </Panel>
+        )}
+
       </div>
-    </div>
+    </AnalysisLayout>
   );
 }
