@@ -24,6 +24,11 @@ const DomainRadar = lazy(() => import('@/pages/DomainRadar'));
 const Clinical    = lazy(() => import('@/pages/Clinical'));
 const Legal       = lazy(() => import('@/pages/Legal'));
 
+const About       = lazy(() => import('@/pages/About'));
+const Careers     = lazy(() => import('@/pages/Careers'));
+const Contact     = lazy(() => import('@/pages/Contact'));
+const Security    = lazy(() => import('@/pages/Security'));
+
 const AdminOverview    = lazy(() => import('@/pages/admin/Overview'));
 const CostAnalytics    = lazy(() => import('@/pages/admin/CostAnalytics'));
 const UsersConsole     = lazy(() => import('@/pages/admin/Users'));
@@ -63,6 +68,11 @@ function AppContent() {
         <Route path="/" element={!isAuthenticated ? <Landing /> : <Navigate to="/workspace" />} />
         <Route path="/auth/callback" element={<AuthCallback />} />
         <Route path="/unauthorized" element={<Unauthorized />} />
+        
+        <Route path="/about" element={<About />} />
+        <Route path="/careers" element={<Careers />} />
+        <Route path="/contact" element={<Contact />} />
+        <Route path="/security" element={<Security />} />
 
         <Route element={<ProtectedRoute />}>
           <Route path="/workspace" element={<Workspace />} />

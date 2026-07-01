@@ -272,7 +272,7 @@ async def _run_llm_synthesis(draft: dict) -> dict:
             {"role": "system", "content": SYSTEM_PROMPT},
             {"role": "user", "content": user_prompt},
         ],
-        model="llama-3.1-8b-instant",
+        model="llama-3.3-70b-versatile",
         response_format={"type": "json_object"},
         temperature=0.0,
     )

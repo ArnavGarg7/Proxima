@@ -437,8 +437,23 @@ async def intelligence_code_optimize(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db)
 ):
-    # Stub for future implementation
-    return {"message": "Optimize mode coming soon."}
+    from proxima.services.code_analysis.analyzer import CodeAnalyzer
+    import time
+    
+    start_time = time.time()
+    session = await create_analysis_session(db, current_user.user_id, "code", template_origin=payload.template_origin)
+    
+    try:
+        result = await CodeAnalyzer.analyze(
+            code=payload.snippet,
+            language_hint=payload.language,
+            operation="optimize"
+        )
+        await complete_analysis_session(db, session, status="completed", start_time=start_time, confidence=result.get("overall_score"))
+        return result
+    except Exception as e:
+        await complete_analysis_session(db, session, status="failed", start_time=start_time)
+        raise e
 
 @router.post("/code/security")
 async def intelligence_code_security(
@@ -446,8 +461,23 @@ async def intelligence_code_security(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db)
 ):
-    # Stub for future implementation
-    return {"message": "Security mode coming soon."}
+    from proxima.services.code_analysis.analyzer import CodeAnalyzer
+    import time
+    
+    start_time = time.time()
+    session = await create_analysis_session(db, current_user.user_id, "code", template_origin=payload.template_origin)
+    
+    try:
+        result = await CodeAnalyzer.analyze(
+            code=payload.snippet,
+            language_hint=payload.language,
+            operation="security"
+        )
+        await complete_analysis_session(db, session, status="completed", start_time=start_time, confidence=result.get("overall_score"))
+        return result
+    except Exception as e:
+        await complete_analysis_session(db, session, status="failed", start_time=start_time)
+        raise e
 
 @router.post("/domain-radar")
 async def intelligence_domain_radar(

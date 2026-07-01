@@ -17,12 +17,14 @@ export default function AuthCallback() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const [error, setError] = useState<string | null>(null);
+  const [redirectPath] = useState(() => localStorage.getItem('postAuthRedirect') || '/workspace');
 
   useEffect(() => {
     let timeoutId: ReturnType<typeof setTimeout> | undefined;
 
     const oauthError = searchParams.get('error');
     if (oauthError) {
+      localStorage.removeItem('postAuthRedirect');
       setError(oauthError);
       timeoutId = setTimeout(() => navigate('/'), 3000);
       return () => clearTimeout(timeoutId);
@@ -33,8 +35,10 @@ export default function AuthCallback() {
     const { isAuthenticated } = useAuthStore.getState();
     
     if (isAuthenticated) {
-      navigate('/workspace', { replace: true });
+      localStorage.removeItem('postAuthRedirect');
+      navigate(redirectPath, { replace: true });
     } else {
+      localStorage.removeItem('postAuthRedirect');
       setError('Authentication failed. Please try again.');
       timeoutId = setTimeout(() => navigate('/'), 3000);
     }
@@ -43,7 +47,7 @@ export default function AuthCallback() {
       clearTimeout(timeoutId);
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [redirectPath]);
 
   if (error) {
     return (

@@ -14,8 +14,8 @@ class GoogleProvider:
             genai.configure(api_key=self.api_key)
 
     def _get_model_id(self, requested_id: str) -> str:
-        # Force using gemini-1.5-flash to avoid strict rate limits on 2.5-flash and unallowed 2.0-lite
-        return os.getenv("DEFAULT_GEMINI_MODEL", "gemini-1.5-flash")
+        # Force using gemini-2.5-flash as gemini-1.5-flash is retired
+        return os.getenv("DEFAULT_GEMINI_MODEL", "gemini-2.5-flash")
 
     def _handle_error(self, e: Exception):
         err_msg = str(e).lower()

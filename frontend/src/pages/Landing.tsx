@@ -1,5 +1,6 @@
 import React from 'react';
 import { motion, useReducedMotion } from 'framer-motion';
+import { useLocation } from 'react-router-dom';
 import { api } from '@/lib/axios';
 import { Button } from '@/components/ui/Button';
 import { CursorInfluence } from '@/components/interaction/CursorInfluence';
@@ -18,7 +19,6 @@ import { Reveal } from '@/components/landing/Reveal';
 import { staggerContainer, staggerItem, EASE_OUT } from '@/components/landing/landingMotion';
 import { duration } from '@/theme/motion';
 import { useDocumentTitle } from '@/hooks/useDocumentTitle';
-import proximaLogo from '@/assets/proxima-logo.png';
 
 /* Action verbs shown beneath the hero headline */
 const HERO_VERBS = ['Upload', 'Analyze', 'Compare', 'Audit'] as const;
@@ -26,17 +26,11 @@ const HERO_VERBS = ['Upload', 'Analyze', 'Compare', 'Audit'] as const;
 /* "Built for" capability strip */
 const BUILT_FOR = ['Legal', 'Healthcare', 'Clinical', 'Research', 'Compliance'] as const;
 
-/* Footer link columns */
-const FOOTER_COLUMNS = [
-  { title: 'Product',   links: ['Workspace', 'Templates', 'Analyzers', 'Workflow'] },
-  { title: 'Solutions', links: ['Legal', 'Healthcare', 'Clinical', 'Research'] },
-  { title: 'Company',   links: ['About', 'Careers', 'Contact', 'Security'] },
-  { title: 'Legal',     links: ['Privacy', 'Terms', 'Compliance', 'Status'] },
-] as const;
-
+import { LandingFooter } from '@/components/landing/LandingFooter';
 export default function Landing() {
   useDocumentTitle();
   const reduced = useReducedMotion() ?? false;
+  const location = useLocation();
 
   /* ── Preserved auth logic — Google OAuth PKCE initiated by the server. The
      single sign-in endpoint is preserved; the `intent` query param carries
@@ -47,6 +41,15 @@ export default function Landing() {
   };
   const handleLogin  = () => startAuth('login');
   const handleSignup = () => startAuth('signup');
+
+  React.useEffect(() => {
+    const state = location.state as { from?: string } | null;
+    if (state?.from) {
+      localStorage.setItem('postAuthRedirect', state.from);
+      handleSignup();
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [location.state]);
 
   const scrollToFeatures = () => {
     document.getElementById('features')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -59,7 +62,7 @@ export default function Landing() {
       <StoryCameraProvider>
       <BackgroundFX id="top" intensity="medium" ambient mesh beams particles spotlight grain className="min-h-screen overflow-x-hidden">
       <ProductShowcaseProvider>
-      <LandingNav onLogin={handleLogin} onSignup={handleSignup} />
+      <LandingNav onSignup={handleSignup} />
 
       {/* ══ Hero ════════════════════════════════════════════════════════════ */}
       <StoryScene section="hero" depth="front">
@@ -239,60 +242,7 @@ export default function Landing() {
 
       {/* ══ Footer ══════════════════════════════════════════════════════════ */}
       <StoryScene section="footer" cinematic={false}>
-      <footer className="relative border-t border-border bg-surface/40 backdrop-blur-sm">
-        <div className="mx-auto w-full max-w-[1400px] px-6 py-16 sm:px-8">
-          <div className="grid grid-cols-2 gap-6 sm:grid-cols-3 sm:gap-10 lg:grid-cols-6">
-
-            {/* Brand block */}
-            <div className="col-span-2 flex flex-col gap-4">
-              <div className="flex items-center gap-2.5">
-                <img
-                  src={proximaLogo}
-                  alt=""
-                  aria-hidden="true"
-                  className="h-7 w-auto shrink-0"
-                />
-                <span className="brand-wordmark text-lg">Proxima</span>
-              </div>
-              <p className="max-w-xs font-sans text-sm leading-relaxed text-text-muted">
-                AI-native document intelligence. Upload, analyze, and audit with
-                confidence.
-              </p>
-            </div>
-
-            {/* Link columns */}
-            {FOOTER_COLUMNS.map((col) => (
-              <div key={col.title} className="flex flex-col gap-3">
-                <span className="font-sans text-xs font-medium uppercase tracking-widest text-text-muted">
-                  {col.title}
-                </span>
-                <ul className="flex flex-col gap-2">
-                  {col.links.map((link) => (
-                    <li key={link}>
-                      <span className="cursor-default font-sans text-sm text-text-secondary transition-colors duration-150 hover:text-text-primary">
-                        {link}
-                      </span>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            ))}
-          </div>
-
-          {/* Bottom bar */}
-          <div className="mt-12 flex flex-col items-center justify-between gap-4 border-t border-border pt-6 sm:flex-row">
-            <div className="flex flex-col items-center gap-1 sm:items-start">
-              <span className="font-sans text-xs text-text-muted">
-                © {new Date().getFullYear()} Proxima. All rights reserved.
-              </span>
-              <span className="font-sans text-[11px] text-text-muted/70">
-                Engineered by Arnav Garg
-              </span>
-            </div>
-            <span className="font-mono text-xs text-text-muted">v4.0</span>
-          </div>
-        </div>
-      </footer>
+        <LandingFooter />
       </StoryScene>
 
       <StoryProgress />

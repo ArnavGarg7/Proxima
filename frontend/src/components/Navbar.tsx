@@ -1,4 +1,4 @@
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { useAuthStore } from '@/store/useAuthStore';
 import { Button } from '@/components/ui/Button';
 import { cn } from '@/lib/cn';
@@ -11,6 +11,12 @@ interface NavbarProps {
 
 export default function Navbar({ onMenuClick, isDrawerOpen }: NavbarProps) {
   const { user, logout } = useAuthStore();
+  const navigate = useNavigate();
+
+  const handleLogout = () => {
+    navigate('/', { replace: true });
+    logout();
+  };
 
   return (
     <header className="flex h-[60px] shrink-0 items-center border-b border-border bg-surface px-4 sm:px-6">
@@ -55,7 +61,7 @@ export default function Navbar({ onMenuClick, isDrawerOpen }: NavbarProps) {
         <span className="hidden sm:block text-sm text-text-muted truncate max-w-[200px]">
           {user?.email}
         </span>
-        <Button variant="ghost" size="sm" onClick={logout}>
+        <Button variant="ghost" size="sm" onClick={handleLogout}>
           Sign Out
         </Button>
       </div>

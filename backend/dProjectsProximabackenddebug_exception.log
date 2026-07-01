@@ -1,0 +1,77 @@
+Exception: JSONDecodeError: Unterminated string starting at: line 75 column 20 (char 4879)
+Fallback Reason: JSON Parsing or Schema Validation Failed
+Raw Response: {
+  "executive_summary": "This document provides a Q3 update on a product launch, indicating that a new feature set has been developed and is anticipated for production deployment, though an exact date is not yet finalized by leadership. The Product Team has identified several critical issues impacting user experience, including a high drop-off rate during the onboarding process, slow dashboard loading speeds (averaging 8 seconds), unclear error messages, and an inconsistent mobile experience across devices.\n\nThe design team has decided to pursue a redesign to address these problems, but the timeline for this initiative is currently uncertain due to existing resourcing constraints and competing priorities within the organization. Despite these challenges, the team believes the product holds significant potential. However, they emphasize that these identified issues must be resolved before a wider rollout can be confidently pursued, and they are actively seeking feedback from stakeholders.",
+  "takeaways": [
+    {
+      "point": "The new feature set is ready for deployment, but the exact production launch date remains unfinalized by leadership.",
+      "evidence": [
+        {
+          "quote": "The new feature set was developed by our team over the course of several months, and it is anticipated that it will be deployed to production sometime in the near future, although a exact date has not yet been finalized by leadership."
+        }
+      ]
+    },
+    {
+      "point": "Significant user drop-off occurs during the onboarding process, indicating a critical need for improvement in the onboarding flow.",
+      "evidence": [
+        {
+          "quote": "There is a need for us to improve the onboarding flow because alot of users are dropping off after the signup screen, and this is something that has been noticed by multiple team members during recent user testing sessions that were conducted in the last sprint."
+        }
+      ]
+    },
+    {
+      "point": "Key technical and usability issues include slow dashboard loading times (upwards of 8 seconds), unhelpful error messages, and an inconsistent mobile experience.",
+      "evidence": [
+        {
+          "quote": "The loading speed of the dashboard is slow, it takes upwards of 8 seconds to fully render on average for most users.",
+          "context": "Identified as a key issue."
+        },
+        {
+          "quote": "Error messages are not very clear or helpful, users dont understand what went wrong when something fails.",
+          "context": "Identified as a key issue."
+        },
+        {
+          "quote": "The mobile experience is inconsistent across devices, with some buttons being to small to tap accurately on smaller screens.",
+          "context": "Identified as a key issue."
+        }
+      ]
+    },
+    {
+      "point": "A product redesign has been decided upon by the design team, but its implementation timeline is uncertain due to resource limitations and conflicting priorities.",
+      "evidence": [
+        {
+          "quote": "It was decided by the design team that a redesign would be persued, however the timeline for this is uncertain at this point in time due to resourcing constraints and competing priorities across the org."
+        }
+      ]
+    },
+    {
+      "point": "The product has potential, but addressing the identified issues is crucial before a wider rollout can be confidently pursued.",
+      "evidence": [
+        {
+          "quote": "In conclusion, we believe that this product has alot of potential, but their are several issues that needs to be addressed before we can confidently say its ready for a wider rollout."
+        }
+      ]
+    }
+  ],
+  "topics": [
+    {
+      "name": "Product Launch Status",
+      "description": "Discussion around the development and anticipated deployment of a new feature set, including the uncertainty of the exact launch date.",
+      "evidence": [
+        {
+          "quote": "Subject: Q3 Product Launch Update"
+        },
+        {
+          "quote": "The new feature set was developed by our team over the course of several months, and it is anticipated that it will be deployed to production sometime in the near future, although a exact date has not yet been finalized by leadership."
+        }
+      ]
+    },
+    {
+      "name": "User Experience Issues",
+      "description": "Detailed identification of problems affecting users, such as onboarding drop-offs, slow performance, unclear error messages, and mobile inconsistencies.",
+      "evidence": [
+        {
+          "quote": "There is a need for us to improve the onboarding flow because alot of users are dropping off after the signup screen, and this is something that has been noticed by multiple team members during recent user testing sessions that were conducted in the last sprint."
+        },
+        {
+          "quote": "Key issues identified: 1

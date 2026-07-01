@@ -34,7 +34,7 @@ class CodeLLMSynthesis(BaseModel):
     performance_findings: List[IntelligenceCard] = Field(description="Performance cards")
     documentation_findings: List[IntelligenceCard] = Field(description="Documentation cards")
 
-async def run_llm_synthesis(code: str, language: str, metrics: dict, security: list, maintainability: list) -> Dict[str, Any]:
+async def run_llm_synthesis(code: str, language: str, metrics: dict, security: list, maintainability: list, operation: str = "review") -> Dict[str, Any]:
     """
     Synthesizes the deterministic findings using LLM.
     Implements Graceful LLM Failure if Groq fails.
@@ -44,10 +44,20 @@ async def run_llm_synthesis(code: str, language: str, metrics: dict, security: l
     try:
         client = AsyncGroq(api_key=api_key)
         
+        operation_instructions = ""
+        if operation == "optimize":
+            operation_instructions = "FOCUS HEAVILY on PERFORMANCE. Identify time/space complexity improvements, inefficient loops, redundant allocations, and algorithmic bottlenecks. Populate performance_findings heavily."
+        elif operation == "security":
+            operation_instructions = "FOCUS HEAVILY on SECURITY. Act as a vulnerability scanner. Identify injection risks, memory safety issues, weak cryptography, and unsafe inputs. Populate security_findings heavily."
+        else:
+            operation_instructions = "Perform a balanced code review covering maintainability, security, documentation, and performance."
+            
         system_prompt = f"""You are a senior {language} code reviewer.
 Analyze the provided code and deterministic metrics.
 You MUST output strictly in JSON format matching this schema:
 {CodeLLMSynthesis.schema_json(indent=2)}
+
+Operation Focus: {operation_instructions}
 
 Deterministic Context:
 Language: {language}
@@ -56,7 +66,7 @@ Pre-computed Security Risks: {json.dumps(security)}
 Pre-computed Maintainability Risks: {json.dumps(maintainability)}
 """
         response = await client.chat.completions.create(
-            model="llama-3.1-8b-instant",
+            model="llama-3.3-70b-versatile",
             messages=[
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": f"Code to review:\n```\n{code}\n```"}

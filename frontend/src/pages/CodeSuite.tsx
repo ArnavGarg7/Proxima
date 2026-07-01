@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useLocation } from 'react-router-dom';
 import { api } from '@/lib/axios';
 import ReactMarkdown from 'react-markdown';
@@ -50,9 +50,11 @@ function scoreTextClass(val: number): string {
 
 function severityStyle(severity: string): string {
   switch (severity.toLowerCase()) {
-    case 'high':   return 'border-conf-critical/30 bg-conf-critical/15 text-conf-critical';
-    case 'medium': return 'border-conf-amber/30 bg-conf-amber/15 text-conf-amber';
-    default:       return 'border-conf-low/30 bg-conf-low/15 text-conf-low';
+    case 'critical': return 'border-conf-critical/30 bg-conf-critical/15 text-conf-critical';
+    case 'high': return 'border-conf-amber/30 bg-conf-amber/15 text-conf-amber';
+    case 'medium': return 'border-gold-primary/30 bg-gold-primary/15 text-gold-primary';
+    case 'low': return 'border-text-muted/30 bg-text-muted/15 text-text-muted';
+    default: return 'border-void-light/30 bg-void-light/15 text-text-secondary';
   }
 }
 
@@ -140,13 +142,31 @@ function CodeEditorSidebar({
   mode,
   onSnippetChange,
   onRunMode,
+  activeLine,
 }: {
   snippet: string;
   mode: AnalysisMode;
+  activeLine?: number | null;
   onSnippetChange: (v: string) => void;
   onRunMode: (m: AnalysisMode) => void;
 }) {
   const modes: AnalysisMode[] = ['review', 'explain', 'docs', 'optimize', 'security'];
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  useEffect(() => {
+    if (activeLine && textareaRef.current) {
+      const lines = snippet.split('\n');
+      let startPos = 0;
+      for (let i = 0; i < activeLine - 1; i++) {
+        startPos += lines[i].length + 1;
+      }
+      const endPos = startPos + (lines[activeLine - 1]?.length || 0);
+      textareaRef.current.focus();
+      textareaRef.current.setSelectionRange(startPos, endPos);
+      const lineHeight = 18;
+      textareaRef.current.scrollTop = (activeLine - 1) * lineHeight - (textareaRef.current.clientHeight / 2);
+    }
+  }, [activeLine, snippet]);
   return (
     <div className="flex flex-col gap-3">
       {/* Mode selector */}
@@ -176,6 +196,7 @@ function CodeEditorSidebar({
       {/* Snippet editor */}
       <Panel title="Code Snippet">
         <textarea
+          ref={textareaRef}
           aria-label="Code snippet"
           value={snippet}
           onChange={e => onSnippetChange(e.target.value)}
@@ -197,6 +218,7 @@ export default function CodeSuite() {
   const [language, setLanguage] = useState('');
   const [mode, setMode] = useState<AnalysisMode>('review');
   const [templateContext, setTemplateContext] = useState<TemplateLaunchContext | null>(null);
+  const [activeLine, setActiveLine] = useState<number | null>(null);
 
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [result, setResult] = useState<CodeReviewResult | LegacyCodeResult | null>(null);
@@ -215,13 +237,6 @@ export default function CodeSuite() {
   const runAnalysis = async (overrideMode?: AnalysisMode) => {
     const activeMode = overrideMode || mode;
     if (overrideMode && overrideMode !== mode) setMode(overrideMode);
-
-    // Optimize / Security intentionally await backend work — show the polished
-    // placeholder instead of dispatching a request that has no implementation.
-    if (activeMode === 'optimize' || activeMode === 'security') {
-      setComingSoon(activeMode);
-      return;
-    }
 
     if (!snippet.trim()) return;
     setIsAnalyzing(true);
@@ -244,6 +259,7 @@ export default function CodeSuite() {
   };
 
   const handleReset = () => {
+    setActiveLine(null);
     setResult(null);
     setError(null);
     setComingSoon(null);
@@ -375,9 +391,9 @@ export default function CodeSuite() {
 
   // ── Result — three-panel workspace ─────────────────────────────────────────
 
-  const isReview = mode === 'review' && 'radar_scores' in result;
-  const reviewResult = isReview ? (result as CodeReviewResult) : null;
-  const legacyResult = !isReview ? (result as LegacyCodeResult) : null;
+  const isStructured = ['review', 'optimize', 'security'].includes(mode) && result && 'radar_scores' in result;
+  const reviewResult = isStructured ? (result as CodeReviewResult) : null;
+  const legacyResult = !isStructured ? (result as LegacyCodeResult) : null;
 
   const header = (
     <AnalysisHeader
@@ -413,6 +429,7 @@ export default function CodeSuite() {
       snippet={snippet}
       mode={mode}
       onSnippetChange={setSnippet}
+      activeLine={activeLine}
       onRunMode={runAnalysis}
     />
   );
@@ -433,7 +450,7 @@ export default function CodeSuite() {
           </Panel>
 
           {/* Quality radar */}
-          <Panel title="Quality Radar">
+          <Panel title="Quality Breakdown">
             <div className="flex flex-col gap-3">
               <RadarBar label="Security"        val={reviewResult.radar_scores.security}        />
               <RadarBar label="Maintainability" val={reviewResult.radar_scores.maintainability} />
@@ -457,6 +474,7 @@ export default function CodeSuite() {
           <Panel title="Engine">
             <div className="flex flex-col gap-2">
               <InspectorStat icon="bolt"      label="Analyzer" value="Code Suite"  />
+              <InspectorStat icon="tune"      label="Mode" value={mode.charAt(0).toUpperCase() + mode.slice(1)}  />
               <InspectorStat icon="code"      label="Language" value={reviewResult.language} />
             </div>
           </Panel>
@@ -534,7 +552,7 @@ export default function CodeSuite() {
             )}
 
             {/* Security Findings */}
-            {reviewResult.security_findings && reviewResult.security_findings.length > 0 && (
+            {reviewResult.security_findings && (
               <Panel
                 id="sec-security"
                 title="Security Findings"
@@ -546,8 +564,14 @@ export default function CodeSuite() {
                 }
               >
                 <div className="flex flex-col gap-4">
-                  {reviewResult.security_findings.map((f, i) => (
-                    <SecurityFindingCard key={i} finding={f} />
+                  {reviewResult.security_findings.length === 0 ? (
+                    <div className="flex flex-col items-center justify-center p-6 text-center bg-elevated/50 rounded-lg border border-border/50">
+                      <span className="material-symbols-outlined text-conf-high text-3xl mb-2">verified_user</span>
+                      <span className="font-sans text-sm font-medium text-text-primary">No security vulnerabilities detected.</span>
+                      <span className="font-sans text-xs text-text-muted mt-1">Your code is secure.</span>
+                    </div>
+                  ) : reviewResult.security_findings.map((f, i) => (
+                    <SecurityFindingCard key={i} finding={f} onLineClick={setActiveLine} />
                   ))}
                 </div>
               </Panel>
@@ -567,7 +591,33 @@ export default function CodeSuite() {
               >
                 <div className="flex flex-col gap-4">
                   {reviewResult.maintainability_findings.map((f, i) => (
-                    <SecurityFindingCard key={i} finding={f} />
+                    <SecurityFindingCard key={i} finding={f} onLineClick={setActiveLine} />
+                  ))}
+                </div>
+              </Panel>
+            )}
+
+            {/* Performance Findings */}
+            {reviewResult.performance_findings && (
+              <Panel
+                id="sec-performance"
+                title="Performance & Optimization"
+                className="scroll-mt-6 border-conf-amber/20"
+                headerAction={
+                  <Badge variant="warning" size="sm" uppercase={false}>
+                    {reviewResult.performance_findings.length}
+                  </Badge>
+                }
+              >
+                <div className="flex flex-col gap-4">
+                  {reviewResult.performance_findings.length === 0 ? (
+                    <div className="flex flex-col items-center justify-center p-6 text-center bg-elevated/50 rounded-lg border border-border/50">
+                      <span className="material-symbols-outlined text-conf-high text-3xl mb-2">check_circle</span>
+                      <span className="font-sans text-sm font-medium text-text-primary">No optimization opportunities detected.</span>
+                      <span className="font-sans text-xs text-text-muted mt-1">Great job.</span>
+                    </div>
+                  ) : reviewResult.performance_findings.map((f, i) => (
+                    <SecurityFindingCard key={i} finding={f} onLineClick={setActiveLine} />
                   ))}
                 </div>
               </Panel>
@@ -587,7 +637,7 @@ export default function CodeSuite() {
               >
                 <div className="flex flex-col gap-4">
                   {reviewResult.documentation_findings.map((f, i) => (
-                    <SecurityFindingCard key={i} finding={f} />
+                    <SecurityFindingCard key={i} finding={f} onLineClick={setActiveLine} />
                   ))}
                 </div>
               </Panel>
