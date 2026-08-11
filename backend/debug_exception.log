@@ -1,0 +1,8 @@
+Exception: SchemaValidationError: JSON did not match Pydantic schema: 2 validation errors for GeneralAnalysisResult
+metadata
+  Field required [type=missing, input_value={'executive_summary': 'Partial response only'}, input_type=dict]
+    For further information visit https://errors.pydantic.dev/2.7/v/missing
+confidence
+  Field required [type=missing, input_value={'executive_summary': 'Partial response only'}, input_type=dict]
+    For further information visit https://errors.pydantic.dev/2.7/v/missing
+Fallback Reason: JSON Parsing or Schema Validation Failed
