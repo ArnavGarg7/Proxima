@@ -83,12 +83,21 @@ class ProximaAIEngine:
         model = await model_registry.get_for_task(request.task_class, request.domain, db)
         
         system_prompt_final = request.system_prompt
-        
+
         if request.structured_output_schema and not stream:
-            # Inject schema instruction as fallback for providers lacking native support,
-            # though GoogleProvider uses response_mime_type="application/json" under the hood.
-            schema_dump = json.dumps(request.structured_output_schema.model_json_schema(), indent=2)
-            system_prompt_final += f"\n\nJSON SCHEMA TO MATCH:\n{schema_dump}\n\nIMPORTANT: Return ONLY valid JSON, without any markdown formatting like ```json"
+            # GoogleProvider uses response_mime_type='application/json' (Gemini native JSON mode).
+            # This enforces JSON at the API level — no schema injection into the prompt is needed.
+            #
+            # OpenAIProvider (Groq) uses response_format={"type": "json_object"} which ensures
+            # the output is valid JSON but does NOT enforce a specific schema. For these providers,
+            # we add a compact field-list hint so the model targets the right keys.
+            if model.provider != "google":
+                field_names = list(request.structured_output_schema.model_fields.keys())
+                system_prompt_final += (
+                    f"\n\nRespond with a valid JSON object containing these keys: {field_names}."
+                    "\nDo not include markdown formatting."
+                )
+
 
         if stream:
             try:
