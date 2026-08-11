@@ -71,3 +71,10 @@ ehthumbs.db
 # Docker
 .docker/
 docker-compose.override.yml
+# Proxima runtime artifacts
+backend/debug_*.log
+backend/*.log
+
+# Uploaded/generated document storage
+backend/storage/*
+!backend/storage/.gitkeep

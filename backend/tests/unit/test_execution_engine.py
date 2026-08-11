@@ -245,3 +245,92 @@ async def test_execute_provider_auth_error_is_normalized():
 
     assert isinstance(result.error, ProviderAuthenticationError)
     assert result.validated_data is None
+
+
+# ---------------------------------------------------------------------------
+# Tests: schema injection behavior (Stage 7A.2 correction)
+# ---------------------------------------------------------------------------
+
+@pytest.mark.asyncio
+async def test_google_provider_does_not_inject_schema_into_prompt():
+    """For the Google provider, the system prompt must NOT contain the full Pydantic schema dump."""
+    mock_db = MagicMock()
+    mock_model = _make_mock_model(provider="google")
+    valid_json = json.dumps({"title": "Google Test", "value": 1})
+    captured_prompt = {}
+
+    async def capture_complete(model, system_prompt, user_message, **kwargs):
+        captured_prompt["system"] = system_prompt
+        return valid_json
+
+    with patch("proxima.services.execution.engine.model_registry") as mock_registry:
+        mock_registry.get_for_task = AsyncMock(return_value=mock_model)
+        mock_registry.complete = capture_complete
+
+        await ProximaAIEngine.execute(mock_db, _make_request(), stream=False)
+
+    # The system prompt must be exactly what the analyzer passed — no schema appended.
+    assert "JSON SCHEMA TO MATCH" not in captured_prompt["system"]
+    assert "model_json_schema" not in captured_prompt["system"]
+    assert captured_prompt["system"] == "You are a test assistant."
+
+
+@pytest.mark.asyncio
+async def test_non_google_provider_adds_compact_field_hint_to_prompt():
+    """For non-Google providers (e.g. Groq/OpenAI), a compact field-name hint is added."""
+    mock_db = MagicMock()
+    mock_model = _make_mock_model(provider="openai", model_id="llama-3.1-8b")
+    valid_json = json.dumps({"title": "Groq Test", "value": 5})
+    captured_prompt = {}
+
+    async def capture_complete(model, system_prompt, user_message, **kwargs):
+        captured_prompt["system"] = system_prompt
+        return valid_json
+
+    with patch("proxima.services.execution.engine.model_registry") as mock_registry:
+        mock_registry.get_for_task = AsyncMock(return_value=mock_model)
+        mock_registry.complete = capture_complete
+
+        await ProximaAIEngine.execute(mock_db, _make_request(), stream=False)
+
+    # A compact field hint must be present, but not the full schema JSON dump.
+    assert "title" in captured_prompt["system"]
+    assert "value" in captured_prompt["system"]
+    # Must NOT be the full verbose schema
+    assert "properties" not in captured_prompt["system"]
+    assert "JSON SCHEMA TO MATCH" not in captured_prompt["system"]
+
+
+@pytest.mark.asyncio
+async def test_pydantic_validation_still_runs_for_google_provider():
+    """Even without schema injection, Pydantic validation still rejects invalid responses."""
+    mock_db = MagicMock()
+    mock_model = _make_mock_model(provider="google")
+    # Missing required 'value' field
+    incomplete_json = json.dumps({"title": "Missing value"})
+
+    with patch("proxima.services.execution.engine.model_registry") as mock_registry:
+        mock_registry.get_for_task = AsyncMock(return_value=mock_model)
+        mock_registry.complete = AsyncMock(return_value=incomplete_json)
+
+        result = await ProximaAIEngine.execute(mock_db, _make_request(), stream=False)
+
+    assert isinstance(result.error, SchemaValidationError)
+    assert result.validated_data is None
+
+
+@pytest.mark.asyncio
+async def test_malformed_json_still_becomes_schema_validation_error():
+    """Malformed JSON returns SchemaValidationError regardless of provider."""
+    mock_db = MagicMock()
+    mock_model = _make_mock_model(provider="google")
+
+    with patch("proxima.services.execution.engine.model_registry") as mock_registry:
+        mock_registry.get_for_task = AsyncMock(return_value=mock_model)
+        mock_registry.complete = AsyncMock(return_value="{broken json {{")
+
+        result = await ProximaAIEngine.execute(mock_db, _make_request(), stream=False)
+
+    assert isinstance(result.error, SchemaValidationError)
+    assert result.validated_data is None
+
