@@ -3,7 +3,7 @@ from proxima.config import settings
 import json
 import os
 import asyncio
-from typing import AsyncGenerator
+from typing import AsyncGenerator, Any
 from fastapi import HTTPException
 
 class GoogleProvider:
@@ -28,7 +28,7 @@ class GoogleProvider:
         else:
             raise HTTPException(status_code=500, detail=f"Provider Error: {str(e)}")
 
-    async def complete(self, model_id: str, system_prompt: str, user_message: str, temperature: float, max_tokens: int, response_format: str = "text") -> str:
+    async def complete(self, model_id: str, system_prompt: str, user_message: str, temperature: float, max_tokens: int, response_format: str = "text", structured_output_schema: Any = None) -> str:
         if not self.api_key:
             raise HTTPException(status_code=401, detail="Invalid API key provided. API key is missing.")
 
@@ -39,7 +39,7 @@ class GoogleProvider:
             'temperature': temperature,
             'max_output_tokens': max_tokens,
         }
-        if response_format == "json":
+        if response_format == "json" or structured_output_schema is not None:
             generation_config['response_mime_type'] = 'application/json'
         
         try:

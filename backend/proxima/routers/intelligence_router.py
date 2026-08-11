@@ -25,6 +25,7 @@ from proxima.services.qhe import QualityHeuristicEngine
 from proxima.services.compare_analyzer import CompareAnalyzer
 from proxima.services.code_suite_service import CodeSuiteService
 from proxima.services.general_document_analyzer import GeneralDocumentAnalyzer
+from proxima.services.execution.engine import ProximaAIEngine, AIExecutionRequest
 
 router = APIRouter(prefix="/api/intelligence", tags=["intelligence"])
 
@@ -155,8 +156,17 @@ async def intelligence_complete(
     assembler = PromptAssemblerService(registry)
     final_prompt = await assembler.assemble_prompt(f"system_{top_domain}", context_package, actual_task)
 
-    # 5. Model Registry
-    model = await model_registry.get_default_generation(db)
+    # 5. AI Execution Request
+    engine_request = AIExecutionRequest(
+        task_class="general_chat",
+        domain=top_domain,
+        system_prompt=final_prompt,
+        user_message=actual_task,
+        user_id=current_user.user_id,
+        document_id=doc.document_id,
+        temperature=payload.temperature,
+        max_tokens=payload.max_tokens
+    )
     
     # 6. Gemini Provider & SSE Stream
     qhe = QualityHeuristicEngine()
@@ -164,13 +174,8 @@ async def intelligence_complete(
     async def stream_generator():
         ai_response_accumulator = ""
         try:
-            async for chunk in model_registry.stream_completion(
-                model=model,
-                system_prompt=final_prompt,
-                user_message=actual_task,
-                temperature=payload.temperature,
-                max_tokens=payload.max_tokens
-            ):
+            execution_result = await ProximaAIEngine.execute(db, engine_request, stream=True)
+            async for chunk in execution_result.content_stream:
                 if await request.is_disconnected():
                     break
                     
@@ -223,7 +228,9 @@ async def intelligence_analyze(
     full_text = "\n\n".join([chunk.content for chunk in chunks])
     
     metadata = {
-        "title": doc.title
+        "title": doc.title,
+        "document_id": doc.document_id,
+        "user_id": current_user.user_id
     }
     
     start_time = time.time()

@@ -83,6 +83,7 @@ class AIRequest(Base):
     tokens_input: Mapped[int] = mapped_column(Integer, default=0)
     tokens_output: Mapped[int] = mapped_column(Integer, default=0)
     computed_cost: Mapped[float] = mapped_column(Float, default=0.0)
+    is_estimated: Mapped[bool] = mapped_column(Boolean, default=True, server_default=text("true"))
     created_at: Mapped[datetime] = mapped_column(TIMESTAMPTZ, server_default=func.now())
     __table_args__ = (
         Index("idx_ai_requests_user_id", "user_id"),
