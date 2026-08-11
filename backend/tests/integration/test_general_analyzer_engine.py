@@ -62,7 +62,7 @@ async def test_general_analyzer_successful_execution():
     mock_model = _make_mock_model()
 
     with patch("proxima.services.execution.engine.model_registry") as mock_registry:
-        mock_registry.get_for_task = AsyncMock(return_value=mock_model)
+        mock_registry.get_routing_candidates_for_task = AsyncMock(return_value=[mock_model])
         mock_registry.complete = AsyncMock(return_value=_valid_llm_json_response())
 
         result = await GeneralDocumentAnalyzer.analyze(mock_db, SAMPLE_TEXT, SAMPLE_METADATA)
@@ -93,7 +93,7 @@ async def test_general_analyzer_api_shape_unchanged():
     mock_model = _make_mock_model()
 
     with patch("proxima.services.execution.engine.model_registry") as mock_registry:
-        mock_registry.get_for_task = AsyncMock(return_value=mock_model)
+        mock_registry.get_routing_candidates_for_task = AsyncMock(return_value=[mock_model])
         mock_registry.complete = AsyncMock(return_value=_valid_llm_json_response())
 
         result = await GeneralDocumentAnalyzer.analyze(mock_db, SAMPLE_TEXT, SAMPLE_METADATA)
@@ -112,7 +112,7 @@ async def test_general_analyzer_deterministic_signals_injected():
     mock_model = _make_mock_model()
 
     with patch("proxima.services.execution.engine.model_registry") as mock_registry:
-        mock_registry.get_for_task = AsyncMock(return_value=mock_model)
+        mock_registry.get_routing_candidates_for_task = AsyncMock(return_value=[mock_model])
         mock_registry.complete = AsyncMock(return_value=_valid_llm_json_response())
 
         result = await GeneralDocumentAnalyzer.analyze(mock_db, SAMPLE_TEXT, SAMPLE_METADATA)
@@ -133,7 +133,7 @@ async def test_general_analyzer_fallback_on_schema_validation_error():
     broken_json = "not valid json at all {{ broken"
 
     with patch("proxima.services.execution.engine.model_registry") as mock_registry:
-        mock_registry.get_for_task = AsyncMock(return_value=mock_model)
+        mock_registry.get_routing_candidates_for_task = AsyncMock(return_value=[mock_model])
         mock_registry.complete = AsyncMock(return_value=broken_json)
 
         result = await GeneralDocumentAnalyzer.analyze(mock_db, SAMPLE_TEXT, SAMPLE_METADATA)
@@ -153,7 +153,7 @@ async def test_general_analyzer_fallback_on_provider_timeout():
     mock_model = _make_mock_model()
 
     with patch("proxima.services.execution.engine.model_registry") as mock_registry:
-        mock_registry.get_for_task = AsyncMock(return_value=mock_model)
+        mock_registry.get_routing_candidates_for_task = AsyncMock(return_value=[mock_model])
         mock_registry.complete = AsyncMock(
             side_effect=HTTPException(status_code=504, detail="Provider timeout.")
         )
@@ -173,7 +173,7 @@ async def test_general_analyzer_fallback_preserves_metadata():
     mock_model = _make_mock_model()
 
     with patch("proxima.services.execution.engine.model_registry") as mock_registry:
-        mock_registry.get_for_task = AsyncMock(return_value=mock_model)
+        mock_registry.get_routing_candidates_for_task = AsyncMock(return_value=[mock_model])
         mock_registry.complete = AsyncMock(
             side_effect=HTTPException(status_code=504, detail="timeout")
         )
@@ -194,7 +194,7 @@ async def test_general_analyzer_fallback_on_pydantic_mismatch():
     partial_response = json.dumps({"executive_summary": "Partial response only"})
 
     with patch("proxima.services.execution.engine.model_registry") as mock_registry:
-        mock_registry.get_for_task = AsyncMock(return_value=mock_model)
+        mock_registry.get_routing_candidates_for_task = AsyncMock(return_value=[mock_model])
         mock_registry.complete = AsyncMock(return_value=partial_response)
 
         result = await GeneralDocumentAnalyzer.analyze(mock_db, SAMPLE_TEXT, SAMPLE_METADATA)

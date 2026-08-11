@@ -60,7 +60,9 @@ DOCUMENT TEXT:
             domain=None,
             system_prompt=system_prompt,
             user_message=prompt,
-            structured_output_schema=GeneralAnalysisResult
+            structured_output_schema=GeneralAnalysisResult,
+            user_id=metadata.get("user_id"),
+            document_id=metadata.get("document_id")
         )
         
         result = await ProximaAIEngine.execute(db, request, stream=False)

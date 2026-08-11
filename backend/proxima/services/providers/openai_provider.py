@@ -1,6 +1,6 @@
 import os
 import json
-from typing import AsyncGenerator
+from typing import AsyncGenerator, Any
 from fastapi import HTTPException
 from openai import AsyncOpenAI
 
@@ -14,17 +14,25 @@ class OpenAIProvider:
             raise HTTPException(status_code=401, detail="API key is missing.")
         return AsyncOpenAI(api_key=self.api_key, base_url=self.base_url)
 
-    async def complete(self, model_id: str, system_prompt: str, user_message: str, temperature: float, max_tokens: int, response_format: str = "text") -> str:
+    async def complete(self, model_id: str, system_prompt: str, user_message: str, temperature: float, max_tokens: int, response_format: str = "text", structured_output_schema: Any = None) -> str:
         client = self._get_client()
         kwargs = {}
-        if response_format == "json":
+        if response_format == "json" or structured_output_schema is not None:
             kwargs["response_format"] = {"type": "json_object"}
-            
+
+        system_prompt_final = system_prompt
+        if structured_output_schema is not None:
+            field_names = list(structured_output_schema.model_fields.keys())
+            system_prompt_final += (
+                f"\n\nRespond with a valid JSON object containing these keys: {field_names}."
+                "\nDo not include markdown formatting."
+            )
+
         try:
             response = await client.chat.completions.create(
                 model=model_id,
                 messages=[
-                    {"role": "system", "content": system_prompt},
+                    {"role": "system", "content": system_prompt_final},
                     {"role": "user", "content": user_message}
                 ],
                 temperature=temperature,
