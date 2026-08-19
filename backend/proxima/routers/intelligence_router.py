@@ -125,26 +125,24 @@ async def intelligence_complete(
     logger = logging.getLogger("proxima.intelligence")
     logger.info(f"Workspace Analysis: Scoping to active document {doc.title} ({doc.document_id})")
 
-    fts = FTSRetrievalService(db)
-    results = await fts.search(actual_task, document_id=str(payload.document_id), limit=5)
+    from proxima.services.retrieval_hybrid import HybridRetrievalService
+    from proxima.services.grounding import GroundingService
+
+    retrieval = HybridRetrievalService(db)
+    results = await retrieval.search(actual_task, user_id=current_user.user_id, document_ids=[doc.document_id], limit=5)
     
     if not results:
-        from sqlalchemy import text
-        fallback_query = text("SELECT chunk_id, document_id, chunk_index, content, 1.0 as rank FROM document_chunks WHERE document_id = :doc_id ORDER BY chunk_index LIMIT 5")
-        fallback_result = await db.execute(fallback_query, {"doc_id": str(payload.document_id)})
-        rows = fallback_result.fetchall()
-        if not rows:
-             async def empty_stream():
-                 import json
-                 yield f"data: {json.dumps({'type': 'error', 'detail': 'Document has no extractable text or chunks.'})}\n\n"
-                 yield "data: [DONE]\n\n"
-             return StreamingResponse(empty_stream(), media_type="text/event-stream")
-        results = [{"chunk_id": str(r.chunk_id), "document_id": str(r.document_id), "chunk_index": r.chunk_index, "content": r.content, "rank": float(r.rank)} for r in rows]
+        async def empty_stream():
+            import json
+            yield f"data: {json.dumps({'type': 'error', 'detail': 'Document has no extractable text or chunks.'})}\n\n"
+            yield "data: [DONE]\n\n"
+        return StreamingResponse(empty_stream(), media_type="text/event-stream")
 
     logger.info(f"Retrieved {len(results)} chunks scoped exclusively to document {payload.document_id}")
 
-    # 2. Context Builder
-    context_package = fts.build_context_package(results)
+    # 2. Context Builder & Authoritative Registry
+    grounding_svc = GroundingService()
+    context_package, registry = grounding_svc.build_context_package(results)
 
     # 3. Domain Detection
     detector = DomainDetectorService()
@@ -152,8 +150,8 @@ async def intelligence_complete(
     top_domain = max(scores, key=scores.get)
 
     # 4. Prompt Assembler
-    registry = PromptRegistryService(db)
-    assembler = PromptAssemblerService(registry)
+    registry_svc = PromptRegistryService(db)
+    assembler = PromptAssemblerService(registry_svc)
     final_prompt = await assembler.assemble_prompt(f"system_{top_domain}", context_package, actual_task)
 
     # 5. AI Execution Request
@@ -182,10 +180,15 @@ async def intelligence_complete(
                 ai_response_accumulator += chunk
                 yield f"data: {json.dumps({'type': 'chunk', 'content': chunk})}\n\n"
             
-            # 7. QHE Execution after completion
+            # 7. QHE & Grounding execution after completion
             if ai_response_accumulator:
                 eval_result = qhe.evaluate_response(final_prompt, ai_response_accumulator, top_domain)
                 yield f"data: {json.dumps({'type': 'qhe', 'eval': eval_result})}\n\n"
+                
+                # Grounding & Citations
+                cleaned_text, citations, invalid_refs = grounding_svc.process_citations(ai_response_accumulator, registry)
+                grounding_result = grounding_svc.evaluate_grounding(cleaned_text, registry, citations, invalid_refs)
+                yield f"data: {json.dumps({'type': 'grounding', 'eval': grounding_result, 'citations': citations, 'text': cleaned_text})}\n\n"
                 
             yield "data: [DONE]\n\n"
             
