@@ -78,5 +78,8 @@ async def test_intelligence_complete_endpoint(db, app):
             # The QHE result should be next
             assert "qhe" in lines[2]
             
+            # Grounding result is next
+            assert "grounding" in lines[3]
+            
             # Finally, DONE
-            assert "[DONE]" in lines[3]
+            assert "[DONE]" in lines[4]

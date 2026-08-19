@@ -68,16 +68,43 @@ class DocumentIngestionService:
                 return False
 
             # Chunk text
-            chunks = self.chunking_service.chunk_text(text)
+            chunks = self.chunking_service.chunk_text_with_metadata(text)
+
+            from proxima.services.embedding import generate_chunk_embedding
+            from proxima.services.model_registry import model_registry
+            from datetime import datetime, timezone
+
+            # Fetch active embedding model details once for metadata tracking
+            emb_model = None
+            try:
+                emb_model = await model_registry.get_default_embedding(self.db)
+            except Exception:
+                pass
 
             # Persist chunks
-            for idx, chunk_text in enumerate(chunks):
+            for idx, chunk in enumerate(chunks):
+                chunk_text = chunk["content"]
+                page_number = chunk["page_number"]
+                
+                # Generate embedding
+                vector = await generate_chunk_embedding(self.db, chunk_text)
+                
                 new_chunk = DocumentChunk(
                     document_id=document.document_id,
                     chunk_index=idx,
                     content=chunk_text,
-                    chunk_type="text"
+                    chunk_type="text",
+                    metadata_fields={"page_number": page_number}
                 )
+                
+                if vector:
+                    new_chunk.embedding = vector
+                    if emb_model:
+                        new_chunk.embedding_model = emb_model.model_id
+                        new_chunk.embedding_version = emb_model.embedding_version
+                        new_chunk.embedding_dimensions = emb_model.embedding_dimensions
+                        new_chunk.embedded_at = datetime.now(timezone.utc)
+                
                 self.db.add(new_chunk)
 
             # Update status to processed
