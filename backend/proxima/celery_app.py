@@ -21,4 +21,9 @@ celery_app.conf.update(
     result_serializer='json',
     timezone='UTC',
     enable_utc=True,
+    # Worker reliability (Stage 7C): fetch one task at a time and only ack after
+    # the task returns, so a crashed worker's task is redelivered rather than
+    # lost. Concurrency is left at the default pending workload benchmarking.
+    worker_prefetch_multiplier=1,
+    task_acks_late=True,
 )

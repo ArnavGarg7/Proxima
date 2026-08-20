@@ -108,11 +108,19 @@ class Export(Base):
 
 class BackgroundJob(Base):
     __tablename__ = "background_jobs"
-    job_id: Mapped[PyUUID] = mapped_column(UUID(as_uuid=True), primary_key=True) # Usually matches Celery ID
+    # Proxima-owned domain identity (generated at dispatch). This is deliberately
+    # decoupled from Celery's task id: the task id is passed to the worker as an
+    # argument and lives in Celery's result backend, so we never need to store or
+    # query by it. Keeping only job_id avoids coupling domain identity to Celery.
+    job_id: Mapped[PyUUID] = mapped_column(UUID(as_uuid=True), primary_key=True)
     user_id: Mapped[PyUUID] = mapped_column(UUID(as_uuid=True), ForeignKey("users.user_id", ondelete="CASCADE"), nullable=False)
     job_type: Mapped[str] = mapped_column(String(50), nullable=False)
     status: Mapped[str] = mapped_column(String(50), default="pending")
     result: Mapped[dict | None] = mapped_column(JSONB)
     error_message: Mapped[str | None] = mapped_column(Text)
     created_at: Mapped[datetime] = mapped_column(TIMESTAMPTZ, server_default=func.now())
+    started_at: Mapped[datetime | None] = mapped_column(TIMESTAMPTZ)
     completed_at: Mapped[datetime | None] = mapped_column(TIMESTAMPTZ)
+    __table_args__ = (
+        Index("idx_jobs_user_created", "user_id", "created_at"),
+    )
