@@ -1,6 +1,7 @@
 import google.generativeai as genai
 from proxima.config import settings
 import json
+import math
 import os
 import asyncio
 from typing import AsyncGenerator, Any
@@ -91,21 +92,36 @@ class GoogleProvider:
         except Exception as e:
             self._handle_error(e)
 
-    async def get_embedding(self, model_id: str, text: str):
+    async def get_embedding(self, model_id: str, text: str, output_dimensionality: int | None = None):
         if not self.api_key:
             raise HTTPException(status_code=401, detail="Invalid API key provided. API key is missing.")
-            
+
+        # gemini-embedding-001 defaults to 3072 dims; request the registry's
+        # dimension (e.g. 768) so vectors fit the pgvector column. Google does
+        # not L2-normalize sub-3072 output, so we normalize below.
+        kwargs = {
+            "model": f"models/{model_id}",
+            "content": text,
+            "task_type": "retrieval_document",
+        }
+        if output_dimensionality:
+            kwargs["output_dimensionality"] = output_dimensionality
+
         try:
             result = await asyncio.wait_for(
-                genai.embed_content_async(
-                    model=f"models/{model_id}",
-                    content=text,
-                    task_type="retrieval_document",
-                ),
+                genai.embed_content_async(**kwargs),
                 timeout=10.0
             )
-            return result['embedding']
+            vector = result['embedding']
         except asyncio.TimeoutError:
             raise HTTPException(status_code=504, detail="Provider timeout.")
         except Exception as e:
             self._handle_error(e)
+
+        # Normalize truncated (< 3072) embeddings so cosine/inner-product are
+        # consistent with a unit-length vector space.
+        if output_dimensionality and output_dimensionality < 3072:
+            norm = math.sqrt(sum(x * x for x in vector))
+            if norm > 0:
+                vector = [x / norm for x in vector]
+        return vector

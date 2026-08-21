@@ -8,10 +8,9 @@ provides a minimal sync counterpart that REUSES the provider logic
 code and never bridging asyncpg (DB reads/writes use the sync session).
 """
 
-import asyncio
 import json
 import time
-from typing import Optional, Type
+from typing import Type
 
 from fastapi import HTTPException
 from pydantic import BaseModel, ValidationError
@@ -40,14 +39,10 @@ class TerminalAnalysisError(AnalysisExecutionError):
     """Non-retryable failure (no model, auth, bad schema)."""
 
 
-_worker_loop: Optional[asyncio.AbstractEventLoop] = None
-
-
-def _run_coro(coro):
-    global _worker_loop
-    if _worker_loop is None or _worker_loop.is_closed():
-        _worker_loop = asyncio.new_event_loop()
-    return _worker_loop.run_until_complete(coro)
+# Bridge async provider calls through the ONE shared worker loop (see
+# proxima.services.sync_bridge) so grpc.aio channels created by the embedding
+# path and the generation path share a single event loop.
+from proxima.services.sync_bridge import run_coro as _run_coro
 
 
 def get_default_generation_sync(db: Session):

@@ -13,6 +13,6 @@ class AnthropicProvider:
         # but the prompt engineering usually handles it.
         raise NotImplementedError("Anthropic provider simple complete not implemented in Stage 1")
 
-    async def get_embedding(self, model_id: str, text: str):
+    async def get_embedding(self, model_id: str, text: str, output_dimensionality: int | None = None):
         # Stage 2 Implementation
         raise NotImplementedError("Anthropic provider not implemented in Stage 1")

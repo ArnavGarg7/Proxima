@@ -109,18 +109,23 @@ class HybridRetrievalService:
         try:
             query_vector = await generate_chunk_embedding(self.db_session, query)
             if query_vector:
+                # asyncpg cannot encode a Python list as pgvector's `vector`
+                # type, so bind the embedding as a vector literal and cast it.
+                # (Binding the raw list raised asyncpg DataError and silently
+                # forced FTS-only retrieval.)
+                query_vector_literal = "[" + ",".join(repr(float(x)) for x in query_vector) + "]"
                 vector_sql = """
                     SELECT chunk_id, document_id, chunk_index, content, metadata_fields,
-                           (1 - (embedding <=> :query_vector)) AS similarity
+                           (1 - (embedding <=> (:query_vector)::vector)) AS similarity
                     FROM document_chunks
                     WHERE document_id = ANY(:doc_ids)
                       AND embedding IS NOT NULL
-                    ORDER BY embedding <=> :query_vector
+                    ORDER BY embedding <=> (:query_vector)::vector
                     LIMIT :pool
                 """
                 vector_res = await self.db_session.execute(
                     text(vector_sql),
-                    {"query_vector": query_vector, "doc_ids": allowed_doc_ids, "pool": pool}
+                    {"query_vector": query_vector_literal, "doc_ids": allowed_doc_ids, "pool": pool}
                 )
                 vector_chunks = vector_res.fetchall()
         except Exception as vec_err:

@@ -142,6 +142,10 @@ class ModelRegistry:
 
     async def get_embedding(self, model: RegisteredModel, text: str):
         provider = self._get_provider(model.provider)
-        return await provider.get_embedding(model_id=model.model_id, text=text)
+        return await provider.get_embedding(
+            model_id=model.model_id,
+            text=text,
+            output_dimensionality=model.embedding_dimensions,
+        )
 
 model_registry = ModelRegistry()
