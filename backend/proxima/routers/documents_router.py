@@ -1,7 +1,7 @@
-from fastapi import APIRouter, Depends, UploadFile, File, HTTPException, status, BackgroundTasks
+from fastapi import APIRouter, Depends, UploadFile, File, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from proxima.database import get_db
-from proxima.models.core import Document, User
+from proxima.models.core import Document, User, BackgroundJob
 from proxima.middleware.auth_middleware import get_current_user
 from proxima.services.upload_security import UploadSecurityService
 from proxima.services.storage_service import StorageService
@@ -60,7 +60,6 @@ async def get_document(
 
 @router.post("/upload")
 async def upload_document(
-    background_tasks: BackgroundTasks,
     file: UploadFile = File(...),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
@@ -87,21 +86,27 @@ async def upload_document(
         original_filename=file.filename
     )
 
-    # 4. Trigger Ingestion in Background
-    from proxima.database import AsyncSessionLocal
-    from proxima.services.chunking import ChunkingService
-    from proxima.services.document_ingestion import DocumentIngestionService
-    
-    async def process_document_bg(doc_id: str, uri: str):
-        async with AsyncSessionLocal() as bg_db:
-            chunking_svc = ChunkingService()
-            ingestion_svc = DocumentIngestionService(chunking_svc, bg_db)
-            await ingestion_svc.ingest_document(doc_id, uri)
-            
-    background_tasks.add_task(process_document_bg, str(new_doc.document_id), file_uri)
+    # 4. Create a durable BackgroundJob and dispatch to Celery.
+    #    The expensive parse/chunk/embed work no longer runs in the HTTP request;
+    #    it is a durable job that survives a FastAPI restart (the record lives in
+    #    Postgres and the message in Redis). The Celery task id is separate from
+    #    our job_id — job_id is passed to the worker as an argument.
+    job = BackgroundJob(
+        job_id=uuid.uuid4(),
+        user_id=user_id,
+        job_type="document_ingestion",
+        status="pending",
+    )
+    db.add(job)
+    await db.commit()
+    await db.refresh(job)
+
+    from proxima.tasks import ingest_document
+    ingest_document.delay(str(job.job_id), str(new_doc.document_id), file_uri)
 
     return {
         "message": "File uploaded successfully",
         "document_id": str(new_doc.document_id),
+        "job_id": str(job.job_id),
         "file_uri": file_uri
     }

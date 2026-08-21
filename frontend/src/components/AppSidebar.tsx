@@ -20,6 +20,7 @@ const NAV_GROUPS = [
   {
     label: 'Intelligence',
     items: [
+      { label: 'Ask',          to: '/ask',      icon: 'forum' },
       { label: 'Analyze',      to: '/analyze',  icon: 'analytics' },
       { label: 'Legal',        to: '/legal',    icon: 'gavel' },
       { label: 'Clinical',     to: '/clinical', icon: 'medical_services' },

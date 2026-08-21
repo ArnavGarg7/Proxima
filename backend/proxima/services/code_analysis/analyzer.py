@@ -6,7 +6,7 @@ from .synthesizer import run_llm_synthesis
 
 class CodeAnalyzer:
     @staticmethod
-    async def analyze(code: str, language_hint: str = None, operation: str = "review") -> dict:
+    async def analyze(code: str, language_hint: str = None, operation: str = "review", db=None, user_id=None) -> dict:
         """
         Orchestrates the Code Suite intelligence pipeline.
         Deterministic first, LLM synthesis second.
@@ -32,8 +32,8 @@ class CodeAnalyzer:
             if m["title"] not in signals_used:
                 signals_used.append(m["title"])
                 
-        # Stage F: LLM Synthesis
-        synthesis = await run_llm_synthesis(code, language, metrics, security, maintainability, operation)
+        # Stage F: LLM Synthesis (routed through ProximaAIEngine, 7E)
+        synthesis = await run_llm_synthesis(db, code, language, metrics, security, maintainability, operation, user_id=user_id)
         
         return {
             "language": language,

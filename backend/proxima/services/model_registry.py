@@ -1,6 +1,7 @@
 from proxima.models import RegisteredModel, ModelRoutingRule
 from proxima.database import get_db
 from sqlalchemy.ext.asyncio import AsyncSession
+from typing import Any
 from sqlalchemy import select
 from proxima.services.providers import GoogleProvider, OpenAIProvider, AnthropicProvider
 import structlog
@@ -25,7 +26,7 @@ class ModelRegistry:
         model = result.scalar_one_or_none()
         if not model:
             raise RuntimeError("No active default generation model found in registry.")
-            
+
         return model
 
     async def get_default_embedding(self, db: AsyncSession) -> RegisteredModel:
@@ -67,13 +68,56 @@ class ModelRegistry:
 
         return await self.get_default_generation(db)
 
+    async def get_routing_candidates_for_task(self, task_class: str, domain: str | None, db: AsyncSession) -> list[RegisteredModel]:
+        candidates = []
+        if domain:
+            stmt = select(ModelRoutingRule).join(
+                RegisteredModel, ModelRoutingRule.model_id == RegisteredModel.model_id
+            ).where(
+                ModelRoutingRule.task_class == task_class,
+                ModelRoutingRule.domain == domain,
+                ModelRoutingRule.is_active == True,
+                RegisteredModel.is_active == True,
+            ).order_by(ModelRoutingRule.priority)
+            result = await db.execute(stmt)
+            rules = result.scalars().all()
+            for r in rules:
+                model = await db.get(RegisteredModel, r.model_id)
+                if model and model not in candidates:
+                    candidates.append(model)
+
+        if not candidates:
+            stmt = select(ModelRoutingRule).join(
+                RegisteredModel, ModelRoutingRule.model_id == RegisteredModel.model_id
+            ).where(
+                ModelRoutingRule.task_class == task_class,
+                ModelRoutingRule.domain == None,
+                ModelRoutingRule.is_active == True,
+                RegisteredModel.is_active == True,
+            ).order_by(ModelRoutingRule.priority)
+            result = await db.execute(stmt)
+            rules = result.scalars().all()
+            for r in rules:
+                model = await db.get(RegisteredModel, r.model_id)
+                if model and model not in candidates:
+                    candidates.append(model)
+
+        if not candidates:
+            try:
+                default_model = await self.get_default_generation(db)
+                candidates.append(default_model)
+            except Exception:
+                pass
+
+        return candidates
+
     def _get_provider(self, provider_name: str):
         provider = self.providers.get(provider_name)
         if not provider:
             raise ValueError(f"Unknown provider: {provider_name}")
         return provider
 
-    async def complete(self, model: RegisteredModel, system_prompt: str, user_message: str, temperature: float = 0.1, max_tokens: int = 2048, response_format: str = "text") -> str:
+    async def complete(self, model: RegisteredModel, system_prompt: str, user_message: str, temperature: float = 0.1, max_tokens: int = 2048, response_format: str = "text", structured_output_schema: Any = None) -> str:
         provider = self._get_provider(model.provider)
         return await provider.complete(
             model_id=model.model_id,
@@ -81,7 +125,8 @@ class ModelRegistry:
             user_message=user_message,
             temperature=temperature,
             max_tokens=max_tokens,
-            response_format=response_format
+            response_format=response_format,
+            structured_output_schema=structured_output_schema
         )
 
     async def stream_completion(self, model: RegisteredModel, system_prompt: str, user_message: str, temperature: float, max_tokens: int):
@@ -97,6 +142,10 @@ class ModelRegistry:
 
     async def get_embedding(self, model: RegisteredModel, text: str):
         provider = self._get_provider(model.provider)
-        return await provider.get_embedding(model_id=model.model_id, text=text)
+        return await provider.get_embedding(
+            model_id=model.model_id,
+            text=text,
+            output_dimensionality=model.embedding_dimensions,
+        )
 
 model_registry = ModelRegistry()

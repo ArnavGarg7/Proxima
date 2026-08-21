@@ -27,10 +27,29 @@ settings.jwt_algorithm = "RS256"
 
 from proxima.main import app
 
+# Stage 7C: execute Celery tasks inline during tests so no broker/worker is
+# required, and don't propagate a task's internal exceptions through
+# .delay()/.apply() (a task records failure on the job row instead).
+from proxima.celery_app import celery_app
+celery_app.conf.task_always_eager = True
+celery_app.conf.task_eager_propagates = False
+
 
 @pytest.fixture(scope="session")
 def anyio_backend():
     return "asyncio"
+
+
+@pytest.fixture(scope="function")
+def sync_db():
+    """Synchronous SQLAlchemy session (psycopg2) mirroring the Celery worker DB."""
+    from proxima.worker_db import SyncSessionLocal
+    session = SyncSessionLocal()
+    try:
+        yield session
+    finally:
+        session.rollback()
+        session.close()
 
 @pytest.fixture(scope="session")
 def event_loop():
