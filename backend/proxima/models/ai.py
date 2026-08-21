@@ -141,3 +141,34 @@ class ClinicalNote(Base):
     content: Mapped[str] = mapped_column(Text, nullable=False)
     is_phi_scrubbed: Mapped[bool] = mapped_column(Boolean, default=True)
     created_at: Mapped[datetime] = mapped_column(TIMESTAMPTZ, server_default=func.now())
+
+
+class ResponseGrounding(Base):
+    """
+    Durable record of an intelligence response's grounding outcome (Stage 7D).
+
+    Deliberately stores only metrics + citation PROVENANCE (document / page /
+    chunk / ref key) and never prompts, user messages, document contents,
+    evidence snippets, or raw model responses. User-scoped for tenant isolation.
+    """
+    __tablename__ = "response_grounding"
+    grounding_id: Mapped[PyUUID] = mapped_column(UUID(as_uuid=True), primary_key=True, server_default=text("gen_random_uuid()"))
+    user_id: Mapped[PyUUID] = mapped_column(UUID(as_uuid=True), ForeignKey("users.user_id", ondelete="CASCADE"), nullable=False)
+    ai_request_id: Mapped[PyUUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("ai_requests.request_id", ondelete="SET NULL"))
+    document_id: Mapped[PyUUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("documents.document_id", ondelete="SET NULL"))
+    model_id: Mapped[str | None] = mapped_column(String(100))
+    task_class: Mapped[str] = mapped_column(String(100), nullable=False)
+    grounding_status: Mapped[str] = mapped_column(String(50), nullable=False)
+    grounding_score: Mapped[float] = mapped_column(Float, default=0.0)
+    citation_validity: Mapped[float] = mapped_column(Float, default=0.0)
+    evidence_coverage: Mapped[float] = mapped_column(Float, default=0.0)
+    citation_count: Mapped[int] = mapped_column(Integer, default=0)
+    invalid_reference_count: Mapped[int] = mapped_column(Integer, default=0)
+    latency_ms: Mapped[int] = mapped_column(Integer, default=0)
+    success: Mapped[bool] = mapped_column(Boolean, default=True)
+    # Citation provenance only (no content): [{ref_key, chunk_id, document_id, document_title, page_number}]
+    citations: Mapped[list | None] = mapped_column(JSONB)
+    created_at: Mapped[datetime] = mapped_column(TIMESTAMPTZ, server_default=func.now())
+    __table_args__ = (
+        Index("idx_response_grounding_user_created", "user_id", "created_at"),
+    )

@@ -57,3 +57,20 @@ class GeneralAnalysisResult(BaseModel):
     metadata: AnalysisMetadata
     confidence: int = Field(description="0-100 score of how confident the extraction is")
     signals: List[str] = Field(default_factory=list, description="Deterministic signals used to aid analysis")
+
+
+class GeneralAnalysisPartial(BaseModel):
+    """
+    Map-stage output for one chunk-batch of a large document (Stage 7D).
+    Same fields as GeneralAnalysisResult minus the document-level `metadata`,
+    so partials can be merged deterministically by the reduce stage.
+    """
+    executive_summary: str = Field(default="", description="Summary of THIS section only")
+    takeaways: List[Takeaway] = Field(default_factory=list)
+    topics: List[Topic] = Field(default_factory=list)
+    entities: List[NamedEntity] = Field(default_factory=list)
+    dates: List[ImportantDate] = Field(default_factory=list)
+    numbers: List[NumericalInsight] = Field(default_factory=list)
+    risks: List[Risk] = Field(default_factory=list)
+    actions: List[ActionItem] = Field(default_factory=list)
+    confidence: int = Field(default=0, description="0-100 confidence for this section")
