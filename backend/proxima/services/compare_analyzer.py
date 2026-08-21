@@ -257,52 +257,49 @@ CRITICAL RULES:
 
 Use the deterministic diff provided. Do not hallucinate diffs that aren't there."""
 
-async def _run_llm_synthesis(draft: dict) -> dict:
-    from openai import AsyncOpenAI
-    
+async def _run_llm_synthesis(db, draft: dict, user_id=None, document_id=None) -> dict:
+    from proxima.services.execution.engine import ProximaAIEngine, AIExecutionRequest
+
     # We pass the deterministic draft to the LLM
     user_prompt = f"Deterministic Diff Data:\n{json.dumps(draft, indent=2)}\n\nGenerate the structured CompareResponseSchema JSON now."
-    
-    client = AsyncOpenAI(
-        api_key=os.getenv("GROQ_API_KEY"),
-        base_url="https://api.groq.com/openai/v1"
+
+    request = AIExecutionRequest(
+        task_class="compare_analysis",
+        system_prompt=SYSTEM_PROMPT,
+        user_message=user_prompt,
+        structured_output_schema=CompareResponseSchema,
+        user_id=user_id,
+        document_id=document_id,
     )
-    response = await client.chat.completions.create(
-        messages=[
-            {"role": "system", "content": SYSTEM_PROMPT},
-            {"role": "user", "content": user_prompt},
-        ],
-        model="llama-3.3-70b-versatile",
-        response_format={"type": "json_object"},
-        temperature=0.0,
-    )
-    raw = response.choices[0].message.content
-    return json.loads(raw)
+    result = await ProximaAIEngine.execute(db, request, stream=False)
+    if result.error or result.validated_data is None:
+        raise RuntimeError(str(result.error) if result.error else "empty LLM result")
+    return result.validated_data.model_dump()
 
 
 class CompareAnalyzer:
     @classmethod
-    async def analyze(cls, source_text: str, target_text: str) -> dict:
+    async def analyze(cls, source_text: str, target_text: str, db=None, user_id=None, document_id=None) -> dict:
         source_text = source_text or ""
         target_text = target_text or ""
-        
+
         # Stage A & B
         diff_data = build_deterministic_diff(source_text, target_text)
-        
+
         # Determine signals
         signals = []
         for s in diff_data["semantic_signals"]:
             cat = s["category"].capitalize()
             signals.append(f"Changed {cat}")
-            
+
         if diff_data["structural_diffs"]:
             signals.append("Structural Change")
-            
+
         diff_data["signals_preview"] = signals
-        
-        # Stage C & D
+
+        # Stage C & D — execution routed through ProximaAIEngine (7E)
         try:
-            llm_result = await _run_llm_synthesis(diff_data)
+            llm_result = await _run_llm_synthesis(db, diff_data, user_id, document_id)
         except Exception as e:
             # Fallback
             llm_result = cls._fallback_response(diff_data, str(e))
