@@ -494,7 +494,10 @@ async def intelligence_compare(
     session = await create_analysis_session(db, current_user.user_id, "compare", source_doc.document_id, payload.template_origin)
         
     try:
-        analysis_result = await CompareAnalyzer.analyze(source_text, target_text)
+        analysis_result = await CompareAnalyzer.analyze(
+            source_text, target_text,
+            db=db, user_id=current_user.user_id, document_id=source_doc.document_id,
+        )
         await complete_analysis_session(db, session, status="completed", start_time=start_time)
         
         # We must also return source and target document objects alongside the analysis result
@@ -529,7 +532,9 @@ async def intelligence_code_review(
     try:
         result = await CodeAnalyzer.analyze(
             code=payload.snippet,
-            language_hint=payload.language
+            language_hint=payload.language,
+            db=db,
+            user_id=current_user.user_id,
         )
         await complete_analysis_session(db, session, status="completed", start_time=start_time, confidence=result.get("overall_score"))
         return result
@@ -553,7 +558,8 @@ async def intelligence_code_explain(
             db=db,
             snippet=payload.snippet,
             operation="explain",
-            language=payload.language
+            language=payload.language,
+            user_id=current_user.user_id,
         )
         await complete_analysis_session(db, session, status="completed", start_time=start_time)
         return result
@@ -577,7 +583,8 @@ async def intelligence_code_docs(
             db=db,
             snippet=payload.snippet,
             operation="docs",
-            language=payload.language
+            language=payload.language,
+            user_id=current_user.user_id,
         )
         await complete_analysis_session(db, session, status="completed", start_time=start_time)
         return result
@@ -601,7 +608,9 @@ async def intelligence_code_optimize(
         result = await CodeAnalyzer.analyze(
             code=payload.snippet,
             language_hint=payload.language,
-            operation="optimize"
+            operation="optimize",
+            db=db,
+            user_id=current_user.user_id,
         )
         await complete_analysis_session(db, session, status="completed", start_time=start_time, confidence=result.get("overall_score"))
         return result
@@ -625,7 +634,9 @@ async def intelligence_code_security(
         result = await CodeAnalyzer.analyze(
             code=payload.snippet,
             language_hint=payload.language,
-            operation="security"
+            operation="security",
+            db=db,
+            user_id=current_user.user_id,
         )
         await complete_analysis_session(db, session, status="completed", start_time=start_time, confidence=result.get("overall_score"))
         return result
@@ -697,9 +708,10 @@ async def intelligence_clinical(
     full_text = "\n\n".join([chunk.content for chunk in chunks])
     metadata = {
         "id": str(doc.document_id),
-        "title": doc.title
+        "title": doc.title,
+        "user_id": str(current_user.user_id),
     }
-    
+
     start_time = time.time()
     session = await create_analysis_session(db, current_user.user_id, "clinical", doc.document_id, payload.template_origin)
     
@@ -744,6 +756,7 @@ async def intelligence_legal(
         "document_id": str(doc.document_id),
         "filename": doc.title,
         "mime_type": getattr(doc, "mime_type", None),
+        "user_id": str(current_user.user_id),
     }
 
     start_time = time.time()

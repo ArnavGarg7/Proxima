@@ -3,7 +3,6 @@ import json
 from typing import Dict, Any, List
 from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
-from proxima.services.providers.google_provider import GoogleProvider
 
 # --- Pydantic Schemas for Stage C LLM Output ---
 
@@ -94,8 +93,8 @@ class ClinicalAnalyzer:
             }
         }
         
-        # Stage C: Controlled LLM Synthesis
-        return await cls._run_llm_clinical_synthesis(text, draft, metadata)
+        # Stage C: Controlled LLM Synthesis (routed through ProximaAIEngine, 7E)
+        return await cls._run_llm_clinical_synthesis(db, text, draft, metadata)
 
     @classmethod
     def _build_document_profile(cls, text: str) -> dict:
@@ -215,7 +214,7 @@ class ClinicalAnalyzer:
         return flags
 
     @classmethod
-    async def _run_llm_clinical_synthesis(cls, text: str, draft: dict, metadata: dict) -> dict:
+    async def _run_llm_clinical_synthesis(cls, db, text: str, draft: dict, metadata: dict) -> dict:
         excerpt = text[:4000]  # Truncate for prompt safety
         
         system_prompt = """You are the Proxima Clinical Analyzer backend service.
@@ -259,28 +258,23 @@ Deterministic Draft Findings:
 
 Generate the structured ClinicalResponseSchema JSON."""
 
-        import os
-        import asyncio
-        import google.generativeai as genai
-        
-        # Use Groq (Gemini free-tier quota is exhausted)
-        from openai import AsyncOpenAI as _AsyncOpenAI
-        _client = _AsyncOpenAI(
-            api_key=os.getenv("GROQ_API_KEY"),
-            base_url="https://api.groq.com/openai/v1"
+        from proxima.services.execution.engine import ProximaAIEngine, AIExecutionRequest
+
+        request = AIExecutionRequest(
+            task_class="clinical_analysis",
+            domain="clinical",
+            system_prompt=system_prompt,
+            user_message=user_prompt,
+            structured_output_schema=ClinicalResponseSchema,
+            user_id=(metadata or {}).get("user_id"),
+            document_id=(metadata or {}).get("id"),
         )
-        chat_completion = await _client.chat.completions.create(
-            messages=[
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": user_prompt}
-            ],
-            model="llama-3.3-70b-versatile",
-            response_format={"type": "json_object"},
-            temperature=0.0
-        )
-        response_text = chat_completion.choices[0].message.content
-        response = json.loads(response_text)
-        
+        result = await ProximaAIEngine.execute(db, request, stream=False)
+        if result.error or result.validated_data is None:
+            return cls._build_clinical_fallback(draft, metadata)
+
+        response = result.validated_data.model_dump()
+
         # Inject standard metadata fields
         response["document_id"] = metadata.get("id", "unknown") if metadata else "unknown"
         response["document_title"] = metadata.get("title", "Clinical Note") if metadata else "Clinical Note"
@@ -302,5 +296,46 @@ Generate the structured ClinicalResponseSchema JSON."""
              
         if not response.get("detected_signals"):
             response["detected_signals"] = signals
-            
+
         return response
+
+    @classmethod
+    def _build_clinical_fallback(cls, draft: dict, metadata: dict) -> dict:
+        """Deterministic fallback shaped like ClinicalResponseSchema.
+
+        Uses ONLY the deterministic draft/signals — it never fabricates clinical
+        conclusions (diagnoses, plans, findings stay empty / "Not generated").
+        """
+        profile = draft["document_profile"]
+        css = draft["clinical_signal_summary"]
+        signals = []
+        if css["has_assessment_section"]:
+            signals.append({"label": "Assessment detected", "description": "A structured assessment section was found.", "strength": "high"})
+        if css["has_plan_section"]:
+            signals.append({"label": "Plan detected", "description": "A structured plan or follow-up section was found.", "strength": "high"})
+        if css["has_medication_mentions"]:
+            signals.append({"label": "Medication mentions", "description": "Medication-like entities were identified.", "strength": "medium"})
+        if not css["is_likely_clinical"]:
+            signals.append({"label": "Weak clinical structure", "description": "Did not match standard clinical note formatting.", "strength": "low"})
+        return {
+            "document_domain_hint": {
+                "is_clinical_like": bool(css["is_likely_clinical"]),
+                "confidence": "low",
+                "reason": "AI synthesis unavailable; deterministic signals only.",
+            },
+            "summary": "AI synthesis was unavailable. Deterministic extraction has been returned; no clinical conclusions were generated.",
+            "confidence": {"overall": 0, "label": "low"},
+            "clinical_snapshot": {"chief_complaint_short": "Not generated", "top_assessment": "Not generated", "top_plan_item": "Not generated"},
+            "document_profile": profile,
+            "clinical_summary": {
+                "chief_complaint": "Not clearly stated in the note",
+                "presenting_summary": "",
+                "key_findings": [], "diagnoses_or_assessment": [],
+                "medications_or_therapies": [], "tests_or_imaging": [], "plan_items": [],
+            },
+            "risk_flags": draft.get("risk_flags_seed", []),
+            "detected_signals": signals,
+            "section_evidence": [],
+            "document_id": (metadata or {}).get("id", "unknown"),
+            "document_title": (metadata or {}).get("title", "Clinical Note"),
+        }
