@@ -750,9 +750,8 @@ Output ONLY valid JSON matching this exact schema — no extra fields, no markdo
 """
 
 
-async def _run_llm_synthesis(text: str, draft: dict, metadata: dict) -> dict:
-    import os
-    from openai import AsyncOpenAI
+async def _run_llm_synthesis(db, text: str, draft: dict, metadata: dict) -> dict:
+    from proxima.services.execution.engine import ProximaAIEngine, AIExecutionRequest
 
     excerpt = text[:5000]
     user_prompt = f"""Document Metadata: {json.dumps(metadata or {})}
@@ -766,24 +765,20 @@ Deterministic Draft:
 
 Generate the structured LegalResponseSchema JSON now. Remember: conservative, evidence-backed, no hallucinated clauses."""
 
-    client = AsyncOpenAI(
-        api_key=os.getenv("GROQ_API_KEY"),
-        base_url="https://api.groq.com/openai/v1"
+    request = AIExecutionRequest(
+        task_class="legal_analysis",
+        domain="legal",
+        system_prompt=SYSTEM_PROMPT,
+        user_message=user_prompt,
+        structured_output_schema=LegalResponseSchema,
+        user_id=(metadata or {}).get("user_id"),
+        document_id=(metadata or {}).get("document_id"),
     )
-    response = await client.chat.completions.create(
-        messages=[
-            {"role": "system", "content": SYSTEM_PROMPT},
-            {"role": "user", "content": user_prompt},
-        ],
-        model="llama-3.3-70b-versatile",
-        response_format={"type": "json_object"},
-        temperature=0.0,
-    )
-    raw = response.choices[0].message.content
-    result = json.loads(raw)
+    result = await ProximaAIEngine.execute(db, request, stream=False)
+    if result.error or result.validated_data is None:
+        raise RuntimeError(str(result.error) if result.error else "empty LLM result")
     # Post-process: normalize string-array fields in case LLM returned objects
-    result = _normalize_llm_result(result)
-    return result
+    return _normalize_llm_result(result.validated_data.model_dump())
 
 
 def _coerce_to_str(item) -> str:
@@ -839,11 +834,11 @@ class ContractAnalyzer:
             entities, clause_signals, obligations, risk_flags
         )
 
-        # Stage C
+        # Stage C — execution now routed through ProximaAIEngine (7E)
         try:
-            llm_result = await _run_llm_synthesis(text, draft, meta)
+            llm_result = await _run_llm_synthesis(db, text, draft, meta)
         except Exception as e:
-            # Graceful fallback if LLM fails
+            # Graceful fallback if the engine (all candidates) fails
             llm_result = _build_fallback_response(draft, meta, str(e))
 
         # Inject guaranteed fields

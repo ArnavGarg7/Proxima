@@ -32,6 +32,22 @@ class ChunkingService:
         if not text:
             return []
 
+        chunks = self.chunk_text_with_metadata(text)
+        return [c["content"] for c in chunks]
+
+    def chunk_text_with_metadata(self, text: str) -> List[dict]:
+        """
+        Splits a single body of text into multiple chunks, tracking page numbers.
+        
+        Args:
+            text (str): The raw extracted text from a document.
+            
+        Returns:
+            List[dict]: A list of dictionaries containing 'content' and 'page_number'.
+        """
+        if not text:
+            return []
+
         chunks = []
         start = 0
         text_length = len(text)
@@ -52,11 +68,24 @@ class ChunkingService:
                 if break_point != -1:
                     end = break_point + 1 # Include the space/newline
             
-            chunks.append(text[start:end].strip())
+            chunk_content = text[start:end]
+            
+            # Page number is count of \f characters up to the start of this chunk + 1
+            page_number = text.count('\f', 0, start) + 1
+            
+            # Clean content by removing \f page breaks
+            clean_content = chunk_content.replace('\f', '\n').strip()
+            
+            if clean_content:
+                chunks.append({
+                    "content": clean_content,
+                    "page_number": page_number
+                })
+                
             start = end - self.chunk_overlap
 
             # Prevent infinite loops if overlap is bigger than chunk advance
             if start <= 0 or start >= end:
                 start = end
 
-        return [c for c in chunks if c]
+        return chunks

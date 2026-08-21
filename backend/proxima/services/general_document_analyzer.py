@@ -1,10 +1,12 @@
-import json
 import re
 import math
-import time
 from langdetect import detect
-from proxima.services.model_registry import model_registry
+import structlog
 from proxima.schemas.general_analysis import GeneralAnalysisResult
+from proxima.services.execution.engine import ProximaAIEngine, AIExecutionRequest
+from proxima.services.execution.errors import SchemaValidationError
+
+logger = structlog.get_logger()
 
 class GeneralDocumentAnalyzer:
     @staticmethod
@@ -53,102 +55,38 @@ DOCUMENT TEXT:
 {full_text}
 """
         
-        model = await model_registry.get_default_generation(db)
+        request = AIExecutionRequest(
+            task_class="general_analysis",
+            domain=None,
+            system_prompt=system_prompt,
+            user_message=prompt,
+            structured_output_schema=GeneralAnalysisResult,
+            user_id=metadata.get("user_id"),
+            document_id=metadata.get("document_id")
+        )
         
-        system_prompt_with_schema = system_prompt + f"\n\nJSON SCHEMA TO MATCH:\n{json.dumps(GeneralAnalysisResult.model_json_schema(), indent=2)}\n\nIMPORTANT: Return ONLY valid JSON, without any markdown formatting like ```json"
+        result = await ProximaAIEngine.execute(db, request, stream=False)
         
-        import structlog
-        logger = structlog.get_logger()
-        
-        start_time = time.time()
-        response_json = ""
-        parse_success = False
-        
-        try:
-            response_json = await model_registry.complete(
-                model=model,
-                system_prompt=system_prompt_with_schema,
-                user_message=prompt,
-                temperature=0.1,
-                max_tokens=8192,
-                response_format="json"
-            )
-            
-            latency_ms = int((time.time() - start_time) * 1000)
-            
-            # Robust JSON cleanup
-            cleaned_json = response_json.strip()
-            if cleaned_json.startswith("```json"):
-                cleaned_json = cleaned_json[7:]
-            if cleaned_json.startswith("```"):
-                cleaned_json = cleaned_json[3:]
-            if cleaned_json.endswith("```"):
-                cleaned_json = cleaned_json[:-3]
-            cleaned_json = cleaned_json.strip()
-            
-            result_dict = json.loads(cleaned_json)
-            parse_success = True
-            
-            # Strict Schema Validation - this will raise ValueError/ValidationError if missing required keys
-            # By passing through Pydantic model, it strips unknown keys and ensures types.
-            validated_model = GeneralAnalysisResult(**result_dict)
-            result_dict = validated_model.model_dump()
-            
-            result_dict["metadata"] = {
-                "reading_time_minutes": reading_time,
-                "word_count": word_count,
-                "language": language
-            }
-            
-            # Combine signals
-            existing_signals = result_dict.get("signals", [])
-            result_dict["signals"] = list(set(existing_signals + signals))
-            
-            logger.info(
-                "GeneralDocumentAnalyzer LLM success",
-                provider=model.provider,
-                model=model.model_id,
-                latency_ms=latency_ms,
-                raw_response_length=len(response_json),
-                parse_success=parse_success
-            )
-            
-            return result_dict
-            
-        except Exception as e:
-            latency_ms = int((time.time() - start_time) * 1000)
-            
-            # Identify specific exception details
-            exception_type = type(e).__name__
-            exception_message = str(e)
-            
-            http_status_code = getattr(e, "status_code", None)
-            
-            if not parse_success and response_json:
+        if result.error:
+            fallback_reason = "Unknown Pipeline Error"
+            if isinstance(result.error, SchemaValidationError):
                 fallback_reason = "JSON Parsing or Schema Validation Failed"
-            elif not response_json:
+            elif type(result.error).__name__.startswith("Provider"):
                 fallback_reason = "Provider/Network Error"
-            else:
-                fallback_reason = "Unknown Pipeline Error"
                 
             logger.error(
                 "GeneralDocumentAnalyzer LLM fallback triggered",
-                provider=model.provider,
-                model=model.model_id,
-                latency_ms=latency_ms,
-                http_status_code=http_status_code,
-                raw_response_length=len(response_json),
-                raw_response_preview=response_json[:500] if response_json else None,
-                parse_success=parse_success,
-                exception_type=exception_type,
-                exception_message=exception_message,
+                provider=result.provider,
+                model=result.model_id,
+                latency_ms=result.latency_ms,
+                exception_type=type(result.error).__name__,
+                exception_message=str(result.error),
                 fallback_reason=fallback_reason
             )
             
             with open("/app/debug_exception.log", "w") as f:
-                f.write(f"Exception: {exception_type}: {exception_message}\n")
+                f.write(f"Exception: {type(result.error).__name__}: {str(result.error)}\n")
                 f.write(f"Fallback Reason: {fallback_reason}\n")
-                f.write(f"Raw Response: {response_json}\n")
             
             # Deterministic, production-grade fallback (does not leak python errors)
             return {
@@ -168,3 +106,24 @@ DOCUMENT TEXT:
                 "confidence": 0,
                 "signals": signals + ["Fallback Mode"]
             }
+            
+        result_dict = result.validated_data.model_dump()
+        
+        result_dict["metadata"] = {
+            "reading_time_minutes": reading_time,
+            "word_count": word_count,
+            "language": language
+        }
+        
+        # Combine signals
+        existing_signals = result_dict.get("signals", [])
+        result_dict["signals"] = list(set(existing_signals + signals))
+        
+        logger.info(
+            "GeneralDocumentAnalyzer LLM success",
+            provider=result.provider,
+            model=result.model_id,
+            latency_ms=result.latency_ms
+        )
+        
+        return result_dict

@@ -1,3 +1,5 @@
+from typing import Any
+
 class AnthropicProvider:
     def __init__(self):
         pass
@@ -6,11 +8,11 @@ class AnthropicProvider:
         # Stage 2 Implementation
         raise NotImplementedError("Anthropic provider not implemented in Stage 1")
 
-    async def complete(self, model_id: str, system_prompt: str, user_message: str, temperature: float, max_tokens: int, response_format: str = "text") -> str:
+    async def complete(self, model_id: str, system_prompt: str, user_message: str, temperature: float, max_tokens: int, response_format: str = "text", structured_output_schema: Any = None) -> str:
         # Anthropic doesn't have a direct JSON mode toggle in the API yet like OpenAI does,
         # but the prompt engineering usually handles it.
         raise NotImplementedError("Anthropic provider simple complete not implemented in Stage 1")
 
-    async def get_embedding(self, model_id: str, text: str):
+    async def get_embedding(self, model_id: str, text: str, output_dimensionality: int | None = None):
         # Stage 2 Implementation
         raise NotImplementedError("Anthropic provider not implemented in Stage 1")

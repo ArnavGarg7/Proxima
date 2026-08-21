@@ -2,7 +2,6 @@ import re
 import json
 from typing import Dict, Any, List
 from sqlalchemy.ext.asyncio import AsyncSession
-from proxima.services.model_registry import model_registry
 
 class CodeSuiteService:
     """
@@ -132,7 +131,7 @@ class CodeSuiteService:
         return signals
 
     @staticmethod
-    async def analyze(db: AsyncSession, snippet: str, operation: str, language: str = None) -> dict:
+    async def analyze(db: AsyncSession, snippet: str, operation: str, language: str = None, user_id=None) -> dict:
         if not snippet or not snippet.strip():
             return CodeSuiteService._fallback_response("empty")
         
@@ -157,47 +156,7 @@ class CodeSuiteService:
             
         signals = CodeSuiteService.detect_review_signals(snippet, detected_lang)
         
-        # Stage B: AI Synthesis
-        model = await model_registry.get_default_generation(db)
-        
-        schema = {
-            "type": "OBJECT",
-            "properties": {
-                "operation": {"type": "STRING"},
-                "language_detected": {"type": "STRING"},
-                "summary": {"type": "STRING"},
-                "result_markdown": {"type": "STRING"},
-                "snippet_profile": {
-                    "type": "OBJECT",
-                    "properties": {
-                        "line_count": {"type": "INTEGER"},
-                        "function_count": {"type": "INTEGER"},
-                        "class_count": {"type": "INTEGER"},
-                        "import_count": {"type": "INTEGER"},
-                        "comment_lines": {"type": "INTEGER"}
-                    }
-                },
-                "review_actions": {
-                    "type": "ARRAY",
-                    "items": {
-                        "type": "OBJECT",
-                        "properties": {
-                            "title": {"type": "STRING"},
-                            "description": {"type": "STRING"},
-                            "severity": {"type": "STRING", "enum": ["critical", "high", "medium", "low"]},
-                            "category": {"type": "STRING", "enum": ["security", "performance", "maintainability", "reliability"]}
-                        }
-                    }
-                },
-                "diagnostics": {
-                    "type": "OBJECT",
-                    "properties": {
-                        "review_signals_detected": {"type": "INTEGER"}
-                    }
-                }
-            },
-            "required": ["operation", "language_detected", "summary", "result_markdown", "snippet_profile", "review_actions", "diagnostics"]
-        }
+        # Stage B: AI Synthesis (routed through ProximaAIEngine, 7E)
 
         # Setup language family specific prompt instructions
         family_instructions = ""
@@ -245,50 +204,28 @@ Incorporate these signals into your analysis where relevant.
 
         user_message = f"Snippet:\n```\n{snippet}\n```\n\nPerform the '{operation}' operation and return JSON."
 
-        # Make the LLM call using the model registry's structured generation
-        try:
-            if model.provider == 'google' and "gemini" in model.model_id.lower():
-                from google.generativeai import GenerativeModel
-                import google.generativeai as genai
-                
-                gm = GenerativeModel(model.model_id, system_instruction=system_prompt)
-                result = gm.generate_content(
-                    user_message,
-                    generation_config=genai.GenerationConfig(
-                        response_mime_type="application/json",
-                        response_schema=schema,
-                        temperature=0.2
-                    )
-                )
-                response_json = json.loads(result.text)
-            else:
-                import os
-                from groq import AsyncGroq
-                api_key = os.environ.get("GROQ_API_KEY")
-                client = AsyncGroq(api_key=api_key)
-                
-                # Append schema to system prompt for Groq
-                groq_system_prompt = system_prompt + f"\n\nYou MUST return a JSON object that strictly adheres to the following JSON schema:\n{json.dumps(schema, indent=2)}"
-                
-                response = await client.chat.completions.create(
-                    model=model.model_id,
-                    messages=[
-                        {"role": "system", "content": groq_system_prompt},
-                        {"role": "user", "content": user_message}
-                    ],
-                    response_format={"type": "json_object"},
-                    temperature=0.2
-                )
-                response_json = json.loads(response.choices[0].message.content)
-            
-            if "diagnostics" not in response_json:
-                response_json["diagnostics"] = {}
-            response_json["diagnostics"]["review_signals_detected"] = len(signals)
-            
-            return response_json
-            
-        except Exception as e:
-            return CodeSuiteService._fallback_response("error", detected_lang, features, str(e))
+        # Execution routed through ProximaAIEngine (7E) — engine owns provider
+        # selection, retry/fallback, validation and telemetry.
+        from proxima.services.execution.engine import ProximaAIEngine, AIExecutionRequest
+        from proxima.schemas.code_suite import LegacyCodeResult
+
+        request = AIExecutionRequest(
+            task_class="code_analysis",
+            system_prompt=system_prompt,
+            user_message=user_message,
+            structured_output_schema=LegacyCodeResult,
+            user_id=user_id,
+            document_id=None,
+        )
+        result = await ProximaAIEngine.execute(db, request, stream=False)
+        if result.error or result.validated_data is None:
+            return CodeSuiteService._fallback_response("error", detected_lang, features, str(result.error))
+
+        response_json = result.validated_data.model_dump()
+        if "diagnostics" not in response_json or response_json["diagnostics"] is None:
+            response_json["diagnostics"] = {}
+        response_json["diagnostics"]["review_signals_detected"] = len(signals)
+        return response_json
 
     @staticmethod
     def _fallback_response(reason: str, lang: str = "unknown", features: dict = None, error_msg: str = "") -> dict:

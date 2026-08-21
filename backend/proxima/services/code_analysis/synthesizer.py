@@ -1,7 +1,5 @@
-import os
 import json
 from typing import List, Dict, Any
-from groq import AsyncGroq
 from pydantic import BaseModel, Field
 
 # --- LLM Schemas ---
@@ -34,16 +32,14 @@ class CodeLLMSynthesis(BaseModel):
     performance_findings: List[IntelligenceCard] = Field(description="Performance cards")
     documentation_findings: List[IntelligenceCard] = Field(description="Documentation cards")
 
-async def run_llm_synthesis(code: str, language: str, metrics: dict, security: list, maintainability: list, operation: str = "review") -> Dict[str, Any]:
+async def run_llm_synthesis(db, code: str, language: str, metrics: dict, security: list, maintainability: list, operation: str = "review", user_id=None) -> Dict[str, Any]:
     """
-    Synthesizes the deterministic findings using LLM.
-    Implements Graceful LLM Failure if Groq fails.
+    Synthesizes the deterministic findings using the LLM (routed through
+    ProximaAIEngine, 7E). Implements graceful failure to a deterministic fallback.
     """
-    api_key = os.environ.get("GROQ_API_KEY")
-    
     try:
-        client = AsyncGroq(api_key=api_key)
-        
+        from proxima.services.execution.engine import ProximaAIEngine, AIExecutionRequest
+
         operation_instructions = ""
         if operation == "optimize":
             operation_instructions = "FOCUS HEAVILY on PERFORMANCE. Identify time/space complexity improvements, inefficient loops, redundant allocations, and algorithmic bottlenecks. Populate performance_findings heavily."
@@ -65,22 +61,21 @@ Metrics: {json.dumps(metrics)}
 Pre-computed Security Risks: {json.dumps(security)}
 Pre-computed Maintainability Risks: {json.dumps(maintainability)}
 """
-        response = await client.chat.completions.create(
-            model="llama-3.3-70b-versatile",
-            messages=[
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": f"Code to review:\n```\n{code}\n```"}
-            ],
-            response_format={"type": "json_object"},
-            temperature=0.1
+        request = AIExecutionRequest(
+            task_class="code_analysis",
+            system_prompt=system_prompt,
+            user_message=f"Code to review:\n```\n{code}\n```",
+            structured_output_schema=CodeLLMSynthesis,
+            user_id=user_id,
+            document_id=None,
         )
-        
-        result_text = response.choices[0].message.content
-        return json.loads(result_text)
-        
-    except Exception as e:
-        print(f"LLM Synthesis failed: {e}")
-        # Graceful Failure
+        result = await ProximaAIEngine.execute(db, request, stream=False)
+        if result.error or result.validated_data is None:
+            raise RuntimeError(str(result.error) if result.error else "empty LLM result")
+        return result.validated_data.model_dump()
+
+    except Exception:
+        # Graceful Failure — deterministic fallback (unchanged shape)
         return {
             "executive_summary": "Deterministic review completed. Executive summary could not be generated because the AI synthesis step was unavailable. All metrics, security findings, maintainability issues, and evidence below remain valid.",
             "overall_score": 0,

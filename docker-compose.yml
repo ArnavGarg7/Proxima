@@ -7,8 +7,6 @@ services:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: password
       POSTGRES_DB: proxima
-    ports:
-      - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     restart: unless-stopped
@@ -60,7 +58,23 @@ services:
       - db
       - redis
       - backend
-    command: celery -A proxima.celery_app worker --loglevel=info
+    # Root-cause fix for the prior exit-137 (OOM): the worker previously ran at
+    # Celery's default prefork concurrency (= CPU count, 12 here), so 12 full-app
+    # child processes exhausted memory. Bound concurrency and recycle children on
+    # task/memory thresholds so a leak or a heavy document can't OOM the host.
+    #   --concurrency=2            : 2 prefork children (tasks are I/O-bound on provider calls)
+    #   --max-tasks-per-child=100  : recycle a child after 100 tasks (bounds slow growth)
+    #   --max-memory-per-child KB  : recycle a child once its RSS exceeds ~350MB
+    command: >
+      celery -A proxima.celery_app worker --loglevel=info
+      --concurrency=2 --max-tasks-per-child=100 --max-memory-per-child=350000
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "celery -A proxima.celery_app inspect ping -t 10 | grep -q pong"]
+      interval: 30s
+      timeout: 15s
+      retries: 3
+      start_period: 40s
 
   frontend:
     build:

@@ -1,6 +1,6 @@
 from proxima.database import Base
 from proxima.models.core import User, Session, Project, Document, DocumentVersion, DocumentChunk, Template, Export, BackgroundJob
-from proxima.models.ai import RegisteredModel, ModelRoutingRule, PromptVersion, OutputSchema, DomainKnowledgeChunk, AIRequest, SegmentConfidenceScore, AuditReport, Comparison, ContractAnalysis, ClinicalNote
+from proxima.models.ai import RegisteredModel, ModelRoutingRule, PromptVersion, OutputSchema, DomainKnowledgeChunk, AIRequest, SegmentConfidenceScore, AuditReport, Comparison, ContractAnalysis, ClinicalNote, ResponseGrounding
 from proxima.models.admin import AdminAuditLog, AdminSession
 from proxima.models.session import AnalysisSession
 
@@ -8,6 +8,6 @@ from proxima.models.session import AnalysisSession
 __all__ = [
     "Base",
     "User", "Session", "Project", "Document", "DocumentVersion", "DocumentChunk", "Template", "Export", "BackgroundJob",
-    "RegisteredModel", "ModelRoutingRule", "PromptVersion", "OutputSchema", "DomainKnowledgeChunk", "AIRequest", "SegmentConfidenceScore", "AuditReport", "Comparison", "ContractAnalysis", "ClinicalNote",
+    "RegisteredModel", "ModelRoutingRule", "PromptVersion", "OutputSchema", "DomainKnowledgeChunk", "AIRequest", "SegmentConfidenceScore", "AuditReport", "Comparison", "ContractAnalysis", "ClinicalNote", "ResponseGrounding",
     "AdminAuditLog", "AdminSession", "AnalysisSession"
 ]

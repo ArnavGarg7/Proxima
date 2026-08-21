@@ -19,6 +19,15 @@ import { useDocumentTitle } from '@/hooks/useDocumentTitle';
 
 const WORKBENCHES = [
   {
+    id:          'ask',
+    icon:        'forum',
+    iconClass:   'text-gold-primary',
+    accentClass: 'group-hover:bg-gold-primary/8',
+    title:       'Ask',
+    description: 'Ask grounded questions about this document and get cited answers.',
+    route:       '/ask',
+  },
+  {
     id:          'analyze',
     icon:        'hub',
     iconClass:   'text-gold-primary',

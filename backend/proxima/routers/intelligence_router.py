@@ -1,12 +1,14 @@
 from pydantic import BaseModel
 import asyncio
-from typing import Optional
+from typing import Optional, List
 from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from proxima.database import get_db
-from proxima.models.core import User, Document, DocumentChunk
+from proxima.models.core import User, Document, DocumentChunk, BackgroundJob
+from proxima.models.ai import RegisteredModel
+from proxima.services.execution.auditor import AIAuditor
 from proxima.middleware.auth_middleware import get_current_user
 import uuid
 import json
@@ -25,6 +27,7 @@ from proxima.services.qhe import QualityHeuristicEngine
 from proxima.services.compare_analyzer import CompareAnalyzer
 from proxima.services.code_suite_service import CodeSuiteService
 from proxima.services.general_document_analyzer import GeneralDocumentAnalyzer
+from proxima.services.execution.engine import ProximaAIEngine, AIExecutionRequest
 
 router = APIRouter(prefix="/api/intelligence", tags=["intelligence"])
 
@@ -42,7 +45,12 @@ class AnalyzeDocumentRequest(BaseModel):
     template_origin: Optional[str] = None
 
 class IntelligenceCompletionRequest(BaseModel):
-    document_id: str
+    # Backward compatible: a single document_id keeps the exact previous behavior.
+    document_id: Optional[str] = None
+    # Stage 7D — library-scoped cross-document intelligence (all optional):
+    document_ids: Optional[List[str]] = None
+    project_id: Optional[str] = None
+    scope: Optional[str] = None  # "document" | "project" | "library"
     user_task: str
     max_tokens: int = 1000
     temperature: float = 0.7
@@ -82,6 +90,86 @@ async def complete_analysis_session(db: AsyncSession, session: AnalysisSession, 
     session.last_opened = datetime.now(timezone.utc)
     await db.commit()
 
+def _sse_error_response(detail: str) -> StreamingResponse:
+    async def gen():
+        yield f"data: {json.dumps({'type': 'error', 'detail': detail})}\n\n"
+        yield "data: [DONE]\n\n"
+    return StreamingResponse(gen(), media_type="text/event-stream")
+
+
+async def _resolve_intelligence_scope(db: AsyncSession, user: User, payload: "IntelligenceCompletionRequest"):
+    """
+    Resolve the authorized retrieval scope server-side (Stage 7D).
+
+    Returns (mode, doc_ids, single_doc): mode is "single" (backward-compatible
+    single document) or "multi". Ownership is ALWAYS enforced from user.user_id;
+    client-supplied ids/project only narrow the owned set.
+    """
+    def _uuid(val: str):
+        try:
+            return uuid.UUID(val)
+        except ValueError:
+            raise HTTPException(status_code=400, detail="Invalid ID format")
+
+    # Whole-library scope
+    if (payload.scope or "").lower() == "library":
+        res = await db.execute(
+            select(Document).where(Document.user_id == user.user_id, Document.status == "processed")
+        )
+        return "multi", [d.document_id for d in res.scalars().all()], None
+
+    # Project/library scope via existing documents.project_id
+    if payload.project_id:
+        pid = _uuid(payload.project_id)
+        res = await db.execute(
+            select(Document).where(
+                Document.user_id == user.user_id,
+                Document.project_id == pid,
+                Document.status == "processed",
+            )
+        )
+        return "multi", [d.document_id for d in res.scalars().all()], None
+
+    # Explicit multi-document scope
+    if payload.document_ids:
+        ids = [_uuid(x) for x in payload.document_ids]
+        res = await db.execute(
+            select(Document).where(
+                Document.user_id == user.user_id,
+                Document.document_id.in_(ids),
+                Document.status == "processed",
+            )
+        )
+        return "multi", [d.document_id for d in res.scalars().all()], None
+
+    # Backward-compatible single document
+    if payload.document_id:
+        did = _uuid(payload.document_id)
+        doc = await db.get(Document, did)
+        if not doc or doc.user_id != user.user_id:
+            raise HTTPException(status_code=403, detail="Not authorized to access this document")
+        return "single", [doc.document_id], doc
+
+    raise HTTPException(status_code=400, detail="A document_id, document_ids, project_id, or scope is required")
+
+
+async def _persist_stream_telemetry(
+    db, user_id, document_id, model_id, task_class,
+    prompt, response, grounding_result, citations, latency_ms, success,
+):
+    """One AIRequest (token/cost) + one ResponseGrounding per stream. No content stored."""
+    model = await db.get(RegisteredModel, model_id) if model_id else None
+    request_id = None
+    if model is not None:
+        request_id = await AIAuditor.log_request(
+            db, user_id, document_id, model, task_class, prompt, response
+        )
+    await AIAuditor.log_grounding(
+        db, user_id, request_id, document_id, model_id, task_class,
+        grounding_result or {}, citations or [], latency_ms, success,
+    )
+
+
 @router.post("/complete")
 async def intelligence_complete(
     request: Request,
@@ -89,61 +177,48 @@ async def intelligence_complete(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db)
 ):
-    # 0. Tenant Authorization Check
-    doc = await db.get(Document, uuid.UUID(payload.document_id))
-    if not doc or doc.user_id != current_user.user_id:
-        raise HTTPException(status_code=403, detail="Not authorized to access this document")
-        
-    # Check explicitly for processing failures
-    if doc.status == "no_extractable_text":
-        async def empty_stream_no_text():
-            import json
-            yield f"data: {json.dumps({'type': 'error', 'detail': 'Extraction failed: Document contains no extractable text. Scanned PDFs or empty files are not supported.'})}\n\n"
-            yield "data: [DONE]\n\n"
-        return StreamingResponse(empty_stream_no_text(), media_type="text/event-stream")
-    elif doc.status == "failed":
-        async def empty_stream_failed():
-            import json
-            yield f"data: {json.dumps({'type': 'error', 'detail': 'Extraction failed due to an unsupported format or corrupted file.'})}\n\n"
-            yield "data: [DONE]\n\n"
-        return StreamingResponse(empty_stream_failed(), media_type="text/event-stream")
-    elif doc.status == "processing":
-        async def empty_stream_processing():
-            import json
-            yield f"data: {json.dumps({'type': 'error', 'detail': 'Document is still processing. Please wait a moment and try again.'})}\n\n"
-            yield "data: [DONE]\n\n"
-        return StreamingResponse(empty_stream_processing(), media_type="text/event-stream")
+    import logging
+    logger = logging.getLogger("proxima.intelligence")
+
+    # 0. Resolve authorized scope server-side (tenant isolation enforced here).
+    mode, doc_ids, single_doc = await _resolve_intelligence_scope(db, current_user, payload)
+
+    if mode == "single":
+        doc = single_doc
+        if doc.status == "no_extractable_text":
+            return _sse_error_response("Extraction failed: Document contains no extractable text. Scanned PDFs or empty files are not supported.")
+        elif doc.status == "failed":
+            return _sse_error_response("Extraction failed due to an unsupported format or corrupted file.")
+        elif doc.status == "processing":
+            return _sse_error_response("Document is still processing. Please wait a moment and try again.")
+        primary_document_id = doc.document_id
+        search_kwargs = dict(document_ids=[doc.document_id], limit=5)
+    else:
+        if not doc_ids:
+            return _sse_error_response("No processed documents found in the requested scope.")
+        primary_document_id = None
+        # Bounded candidate pool + per-document cap so no single document dominates.
+        search_kwargs = dict(document_ids=doc_ids, limit=8, per_document_cap=3, candidate_pool=50)
 
     # Clean up user task if it's just the default UI hydration string
     actual_task = payload.user_task
     if actual_task.startswith("[File Uploaded:") or actual_task.startswith("[Hydrated Document:"):
         actual_task = "Analyze this document completely and provide a comprehensive summary."
 
-    # 1. Retrieval
-    import logging
-    logger = logging.getLogger("proxima.intelligence")
-    logger.info(f"Workspace Analysis: Scoping to active document {doc.title} ({doc.document_id})")
+    from proxima.services.retrieval_hybrid import HybridRetrievalService
+    from proxima.services.grounding import GroundingService
 
-    fts = FTSRetrievalService(db)
-    results = await fts.search(actual_task, document_id=str(payload.document_id), limit=5)
-    
+    retrieval = HybridRetrievalService(db)
+    results = await retrieval.search(actual_task, user_id=current_user.user_id, **search_kwargs)
+
     if not results:
-        from sqlalchemy import text
-        fallback_query = text("SELECT chunk_id, document_id, chunk_index, content, 1.0 as rank FROM document_chunks WHERE document_id = :doc_id ORDER BY chunk_index LIMIT 5")
-        fallback_result = await db.execute(fallback_query, {"doc_id": str(payload.document_id)})
-        rows = fallback_result.fetchall()
-        if not rows:
-             async def empty_stream():
-                 import json
-                 yield f"data: {json.dumps({'type': 'error', 'detail': 'Document has no extractable text or chunks.'})}\n\n"
-                 yield "data: [DONE]\n\n"
-             return StreamingResponse(empty_stream(), media_type="text/event-stream")
-        results = [{"chunk_id": str(r.chunk_id), "document_id": str(r.document_id), "chunk_index": r.chunk_index, "content": r.content, "rank": float(r.rank)} for r in rows]
+        return _sse_error_response("No relevant content was found in the selected documents.")
 
-    logger.info(f"Retrieved {len(results)} chunks scoped exclusively to document {payload.document_id}")
+    logger.info(f"Retrieved {len(results)} chunks across {len(doc_ids)} document(s) [mode={mode}]")
 
-    # 2. Context Builder
-    context_package = fts.build_context_package(results)
+    # 2. Context Builder & Authoritative Registry (cross-document provenance)
+    grounding_svc = GroundingService()
+    context_package, registry = grounding_svc.build_context_package(results)
 
     # 3. Domain Detection
     detector = DomainDetectorService()
@@ -151,45 +226,74 @@ async def intelligence_complete(
     top_domain = max(scores, key=scores.get)
 
     # 4. Prompt Assembler
-    registry = PromptRegistryService(db)
-    assembler = PromptAssemblerService(registry)
+    registry_svc = PromptRegistryService(db)
+    assembler = PromptAssemblerService(registry_svc)
     final_prompt = await assembler.assemble_prompt(f"system_{top_domain}", context_package, actual_task)
 
-    # 5. Model Registry
-    model = await model_registry.get_default_generation(db)
-    
+    # 5. AI Execution Request
+    engine_request = AIExecutionRequest(
+        task_class="general_chat",
+        domain=top_domain,
+        system_prompt=final_prompt,
+        user_message=actual_task,
+        user_id=current_user.user_id,
+        document_id=primary_document_id,
+        temperature=payload.temperature,
+        max_tokens=payload.max_tokens
+    )
+
     # 6. Gemini Provider & SSE Stream
     qhe = QualityHeuristicEngine()
 
     async def stream_generator():
         ai_response_accumulator = ""
+        model_id_used = None
+        grounding_result = None
+        citations = []
+        success = False
+        audited = False
+        start_ts = time.time()
         try:
-            async for chunk in model_registry.stream_completion(
-                model=model,
-                system_prompt=final_prompt,
-                user_message=actual_task,
-                temperature=payload.temperature,
-                max_tokens=payload.max_tokens
-            ):
+            execution_result = await ProximaAIEngine.execute(db, engine_request, stream=True)
+            model_id_used = execution_result.model_id
+            async for chunk in execution_result.content_stream:
                 if await request.is_disconnected():
                     break
-                    
+
                 ai_response_accumulator += chunk
                 yield f"data: {json.dumps({'type': 'chunk', 'content': chunk})}\n\n"
-            
-            # 7. QHE Execution after completion
+
+            # 7. QHE & Grounding execution after completion
             if ai_response_accumulator:
                 eval_result = qhe.evaluate_response(final_prompt, ai_response_accumulator, top_domain)
                 yield f"data: {json.dumps({'type': 'qhe', 'eval': eval_result})}\n\n"
-                
+
+                # Grounding & Citations (authoritative registry; LLM is never the authority)
+                cleaned_text, citations, invalid_refs = grounding_svc.process_citations(ai_response_accumulator, registry)
+                grounding_result = grounding_svc.evaluate_grounding(cleaned_text, registry, citations, invalid_refs)
+                yield f"data: {json.dumps({'type': 'grounding', 'eval': grounding_result, 'citations': citations, 'text': cleaned_text})}\n\n"
+
+            success = True
             yield "data: [DONE]\n\n"
-            
+
         except HTTPException as he:
             yield f"data: {json.dumps({'type': 'error', 'detail': he.detail})}\n\n"
         except asyncio.TimeoutError:
             yield f"data: {json.dumps({'type': 'error', 'detail': 'Provider timeout.'})}\n\n"
         except Exception as e:
             yield f"data: {json.dumps({'type': 'error', 'detail': str(e)})}\n\n"
+        finally:
+            # WS-3: exactly one telemetry record per stream. Never break the stream.
+            if not audited:
+                audited = True
+                try:
+                    await _persist_stream_telemetry(
+                        db, current_user.user_id, primary_document_id, model_id_used,
+                        engine_request.task_class, final_prompt, ai_response_accumulator,
+                        grounding_result, citations, int((time.time() - start_ts) * 1000), success,
+                    )
+                except Exception as tel_err:
+                    logger.error(f"stream telemetry persistence failed: {tel_err}")
 
     return StreamingResponse(stream_generator(), media_type="text/event-stream")
 
@@ -223,7 +327,9 @@ async def intelligence_analyze(
     full_text = "\n\n".join([chunk.content for chunk in chunks])
     
     metadata = {
-        "title": doc.title
+        "title": doc.title,
+        "document_id": doc.document_id,
+        "user_id": current_user.user_id
     }
     
     start_time = time.time()
@@ -236,6 +342,54 @@ async def intelligence_analyze(
     except Exception as e:
         await complete_analysis_session(db, session, status="failed", start_time=start_time)
         raise e
+
+@router.post("/analyze/async")
+async def intelligence_analyze_async(
+    payload: AnalyzeDocumentRequest,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Durable general analysis (Stage 7D). Creates a BackgroundJob and dispatches a
+    Celery task (map-reduce for large documents); results are surfaced via the
+    existing jobs API (GET /api/jobs/{job_id}). The synchronous /analyze endpoint
+    is unchanged for backward compatibility.
+    """
+    try:
+        doc_uuid = uuid.UUID(payload.document_id)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid document ID format")
+
+    doc = await db.get(Document, doc_uuid)
+    if not doc or doc.user_id != current_user.user_id:
+        raise HTTPException(status_code=403, detail="Not authorized to access this document")
+    if doc.status == "processing":
+        raise HTTPException(status_code=422, detail="Document is still processing")
+    elif doc.status == "failed":
+        raise HTTPException(status_code=422, detail="Document parsing failed")
+    elif doc.status == "no_extractable_text":
+        raise HTTPException(status_code=422, detail="Document contains no extractable text")
+
+    job = BackgroundJob(
+        job_id=uuid.uuid4(),
+        user_id=current_user.user_id,
+        job_type="analysis",
+        status="pending",
+    )
+    db.add(job)
+    await db.commit()
+    await db.refresh(job)
+
+    from proxima.tasks import run_document_analysis
+    run_document_analysis.delay(str(job.job_id), str(doc.document_id))
+
+    return {
+        "job_id": str(job.job_id),
+        "document_id": str(doc.document_id),
+        "analyzer": "general",
+        "status": "pending",
+    }
+
 
 @router.post("/scan")
 async def intelligence_scan():
@@ -340,7 +494,10 @@ async def intelligence_compare(
     session = await create_analysis_session(db, current_user.user_id, "compare", source_doc.document_id, payload.template_origin)
         
     try:
-        analysis_result = await CompareAnalyzer.analyze(source_text, target_text)
+        analysis_result = await CompareAnalyzer.analyze(
+            source_text, target_text,
+            db=db, user_id=current_user.user_id, document_id=source_doc.document_id,
+        )
         await complete_analysis_session(db, session, status="completed", start_time=start_time)
         
         # We must also return source and target document objects alongside the analysis result
@@ -375,7 +532,9 @@ async def intelligence_code_review(
     try:
         result = await CodeAnalyzer.analyze(
             code=payload.snippet,
-            language_hint=payload.language
+            language_hint=payload.language,
+            db=db,
+            user_id=current_user.user_id,
         )
         await complete_analysis_session(db, session, status="completed", start_time=start_time, confidence=result.get("overall_score"))
         return result
@@ -399,7 +558,8 @@ async def intelligence_code_explain(
             db=db,
             snippet=payload.snippet,
             operation="explain",
-            language=payload.language
+            language=payload.language,
+            user_id=current_user.user_id,
         )
         await complete_analysis_session(db, session, status="completed", start_time=start_time)
         return result
@@ -423,7 +583,8 @@ async def intelligence_code_docs(
             db=db,
             snippet=payload.snippet,
             operation="docs",
-            language=payload.language
+            language=payload.language,
+            user_id=current_user.user_id,
         )
         await complete_analysis_session(db, session, status="completed", start_time=start_time)
         return result
@@ -447,7 +608,9 @@ async def intelligence_code_optimize(
         result = await CodeAnalyzer.analyze(
             code=payload.snippet,
             language_hint=payload.language,
-            operation="optimize"
+            operation="optimize",
+            db=db,
+            user_id=current_user.user_id,
         )
         await complete_analysis_session(db, session, status="completed", start_time=start_time, confidence=result.get("overall_score"))
         return result
@@ -471,7 +634,9 @@ async def intelligence_code_security(
         result = await CodeAnalyzer.analyze(
             code=payload.snippet,
             language_hint=payload.language,
-            operation="security"
+            operation="security",
+            db=db,
+            user_id=current_user.user_id,
         )
         await complete_analysis_session(db, session, status="completed", start_time=start_time, confidence=result.get("overall_score"))
         return result
@@ -502,9 +667,10 @@ async def intelligence_domain_radar(
     full_text = "\n\n".join([chunk.content for chunk in chunks])
     metadata = {
         "id": str(doc.document_id),
-        "title": doc.title
+        "title": doc.title,
+        "user_id": str(current_user.user_id),
     }
-    
+
     start_time = time.time()
     session = await create_analysis_session(db, current_user.user_id, "domain_radar", doc.document_id, payload.template_origin)
     
@@ -543,9 +709,10 @@ async def intelligence_clinical(
     full_text = "\n\n".join([chunk.content for chunk in chunks])
     metadata = {
         "id": str(doc.document_id),
-        "title": doc.title
+        "title": doc.title,
+        "user_id": str(current_user.user_id),
     }
-    
+
     start_time = time.time()
     session = await create_analysis_session(db, current_user.user_id, "clinical", doc.document_id, payload.template_origin)
     
@@ -590,6 +757,7 @@ async def intelligence_legal(
         "document_id": str(doc.document_id),
         "filename": doc.title,
         "mime_type": getattr(doc, "mime_type", None),
+        "user_id": str(current_user.user_id),
     }
 
     start_time = time.time()
