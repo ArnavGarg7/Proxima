@@ -158,3 +158,34 @@ async def test_code_analysis_failure_uses_fallback(monkeypatch):
     result = await CodeAnalyzer.analyze("def f():\n    return 1", operation="review", db=None, user_id=uuid.uuid4())
     assert result["overall_score"] == 0
     assert "metrics" in result
+
+
+# ── Domain Radar (Stage 7F P0) ───────────────────────────────────────────────
+
+@pytest.mark.asyncio
+async def test_domain_radar_success(monkeypatch):
+    from proxima.services.domain_radar import DomainRadar
+    spy = []
+    canned = {
+        "primary_domain": {"domain": "legal", "score": 0.8, "confidence_label": "high"},
+        "summary": "A legal agreement.",
+        "recommended_surfaces": [{"surface": "audit", "reason": "risk review"}],
+    }
+    _patch_engine(monkeypatch, data=canned, spy=spy)
+    meta = {"id": str(uuid.uuid4()), "title": "Contract", "user_id": str(uuid.uuid4())}
+    result = await DomainRadar.analyze(None, "This Agreement shall govern liability and indemnify.", meta)
+    assert result["primary_domain"]["domain"] == "legal"
+    assert result["recommended_surfaces"][0]["surface"] == "audit"
+    assert "candidate_domains" in result and result["diagnostics"]["llm_resolution_used"] is True
+    assert spy[0].task_class == "domain_analysis"
+    assert spy[0].structured_output_schema is not None
+
+
+@pytest.mark.asyncio
+async def test_domain_radar_failure_uses_fallback(monkeypatch):
+    from proxima.services.domain_radar import DomainRadar
+    _patch_engine(monkeypatch, error=RuntimeError("boom"))
+    meta = {"id": str(uuid.uuid4()), "title": "Doc", "user_id": str(uuid.uuid4())}
+    result = await DomainRadar.analyze(None, "This Agreement shall govern liability.", meta)
+    assert result["diagnostics"]["llm_resolution_used"] is False
+    assert "primary_domain" in result and "candidate_domains" in result

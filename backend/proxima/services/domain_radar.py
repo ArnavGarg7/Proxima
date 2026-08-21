@@ -2,7 +2,6 @@ import re
 import json
 from typing import Dict, Any, List
 from sqlalchemy.ext.asyncio import AsyncSession
-from proxima.services.model_registry import model_registry
 
 class DomainRadar:
     """
@@ -244,34 +243,7 @@ class DomainRadar:
                 if len(deduped_signals) < 5:
                     deduped_signals.append(s)
 
-        # Stage C: AI Resolution
-        model = await model_registry.get_default_generation(db)
-        
-        schema = {
-            "type": "OBJECT",
-            "properties": {
-                "primary_domain": {
-                    "type": "OBJECT",
-                    "properties": {
-                        "domain": {"type": "STRING", "enum": ["clinical", "legal", "academic", "technical", "business", "general"]},
-                        "score": {"type": "NUMBER"},
-                        "confidence_label": {"type": "STRING", "enum": ["high", "medium", "low"]}
-                    }
-                },
-                "summary": {"type": "STRING"},
-                "recommended_surfaces": {
-                    "type": "ARRAY",
-                    "items": {
-                        "type": "OBJECT",
-                        "properties": {
-                            "surface": {"type": "STRING", "enum": ["workspace", "audit", "clinical", "compare", "code"]},
-                            "reason": {"type": "STRING"}
-                        }
-                    }
-                }
-            },
-            "required": ["primary_domain", "summary", "recommended_surfaces"]
-        }
+        # Stage C: AI Resolution (routed through ProximaAIEngine, 7F)
 
         # Excerpt to save tokens
         excerpt = document_text[:4000] if len(document_text) > 4000 else document_text
@@ -297,22 +269,22 @@ Instructions:
 
         user_message = f"Excerpt:\n```\n{excerpt}\n```\n\nResolve the domain and provide the summary and recommended surfaces."
 
-        try:
-            import google.generativeai as genai
-            from google.generativeai import GenerativeModel
-            
-            gm = GenerativeModel(model.model_id, system_instruction=system_prompt)
-            result = gm.generate_content(
-                user_message,
-                generation_config=genai.GenerationConfig(
-                    response_mime_type="application/json",
-                    response_schema=schema,
-                    temperature=0.1
-                )
-            )
-            
-            resolution = json.loads(result.text)
-            
+        from proxima.services.execution.engine import ProximaAIEngine, AIExecutionRequest
+        from proxima.schemas.domain_radar import DomainRadarResolution
+
+        request = AIExecutionRequest(
+            task_class="domain_analysis",
+            system_prompt=system_prompt,
+            user_message=user_message,
+            structured_output_schema=DomainRadarResolution,
+            user_id=(document_metadata or {}).get("user_id"),
+            document_id=(document_metadata or {}).get("id"),
+        )
+        result = await ProximaAIEngine.execute(db, request, stream=False)
+
+        if not result.error and result.validated_data is not None:
+            resolution = result.validated_data.model_dump()
+
             # Reconstruct the final contract
             final_response = {
                 "document_id": document_metadata.get("id", "unknown") if document_metadata else "unknown",
@@ -343,9 +315,9 @@ Instructions:
             }
             
             return final_response
-            
-        except Exception as e:
-            # Fallback if LLM fails
+
+        else:
+            # Deterministic fallback if the engine (all candidates) fails
             final_response = {
                 "document_id": document_metadata.get("id", "unknown") if document_metadata else "unknown",
                 "document_title": document_metadata.get("title", "Unknown Document") if document_metadata else "Unknown Document",
@@ -374,7 +346,7 @@ Instructions:
                 "diagnostics": {
                     "llm_resolution_used": False,
                     "domains_scored": len(ranked_candidates),
-                    "error": str(e)
+                    "error": str(result.error),
                 }
             }
             return final_response

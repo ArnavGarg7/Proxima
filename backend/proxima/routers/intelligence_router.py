@@ -667,9 +667,10 @@ async def intelligence_domain_radar(
     full_text = "\n\n".join([chunk.content for chunk in chunks])
     metadata = {
         "id": str(doc.document_id),
-        "title": doc.title
+        "title": doc.title,
+        "user_id": str(current_user.user_id),
     }
-    
+
     start_time = time.time()
     session = await create_analysis_session(db, current_user.user_id, "domain_radar", doc.document_id, payload.template_origin)
     

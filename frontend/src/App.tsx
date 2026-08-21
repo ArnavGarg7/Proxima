@@ -23,6 +23,7 @@ const CodeSuite   = lazy(() => import('@/pages/CodeSuite'));
 const DomainRadar = lazy(() => import('@/pages/DomainRadar'));
 const Clinical    = lazy(() => import('@/pages/Clinical'));
 const Legal       = lazy(() => import('@/pages/Legal'));
+const Ask         = lazy(() => import('@/pages/Ask'));
 
 const About       = lazy(() => import('@/pages/About'));
 const Careers     = lazy(() => import('@/pages/Careers'));
@@ -76,6 +77,7 @@ function AppContent() {
 
         <Route element={<ProtectedRoute />}>
           <Route path="/workspace" element={<Workspace />} />
+          <Route path="/ask" element={<Ask />} />
           <Route path="/analyze" element={<Analyze />} />
           <Route path="/legal" element={<Legal />} />
           <Route path="/clinical" element={<Clinical />} />
