@@ -78,3 +78,7 @@ backend/*.log
 # Uploaded/generated document storage
 backend/storage/*
 !backend/storage/.gitkeep
+
+# Local SQLite scratch databases (the app uses PostgreSQL)
+backend/*.db
+backend/*.sqlite3

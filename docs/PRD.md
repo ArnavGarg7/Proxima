@@ -1,6 +1,12 @@
-# PROXIMA v4.0
-## Product Requirements Document — Master Specification
-**v4.1 · Engineered by Arnav Garg · B.Tech CSE (AI/ML) · UPES Dehradun · 2026**
+# Proxima — Product Requirements
+
+Product specification for Proxima: scope, domain behaviour, API contract, and
+quality/confidence rules.
+
+> **Note on scope.** This document is the *product intent* baseline. Where it
+> disagrees with the code, the code is authoritative — the schema has grown
+> since this was written (see `backend/alembic/versions/` for the current
+> migration chain, and `README.md` for the implemented architecture).
 
 ---
 
@@ -17,9 +23,12 @@ Proxima's three proprietary intelligence layers power every feature:
 
 ---
 
-## 2. Database Schema — 22 Tables
+## 2. Database Schema
 
-The schema consists of exactly **22 tables**. No other count is correct.
+The core tables below define the original product baseline. The live schema is
+defined by the Alembic migration chain in `backend/alembic/versions/` and has
+since grown beyond this list (background jobs, response grounding, and analysis
+sessions were added later).
 
 ### 2.1 Table Index (dependency order)
 
