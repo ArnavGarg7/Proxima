@@ -62,6 +62,6 @@ class OpenAIProvider:
         except Exception as e:
             raise HTTPException(status_code=502, detail=f"Provider Error: {str(e)}")
 
-    async def get_embedding(self, model_id: str, text: str):
+    async def get_embedding(self, model_id: str, text: str, output_dimensionality: int | None = None):
         # Groq does not support embeddings, fallback to original if needed
         raise NotImplementedError("OpenAI provider embeddings not implemented")

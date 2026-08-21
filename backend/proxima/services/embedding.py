@@ -12,7 +12,6 @@ async provider call through a per-process event loop. Provider logic is never
 duplicated.
 """
 
-import asyncio
 import structlog
 from typing import List, Optional
 
@@ -68,15 +67,10 @@ async def generate_chunk_embedding(db: AsyncSession, text: str) -> Optional[List
 
 # ── Synchronous worker boundary ─────────────────────────────────────────────
 
-# One event loop per worker process, reused to bridge the async provider call.
-_worker_loop: Optional[asyncio.AbstractEventLoop] = None
-
-
-def _run_coro(coro):
-    global _worker_loop
-    if _worker_loop is None or _worker_loop.is_closed():
-        _worker_loop = asyncio.new_event_loop()
-    return _worker_loop.run_until_complete(coro)
+# Bridge the async provider call through the ONE shared worker loop (see
+# proxima.services.sync_bridge) so the embedding and generation paths do not
+# create grpc.aio channels on different event loops.
+from proxima.services.sync_bridge import run_coro as _run_coro
 
 
 def get_default_embedding_sync(db: Session):
