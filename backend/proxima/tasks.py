@@ -143,3 +143,101 @@ def ingest_document(self, job_id: str, document_id: str, file_uri: str) -> dict:
             embed_failure=outcome.embed_failure,
         )
         return {"status": outcome.status, "job_id": str(job_id), **outcome.as_dict()}
+
+
+@celery_app.task(
+    bind=True,
+    name="proxima.tasks.run_document_analysis",
+    acks_late=True,
+    max_retries=3,
+    default_retry_delay=10,
+)
+def run_document_analysis(self, job_id: str, document_id: str) -> dict:
+    """
+    Durable general-document analysis (Stage 7D).
+
+    Carries only identifiers (never document contents). Validates that the job
+    and document belong to the same user, reconstructs chunk text via the sync
+    worker DB, runs the map-reduce analyzer, and stores the GeneralAnalysisResult
+    in BackgroundJob.result. Idempotent under Celery redelivery.
+    """
+    from sqlalchemy import select
+    from proxima.models.core import BackgroundJob, Document, DocumentChunk
+    from proxima.services.analysis.general_analysis_job import run_general_analysis_sync
+    from proxima.services.execution.sync_engine import TransientAnalysisError
+    from proxima.worker_db import get_sync_session
+
+    start = time.monotonic()
+
+    with get_sync_session() as db:
+        job = db.get(BackgroundJob, job_id)
+        if job is None:
+            logger.error("analysis.job_missing", job_id=str(job_id))
+            return {"status": "job_missing", "job_id": str(job_id)}
+        if job.status == "completed":
+            logger.info("analysis.already_completed", job_id=str(job_id))
+            return {"status": "already_completed", "job_id": str(job_id)}
+
+        document = db.get(Document, document_id)
+        if document is None:
+            _fail_job(db, job, "document_not_found")
+            return {"status": "document_not_found", "job_id": str(job_id)}
+
+        # Security: job and document must belong to the same user.
+        if str(document.user_id) != str(job.user_id):
+            _fail_job(db, job, "ownership_mismatch")
+            logger.error("analysis.ownership_mismatch", job_id=str(job_id))
+            return {"status": "forbidden", "job_id": str(job_id)}
+
+        job.status = "running"
+        if job.started_at is None:
+            job.started_at = _utcnow()
+        db.commit()
+
+        rows = db.execute(
+            select(DocumentChunk)
+            .where(DocumentChunk.document_id == document.document_id)
+            .order_by(DocumentChunk.chunk_index)
+        ).scalars().all()
+        if not rows:
+            _fail_job(db, job, "no_content")
+            return {"status": "failed", "job_id": str(job_id), "reason": "no_content"}
+
+        chunk_texts = [r.content for r in rows]
+        metadata = {
+            "title": document.title,
+            "document_id": document.document_id,
+            "user_id": document.user_id,
+        }
+
+        try:
+            analysis = run_general_analysis_sync(db, chunk_texts, metadata)
+        except TransientAnalysisError as exc:
+            logger.warning("analysis.transient_retry", job_id=str(job_id), retries=self.request.retries)
+            raise self.retry(exc=exc)
+        except Exception as exc:
+            _fail_job(db, job, f"internal_error:{type(exc).__name__}")
+            logger.error("analysis.unexpected", job_id=str(job_id), error=str(exc))
+            raise
+
+        duration_ms = int((time.monotonic() - start) * 1000)
+        job.status = "completed"
+        job.completed_at = _utcnow()
+        job.result = {
+            "analyzer": "general",
+            "document_id": str(document.document_id),
+            "duration_ms": duration_ms,
+            "retry_count": self.request.retries,
+            "analysis": analysis,
+        }
+        db.commit()
+
+        logger.info(
+            "analysis.completed",
+            job_id=str(job_id),
+            task_type="document_analysis",
+            duration_ms=duration_ms,
+            retry_count=self.request.retries,
+            chunks_processed=len(rows),
+        )
+        return {"status": "completed", "job_id": str(job_id), "analyzer": "general"}
