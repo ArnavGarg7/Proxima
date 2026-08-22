@@ -74,6 +74,9 @@ docker-compose.override.yml
 # Proxima runtime artifacts
 backend/debug_*.log
 backend/*.log
+# Captured logs (any location, e.g. `docker compose logs > backend_logs.txt`)
+*.log
+/backend_logs.txt
 
 # Uploaded/generated document storage
 backend/storage/*

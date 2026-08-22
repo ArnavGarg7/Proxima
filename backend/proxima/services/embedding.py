@@ -12,6 +12,9 @@ async provider call through a per-process event loop. Provider logic is never
 duplicated.
 """
 
+import threading
+import time
+
 import structlog
 from typing import List, Optional
 
@@ -20,9 +23,40 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import Session
 
+from proxima.config import settings
 from proxima.services.model_registry import model_registry
 
 logger = structlog.get_logger()
+
+
+class SyncRateLimiter:
+    """Thread-safe minimum-interval throttle for the synchronous ingestion path.
+
+    Only sleeps when calls arrive faster than the configured requests/minute, so
+    small documents (a handful of chunks) are never slowed. Bounds embedding
+    throughput below the provider's per-minute quota so a large document does not
+    exhaust its retry budget on 429s. Provider-agnostic — it is just an RPM cap.
+    """
+
+    def __init__(self, rpm: int):
+        self._min_interval = 60.0 / rpm if rpm and rpm > 0 else 0.0
+        self._lock = threading.Lock()
+        self._next = 0.0
+
+    def acquire(self) -> None:
+        if self._min_interval <= 0:
+            return
+        with self._lock:
+            now = time.monotonic()
+            wait = self._next - now
+            if wait > 0:
+                time.sleep(wait)
+                now = time.monotonic()
+            self._next = now + self._min_interval
+
+
+# Process-wide limiter for the ingestion embedding path (0 rpm = unlimited).
+_embedding_limiter = SyncRateLimiter(settings.embedding_rpm)
 
 
 class EmbeddingError(Exception):
@@ -106,6 +140,8 @@ def generate_chunk_embedding_sync(db: Session, text: str, emb_model=None) -> Opt
             emb_model = get_default_embedding_sync(db)
         if not emb_model:
             return None
+        # Backpressure: stay under the provider's per-minute embedding quota.
+        _embedding_limiter.acquire()
         return _run_coro(model_registry.get_embedding(emb_model, text))
     except TransientEmbeddingError:
         raise

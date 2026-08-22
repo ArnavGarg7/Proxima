@@ -97,6 +97,33 @@ def _sse_error_response(detail: str) -> StreamingResponse:
     return StreamingResponse(gen(), media_type="text/event-stream")
 
 
+def _safe_stream_error(exc: Exception) -> str:
+    """Map an internal exception to a client-safe SSE error message.
+
+    The full detail is logged server-side; the browser never receives provider
+    names, model ids, API versions, or raw exception text (which can leak
+    implementation details). The SSE event structure is unchanged.
+    """
+    import logging
+    log = logging.getLogger("proxima.intelligence")
+
+    if isinstance(exc, HTTPException):
+        status = exc.status_code
+        log.error("intelligence.stream_http_error status=%s detail=%s", status, exc.detail)
+        if status in (401, 403):
+            return "The AI provider rejected the request. Please contact support if this persists."
+        if status == 429:
+            return "The service is busy right now. Please try again in a moment."
+        if status in (502, 503):
+            return "The AI provider is temporarily unavailable. Please try again shortly."
+        if status == 504:
+            return "The request to the AI provider timed out. Please try again."
+        return "Something went wrong while generating the answer."
+
+    log.error("intelligence.stream_error type=%s detail=%s", type(exc).__name__, str(exc))
+    return "Something went wrong while generating the answer."
+
+
 async def _resolve_intelligence_scope(db: AsyncSession, user: User, payload: "IntelligenceCompletionRequest"):
     """
     Resolve the authorized retrieval scope server-side (Stage 7D).
@@ -277,11 +304,11 @@ async def intelligence_complete(
             yield "data: [DONE]\n\n"
 
         except HTTPException as he:
-            yield f"data: {json.dumps({'type': 'error', 'detail': he.detail})}\n\n"
+            yield f"data: {json.dumps({'type': 'error', 'detail': _safe_stream_error(he)})}\n\n"
         except asyncio.TimeoutError:
-            yield f"data: {json.dumps({'type': 'error', 'detail': 'Provider timeout.'})}\n\n"
+            yield f"data: {json.dumps({'type': 'error', 'detail': 'The request to the AI provider timed out. Please try again.'})}\n\n"
         except Exception as e:
-            yield f"data: {json.dumps({'type': 'error', 'detail': str(e)})}\n\n"
+            yield f"data: {json.dumps({'type': 'error', 'detail': _safe_stream_error(e)})}\n\n"
         finally:
             # WS-3: exactly one telemetry record per stream. Never break the stream.
             if not audited:
