@@ -178,6 +178,45 @@ docker compose exec backend alembic upgrade head
 docker compose build backend worker && docker compose up -d backend worker
 ```
 
+## Production Deployment
+
+Production uses a dedicated profile, `docker-compose.prod.yml`, which is separate
+from the development stack: no source bind mounts, no `--reload`, the frontend is
+a static build served by nginx (which also proxies `/api` to the backend so the
+API is same-origin and cookies are first-party), the database and Redis are not
+published to the host, and uploaded documents live on a persistent volume shared
+by the API and the worker.
+
+**1. Configure secrets.** Populate `backend/.env` from `backend/.env.example`
+(session secret, RS256 JWT keypair, provider key, Google OAuth). In production,
+missing `SESSION_SECRET`, JWT keys, `DATABASE_URL`, `CORS_ORIGINS`, or a provider
+key cause the backend to fail on startup rather than serving traffic insecurely.
+
+**2. Supply deployment variables** to Compose (via the shell or a root `.env`,
+never committed): `POSTGRES_PASSWORD` (required), and optionally `CORS_ORIGINS`,
+`VITE_API_URL` (the public origin, baked into the frontend at build time),
+`FRONTEND_PORT`, and `EMBEDDING_RPM`.
+
+**3. Deploy** with an explicit project name so it never collides with the dev
+stack:
+
+```bash
+POSTGRES_PASSWORD=... CORS_ORIGINS=https://your.domain VITE_API_URL=https://your.domain \
+  docker compose -p proxima_prod -f docker-compose.prod.yml up -d --build
+```
+
+Migrations run automatically: a one-shot `migrate` service applies
+`alembic upgrade head` before the backend and worker start, so a fresh database
+bootstraps to a usable schema (model registry, routing rules, and system prompts
+are all migration-seeded) with no manual step.
+
+**4. Verify readiness.** `GET /api/health` returns `200` only when the database
+and Redis are reachable (`503` otherwise); `GET /api/health/live` is a plain
+liveness probe.
+
+For a real deployment, set `GOOGLE_REDIRECT_URI` to `https://your.domain/api/auth/callback`
+and serve over HTTPS (secure cookies are enabled automatically in production).
+
 ## Environment Variables
 
 Backend (`backend/.env.example`) — never commit real values:
@@ -228,11 +267,12 @@ This project makes no regulatory compliance claims. Do not upload regulated pers
 - **Answers are not persisted.** Ask results are streamed and then discarded — there is no conversation history or saved-answer view.
 - **Provider dependency.** Generation and embeddings require a reachable provider; embedding failures degrade retrieval to FTS-only rather than failing the request.
 - **"Insufficient evidence" is conservative.** Detection depends on the model signalling it cannot answer, so some weakly-supported answers are still labelled grounded.
-- **Domain prompts and templates are not seeded by migrations.** A fresh database starts with a working model registry but falls back to a generic system prompt until prompts are configured.
+- **Citations are model-dependent.** They resolve to real document/page metadata when present, but the model must emit `[Ref N]` markers; on short answers it sometimes omits them even when grounded.
+- **Templates and domain knowledge are not migration-seeded.** System prompts now are (so analyzers use domain prompts on a fresh database), but the Templates page and domain-knowledge chunks start empty.
 - **Text extraction only.** Scanned documents without a text layer are rejected; there is no OCR, and tables and images are not specially handled.
 
 ## Roadmap
 
-- Deployment hardening: production compose profile, automated migrations, secret management, and error/metric reporting
 - Persisted Ask sessions so answers can be revisited and continued
 - Stronger evidence-sufficiency detection informed by real usage
+- Object storage (S3) as an alternative to the shared volume for multi-host scale

@@ -1,0 +1,35 @@
+# Keep secrets, runtime data, and dev-only artifacts out of the image layers.
+# The Dockerfile uses `COPY . .`; this file makes that copy production-safe.
+
+# Secrets / environment
+.env
+.env.*
+
+# Python caches / bytecode
+__pycache__/
+*.py[cod]
+
+# Local databases
+*.db
+*.sqlite3
+
+# Uploaded/generated document storage (mounted as a runtime volume in prod)
+storage/
+
+# Tests (not needed in the runtime image)
+tests/
+
+# Root-level manual test scripts and their generated sample documents (dev only).
+# Matched at the context root only (filepath.Match does not cross '/'), so
+# application code under proxima/ is never affected.
+test_*.py
+test_*.pdf
+test_*.docx
+test_*.txt
+test_*.json
+
+# VCS / local tooling
+.git/
+.gitignore
+.pytest_cache/
+.dockerignore
