@@ -5,13 +5,16 @@ from proxima.models.core import Document, User, BackgroundJob
 from proxima.middleware.auth_middleware import get_current_user
 from proxima.services.upload_security import UploadSecurityService
 from proxima.services.storage_service import StorageService
+from proxima.config import settings
 import uuid
 
 router = APIRouter(prefix="/api/documents", tags=["documents"])
 
-# In a real system, these would likely be injected or cached singletons
+# In a real system, these would likely be injected or cached singletons.
+# The storage root is configurable so production can back it with a persistent
+# volume shared by the API (writer) and the Celery worker (reader).
 security_service = UploadSecurityService()
-storage_service = StorageService()
+storage_service = StorageService(settings.storage_path)
 
 @router.get("/")
 async def list_documents(
