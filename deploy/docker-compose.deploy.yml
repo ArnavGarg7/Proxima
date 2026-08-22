@@ -1,0 +1,31 @@
+# Deployment overlay for a single VM (e.g. Oracle Cloud Always Free) with
+# automatic HTTPS via Caddy + a free DuckDNS subdomain.
+#
+# Use it ON TOP of the production profile — Caddy becomes the only public
+# entrypoint (ports 80/443); the frontend nginx is reached internally:
+#
+#   docker compose -f docker-compose.prod.yml -f deploy/docker-compose.deploy.yml up -d --build
+#
+# Relative paths resolve from the repo root (the directory of the first -f file).
+
+services:
+  # Public entrypoint: terminates TLS (Let's Encrypt, automatic) and reverse-
+  # proxies to the frontend container, which serves the SPA and proxies /api.
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      - SITE_ADDRESS=${SITE_ADDRESS:?set SITE_ADDRESS to your public domain, e.g. proxima-you.duckdns.org}
+    volumes:
+      - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data      # ACME account + issued certificates (persist!)
+      - caddy_config:/config
+    depends_on:
+      - frontend
+
+volumes:
+  caddy_data:
+  caddy_config:

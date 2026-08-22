@@ -1,0 +1,16 @@
+# Caddy serves the public domain over HTTPS (certificate obtained and renewed
+# automatically from Let's Encrypt) and reverse-proxies everything to the
+# frontend container. The frontend nginx handles SPA routing and proxies /api to
+# the backend, so this stays a single same-origin site.
+#
+# SITE_ADDRESS is injected from the environment (see docker-compose.deploy.yml).
+
+{$SITE_ADDRESS} {
+	encode zstd gzip
+
+	# flush_interval -1 streams responses immediately — required for the
+	# Server-Sent Events stream on /api/intelligence/complete.
+	reverse_proxy frontend:80 {
+		flush_interval -1
+	}
+}

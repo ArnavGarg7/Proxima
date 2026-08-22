@@ -1,0 +1,4 @@
+# Files deployed to / executed on Linux must keep LF endings, or the shebang
+# and shell parsing break (e.g. `/usr/bin/env bash\r: no such file`).
+*.sh text eol=lf
+deploy/Caddyfile text eol=lf
