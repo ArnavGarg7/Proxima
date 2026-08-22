@@ -83,11 +83,7 @@ DOCUMENT TEXT:
                 exception_message=str(result.error),
                 fallback_reason=fallback_reason
             )
-            
-            with open("/app/debug_exception.log", "w") as f:
-                f.write(f"Exception: {type(result.error).__name__}: {str(result.error)}\n")
-                f.write(f"Fallback Reason: {fallback_reason}\n")
-            
+
             # Deterministic, production-grade fallback (does not leak python errors)
             return {
                 "executive_summary": "AI analysis could not be completed. Please try again later or check system status.",

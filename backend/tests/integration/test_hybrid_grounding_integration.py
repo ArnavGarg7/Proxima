@@ -50,11 +50,13 @@ async def test_multi_tenant_isolation_boundary(db):
 
 @pytest.mark.asyncio
 async def test_complete_hybrid_endpoint_streaming(client: AsyncClient, db):
-    # 1. Fetch current test user (seeded by fixture/conftest)
-    stmt = select(User).limit(1)
+    # 1. Fetch the user the auth override authenticates as (role="user"), so the
+    #    document is owned by the requesting user (an unfiltered LIMIT 1 can pick
+    #    an admin user first on a fresh DB and yield 403).
+    stmt = select(User).where(User.role == "user").limit(1)
     res = await db.execute(stmt)
     user = res.scalars().first()
-    
+
     if not user:
         user = User(email="test_router@example.com", name="Router User")
         db.add(user)

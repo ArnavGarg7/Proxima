@@ -32,6 +32,14 @@ class Settings(BaseSettings):
     anthropic_api_key: str = ""
     session_secret: str = ""
     cors_origins: str = "http://localhost:5173"
+    # Local document storage root, shared by the API (writer) and the Celery
+    # worker (reader). In production this path is backed by a persistent volume
+    # mounted into both containers.
+    storage_path: str = "./storage"
+    # Embedding requests/minute ceiling for the ingestion path (0 = unlimited).
+    # Guards against provider rate limits (e.g. Gemini free tier ~100/min) so a
+    # large document does not exhaust retries on 429s. Provider-agnostic.
+    embedding_rpm: int = 0
 
     @property
     def storage_configured(self) -> bool:

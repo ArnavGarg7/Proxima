@@ -10,8 +10,11 @@ async def test_intelligence_complete_endpoint(db, app):
     from proxima.models import RegisteredModel
     from sqlalchemy import select
     
-    # Setup user
-    result = await db.execute(select(User).limit(1))
+    # Setup user — must match the user the auth override authenticates as
+    # (role="user"), so the document is owned by the requesting user. On a fresh
+    # DB an admin user may be the first row, so an unfiltered LIMIT 1 would own
+    # the doc as admin and the request (role="user") would get 403.
+    result = await db.execute(select(User).where(User.role == "user").limit(1))
     user = result.scalars().first()
     if not user:
         user = User(email="m5@example.com", name="M5 User")
