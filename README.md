@@ -2,6 +2,8 @@
 
 A document intelligence platform that answers questions about your documents with grounded, individually verifiable citations.
 
+**🔗 Live demo:** **[proxima-arnav.duckdns.org](https://proxima-arnav.duckdns.org)** — sign in with Google, upload a document, and try Ask. (Self-hosted on a single VM; if it's briefly unavailable it's mid-restart.)
+
 ## Overview
 
 Proxima solves a specific problem with LLMs over private documents: an answer that *sounds* right is worthless if you cannot check it. Proxima never lets the language model be the authority on what its sources were. Evidence is retrieved and registered server-side, the model's citation markers are validated against that registry, and any reference the model invents is stripped and reported rather than shown as fact.
