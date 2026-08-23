@@ -68,6 +68,10 @@ services:
       - CELERY_RESULT_BACKEND=redis://redis:6379/2
       - STORAGE_PATH=/app/storage
       - CORS_ORIGINS=${CORS_ORIGINS:-http://localhost:8080}
+      # Public site origin the backend redirects to after Google OAuth. Same as
+      # VITE_API_URL in this same-origin (nginx-proxied) deployment; without it
+      # the app would fall back to http://localhost:5173 after login.
+      - FRONTEND_URL=${VITE_API_URL:-http://localhost:8080}
     env_file:
       - ./backend/.env
     volumes:
