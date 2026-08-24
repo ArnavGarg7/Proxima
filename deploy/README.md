@@ -136,15 +136,25 @@ Then sign in with Google, upload a document, and try the Ask surface.
   sudo docker compose -f docker-compose.prod.yml -f deploy/docker-compose.deploy.yml up -d --build
   ```
 - **Stop / start:** `... down` / `... up -d` (data persists in named volumes: `proxima_pgdata`, `proxima_redisdata`, `proxima_storage`, `caddy_data`).
-- **Back up the database:**
+- **Back up the database (automated):** `deploy/backup.sh` dumps the DB from the
+  running container, gzips it to `$HOME/proxima-backups/`, and keeps the newest
+  14. Install it as a daily cron once (from the repo root):
   ```bash
-  sudo docker compose -f docker-compose.prod.yml -f deploy/docker-compose.deploy.yml exec db \
-    pg_dump -U proxima proxima > proxima_backup_$(date +%F).sql
+  ( crontab -l 2>/dev/null | grep -v 'deploy/backup.sh'; \
+    echo "30 3 * * * $(pwd)/deploy/backup.sh >> \$HOME/proxima-backups/backup.log 2>&1" ) | crontab -
+  ```
+  Run it by hand any time with `./deploy/backup.sh`. Restore a dump with:
+  ```bash
+  zcat ~/proxima-backups/proxima_<timestamp>.sql.gz | \
+    sudo docker compose -f docker-compose.prod.yml -f deploy/docker-compose.deploy.yml \
+    exec -T db psql -U proxima -d proxima
   ```
 
 ## Known limitations (fine for a portfolio demo)
 - **Single VM** — no high availability; a reboot means a few minutes of downtime.
 - **Google login required** for every visitor (no guest/demo mode).
 - **Gemini free-tier quota** (~100 embeds/min) caps ingestion throughput; `EMBEDDING_RPM=90` keeps you under it.
-- **No off-box backups** by default — the `pg_dump` above is manual.
+- **On-box backups only** — `deploy/backup.sh` runs daily and retains 14 dumps,
+  but they live on the same VM. Copy them off periodically (e.g. `scp
+  ubuntu@VM:~/proxima-backups/proxima_*.sql.gz .`) if you want true off-box safety.
 - Uploaded files live on the VM's `proxima_storage` volume (single host).
